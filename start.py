@@ -25,6 +25,12 @@ ROOT_DIR = Path(__file__).parent.absolute()
 FRONTEND_DIR = ROOT_DIR / "frontend"
 BACKEND_DIR = ROOT_DIR / "backend"
 XASR_MODELS_DIR = BACKEND_DIR / "xasr" / "models"
+BACKEND_HOST = os.environ.get("DITING_BACKEND_HOST", "127.0.0.1")
+FRONTEND_HOST = os.environ.get("DITING_FRONTEND_HOST", "127.0.0.1")
+BACKEND_PORT = int(os.environ.get("DITING_BACKEND_PORT", "8765"))
+FRONTEND_PORT = int(os.environ.get("DITING_FRONTEND_PORT", "3000"))
+BACKEND_URL = f"http://localhost:{BACKEND_PORT}"
+FRONTEND_URL = f"http://localhost:{FRONTEND_PORT}/?apiPort={BACKEND_PORT}"
 
 
 def is_compatible_backend(health_info):
@@ -73,31 +79,39 @@ def start_backend():
     env["PYTHONIOENCODING"] = "utf-8"
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765"],
+        [
+            sys.executable, "-m", "uvicorn", "main:app",
+            "--host", BACKEND_HOST, "--port", str(BACKEND_PORT),
+        ],
         env=env,
     )
 
     # Wait for server to be ready
     for i in range(60):
+        if proc.poll() is not None:
+            raise RuntimeError(
+                f"Backend exited with code {proc.returncode}; "
+                f"port {BACKEND_PORT} may already be in use"
+            )
         try:
             import urllib.request
-            resp = urllib.request.urlopen("http://localhost:8765/api/health")
+            resp = urllib.request.urlopen(f"{BACKEND_URL}/api/health")
             data = resp.read().decode()
             health_info = json.loads(data)
             if not is_compatible_backend(health_info):
                 if proc.poll() is None:
                     proc.terminate()
                 raise RuntimeError(
-                    "Port 8765 is occupied by an old or incompatible "
+                    f"Port {BACKEND_PORT} is occupied by an old or incompatible "
                     "DiTing backend. Stop the earlier process, then start again."
                 )
-            print(f"[DiTing] Backend ready -> http://localhost:8765")
-            print(f"[DiTing] API Docs  -> http://localhost:8765/docs")
+            print(f"[DiTing] Backend ready -> {BACKEND_URL}")
+            print(f"[DiTing] API Docs  -> {BACKEND_URL}/docs")
             print(f"[DiTing] Logs     -> backend/logs/diting.log")
 
             # Check X-ASR status
             try:
-                status = urllib.request.urlopen("http://localhost:8765/api/xasr/status")
+                status = urllib.request.urlopen(f"{BACKEND_URL}/api/xasr/status")
                 xasr_info = json.loads(status.read().decode())
                 if xasr_info.get("available") and xasr_info.get("model_available"):
                     print(f"[DiTing] X-ASR Engine: READY ({xasr_info.get('model_dir', '')})")
@@ -126,10 +140,10 @@ def start_frontend_server():
             super().__init__(*args, directory=str(FRONTEND_DIR), **kwargs)
 
     socketserver.TCPServer.allow_reuse_address = True
-    server = socketserver.TCPServer(("", 3000), Handler)
+    server = socketserver.TCPServer((FRONTEND_HOST, FRONTEND_PORT), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    print(f"[DiTing] Frontend ready -> http://localhost:3000")
+    print(f"[DiTing] Frontend ready -> {FRONTEND_URL}")
     return server
 
 
@@ -154,11 +168,11 @@ def main():
     print("=" * 62)
     print("  DiTing system is ready!")
     print()
-    print("  Backend API:   http://localhost:8765")
-    print("  API Docs:      http://localhost:8765/docs")
-    print("  X-ASR Status:  http://localhost:8765/api/xasr/status")
-    print("  Eval Status:   http://localhost:8765/api/eval/status")
-    print("  Demo Page:     http://localhost:3000")
+    print(f"  Backend API:   {BACKEND_URL}")
+    print(f"  API Docs:      {BACKEND_URL}/docs")
+    print(f"  X-ASR Status:  {BACKEND_URL}/api/xasr/status")
+    print(f"  Eval Status:   {BACKEND_URL}/api/eval/status")
+    print(f"  Demo Page:     {FRONTEND_URL}")
     print()
     print("  Features:")
     print("    [Demo Mode]     Pre-recorded simulated meeting")
@@ -171,7 +185,7 @@ def main():
 
     # Open browser
     try:
-        webbrowser.open("http://localhost:3000")
+        webbrowser.open(FRONTEND_URL)
     except Exception:
         pass
 

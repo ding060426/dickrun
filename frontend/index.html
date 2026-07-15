@@ -451,7 +451,7 @@ body {
 .upload-status-card .stage { color: var(--accent-blue); }
 .upload-status-card .done { color: var(--accent-green); }
 
-/* ── Hotword Settings ── */
+/* ── Settings Workspace ── */
 .hotword-modal {
   position: fixed;
   inset: 0;
@@ -466,16 +466,100 @@ body {
 }
 .hotword-modal.visible { display: flex; }
 .hotword-dialog {
-  width: min(720px, calc(100vw - 32px));
-  max-height: min(760px, calc(100vh - 32px));
-  display: flex;
-  flex-direction: column;
+  width: min(1180px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 48px));
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--border-active);
   border-radius: 16px;
   background: rgba(24, 27, 36, 0.98);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
+.settings-sidebar {
+  min-width: 0;
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-right: 1px solid var(--border);
+  background: rgba(20, 24, 31, 0.98);
+}
+.settings-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 6px 8px;
+}
+.settings-sidebar-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-active);
+  border-radius: 9px;
+  color: var(--accent-blue);
+  background: rgba(65, 137, 230, 0.1);
+  font-size: 12px;
+  font-weight: 800;
+}
+.settings-sidebar-title strong { display: block; font-size: 14px; color: var(--text-primary); }
+.settings-sidebar-title small { display: block; margin-top: 2px; font-size: 9px; color: var(--text-muted); }
+.settings-search {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+.settings-search:focus { border-color: var(--accent-blue); }
+.settings-nav-label {
+  padding: 0 8px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.settings-nav { display: flex; flex-direction: column; gap: 5px; }
+.settings-nav-button {
+  width: 100%;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: 140ms ease;
+}
+.settings-nav-button:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.035); }
+.settings-nav-button.active {
+  border-color: rgba(65, 137, 230, 0.25);
+  color: var(--text-primary);
+  background: rgba(65, 137, 230, 0.12);
+}
+.settings-nav-icon {
+  width: 30px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+.settings-nav-button.active .settings-nav-icon { color: var(--accent-blue); background: rgba(65, 137, 230, 0.16); }
+.settings-workspace { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .hotword-dialog-header,
 .hotword-dialog-footer {
   padding: 14px 16px;
@@ -486,13 +570,15 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .hotword-dialog-footer { border-top: 1px solid var(--border); border-bottom: 0; }
-.hotword-dialog-body { padding: 14px 16px; overflow-y: auto; }
+.hotword-dialog-body { flex: 1; min-height: 0; padding: 24px 28px; overflow-y: auto; }
+.settings-page-heading { margin-bottom: 20px; }
+.settings-page-heading h2 { margin: 0; color: var(--text-primary); font-size: 22px; }
+.settings-page-heading p { margin: 6px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
 .settings-section {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+  max-width: 840px;
 }
-.settings-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .settings-section-title { margin-bottom: 9px; font-size: 12px; font-weight: 700; color: var(--text-primary); }
 .settings-grid {
   display: grid;
@@ -567,6 +653,33 @@ body {
 .hotword-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
 .hotword-note { margin-top: 10px; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
 .hotword-save-status { min-height: 16px; font-size: 10px; color: var(--text-muted); }
+.domain-preset-section {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(65, 137, 230, 0.045);
+}
+.domain-preset-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.domain-preset-heading strong { display: block; color: var(--text-primary); font-size: 12px; }
+.domain-preset-heading span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 9px; }
+.domain-preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.domain-preset-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: 140ms ease;
+}
+.domain-preset-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
+.domain-preset-card strong { display: block; color: var(--text-primary); font-size: 11px; }
+.domain-preset-card span { display: block; min-height: 28px; margin-top: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
+.domain-preset-card em { display: block; margin-top: 7px; color: var(--accent-blue); font-size: 9px; font-style: normal; }
 .diarization-upload-options {
   display: flex;
   align-items: center;
@@ -582,8 +695,23 @@ body {
   color: var(--text-primary);
   font-size: 10px;
 }
+@media (max-width: 820px) {
+  .hotword-dialog {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .settings-sidebar { padding: 10px; gap: 9px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .settings-sidebar-title, .settings-nav-label { display: none; }
+  .settings-nav { flex-direction: row; }
+  .settings-nav-button { justify-content: center; padding: 7px; }
+  .settings-nav-icon { display: none; }
+  .hotword-dialog-body { padding: 18px; }
+}
 @media (max-width: 620px) {
   .hotword-setting-grid, .settings-grid { grid-template-columns: 1fr; }
+  .domain-preset-grid { grid-template-columns: 1fr 1fr; }
   .hotword-list-header,
   .hotword-row { grid-template-columns: 30px minmax(120px, 1fr) 72px 34px; }
 }
@@ -727,15 +855,39 @@ body {
 
 <div class="hotword-modal" id="hotwordModal" aria-hidden="true">
   <section class="hotword-dialog" role="dialog" aria-modal="true" aria-labelledby="hotwordDialogTitle">
+    <aside class="settings-sidebar" aria-label="设置分类">
+      <div class="settings-sidebar-title">
+        <span class="settings-sidebar-mark">DT</span>
+        <div><strong>设置</strong><small>识别、设备与领域热词</small></div>
+      </div>
+      <input class="settings-search" id="settingsSearch" type="search" placeholder="搜索设置..." aria-label="搜索设置分类">
+      <div class="settings-nav-label">语音识别</div>
+      <nav class="settings-nav" id="settingsNav" role="tablist" aria-label="设置分类">
+        <button class="settings-nav-button active" id="settingsTabRecognition" type="button" role="tab" data-settings-tab="recognition" data-settings-search="识别 模型 文件 分段 VAD Silero" aria-controls="settingsPanelRecognition" aria-selected="true">
+          <span class="settings-nav-icon">ASR</span><span>识别与分段</span>
+        </button>
+        <button class="settings-nav-button" id="settingsTabMicrophone" type="button" role="tab" data-settings-tab="microphone" data-settings-search="麦克风 设备 延迟 回声 噪声 增益 VAD" aria-controls="settingsPanelMicrophone" aria-selected="false" tabindex="-1">
+          <span class="settings-nav-icon">MIC</span><span>麦克风</span>
+        </button>
+        <button class="settings-nav-button" id="settingsTabHotwords" type="button" role="tab" data-settings-tab="hotwords" data-settings-search="热词 领域 预设 拼音 权重 专业词" aria-controls="settingsPanelHotwords" aria-selected="false" tabindex="-1">
+          <span class="settings-nav-icon">Aa</span><span>热词与预设</span>
+        </button>
+      </nav>
+    </aside>
+    <div class="settings-workspace">
     <div class="hotword-dialog-header">
       <div>
-        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">识别与麦克风设置</div>
-        <div style="font-size:10px;color:var(--text-muted);">模型、文件切分、麦克风延迟和热词统一管理</div>
+        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">识别与分段</div>
+        <div id="settingsPageDescription" style="font-size:10px;color:var(--text-muted);">配置实时与最终转写模型，以及文件语音切分参数</div>
       </div>
-      <button class="btn btn-secondary" id="btnCloseHotwords" aria-label="关闭热词设置">Close</button>
+      <button class="btn btn-secondary" id="btnCloseHotwords" aria-label="关闭设置">Close</button>
     </div>
     <div class="hotword-dialog-body">
-      <div class="settings-section">
+      <div class="settings-panel settings-section active" id="settingsPanelRecognition" role="tabpanel" data-settings-panel="recognition" aria-labelledby="settingsTabRecognition" aria-hidden="false">
+        <div class="settings-page-heading">
+          <h2>识别与分段</h2>
+          <p>选择适合实时预览和最终转写的本地模型，并调整长音频的 VAD 切分方式。</p>
+        </div>
         <div class="settings-section-title">识别模型与文件切分</div>
         <div class="settings-grid">
           <label class="settings-field"><span>实时预览模型</span>
@@ -764,7 +916,11 @@ body {
         <div class="settings-model-status" id="modelProfileStatus">正在读取本地模型...</div>
       </div>
 
-      <div class="settings-section">
+      <div class="settings-panel settings-section" id="settingsPanelMicrophone" role="tabpanel" data-settings-panel="microphone" aria-labelledby="settingsTabMicrophone" aria-hidden="true">
+        <div class="settings-page-heading">
+          <h2>麦克风</h2>
+          <p>管理输入设备、实时断句策略和浏览器侧音频增强选项。</p>
+        </div>
         <div class="settings-section-title">麦克风设备与延迟</div>
         <div class="settings-grid">
           <label class="settings-field wide"><span>输入设备</span>
@@ -796,7 +952,17 @@ body {
         </div>
       </div>
 
-      <div class="settings-section">
+      <div class="settings-panel settings-section" id="settingsPanelHotwords" role="tabpanel" data-settings-panel="hotwords" aria-labelledby="settingsTabHotwords" aria-hidden="true">
+        <div class="settings-page-heading">
+          <h2>热词与领域预设</h2>
+          <p>载入常见领域词库或维护自定义词条。预设只追加缺失词，不覆盖已有权重。</p>
+        </div>
+        <div class="domain-preset-section">
+          <div class="domain-preset-heading">
+            <div><strong>领域预设</strong><span>一键载入后仍可逐词修改，点击保存后应用到新识别会话</span></div>
+          </div>
+          <div class="domain-preset-grid" id="domainPresetGrid"></div>
+        </div>
         <div class="settings-section-title">热词与模糊拼音</div>
       <div class="hotword-setting-grid">
         <div class="hotword-setting-card">
@@ -830,6 +996,7 @@ body {
         <button class="btn btn-secondary" id="btnCancelHotwords">Cancel</button>
         <button class="btn btn-primary" id="btnSaveHotwords">Save &amp; Apply</button>
       </div>
+    </div>
     </div>
   </section>
 </div>
@@ -948,6 +1115,11 @@ const modelProfileStatus = $('modelProfileStatus');
 const microphoneDevice = $('microphoneDevice');
 const micTestStatus = $('micTestStatus');
 const micTestMeter = $('micTestMeter');
+const settingsSearch = $('settingsSearch');
+const settingsPageDescription = $('settingsPageDescription');
+const settingsNavButtons = Array.from(document.querySelectorAll('[data-settings-tab]'));
+const settingsPanels = Array.from(document.querySelectorAll('[data-settings-panel]'));
+const domainPresetGrid = $('domainPresetGrid');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -981,6 +1153,7 @@ let appSettingsState = null;
 let micTestStream = null;
 let micTestAudioContext = null;
 let micTestAnimationFrame = null;
+let activeSettingsTab = 'recognition';
 
 // Log stream
 let logWs = null;
@@ -1947,6 +2120,99 @@ function finishUploadUI(status) {
 // Hotword Settings
 // ═══════════════════════════════════════════════════════════
 
+const SETTINGS_TABS = {
+  recognition: {
+    title: '识别与分段',
+    description: '配置实时与最终转写模型，以及文件语音切分参数',
+  },
+  microphone: {
+    title: '麦克风',
+    description: '管理输入设备、实时断句策略和浏览器音频增强',
+  },
+  hotwords: {
+    title: '热词与预设',
+    description: '维护自定义热词，或一键载入常见领域词库',
+  },
+};
+
+function switchSettingsTab(tabId) {
+  if (!SETTINGS_TABS[tabId]) return;
+  activeSettingsTab = tabId;
+  settingsNavButtons.forEach(button => {
+    const active = button.dataset.settingsTab === tabId;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+  settingsPanels.forEach(panel => {
+    const active = panel.dataset.settingsPanel === tabId;
+    panel.classList.toggle('active', active);
+    panel.setAttribute('aria-hidden', String(!active));
+  });
+  const metadata = SETTINGS_TABS[tabId];
+  const title = $('hotwordDialogTitle');
+  if (title) title.textContent = metadata.title;
+  if (settingsPageDescription) settingsPageDescription.textContent = metadata.description;
+  const body = hotwordModal?.querySelector('.hotword-dialog-body');
+  if (body) body.scrollTop = 0;
+}
+
+function filterSettingsNavigation(query) {
+  const normalized = String(query || '').trim().toLocaleLowerCase();
+  const visibleButtons = settingsNavButtons.filter(button => {
+    const haystack = `${button.textContent} ${button.dataset.settingsSearch || ''}`.toLocaleLowerCase();
+    const visible = !normalized || haystack.includes(normalized);
+    button.hidden = !visible;
+    return visible;
+  });
+  const activeVisible = visibleButtons.some(button => button.dataset.settingsTab === activeSettingsTab);
+  if (!activeVisible && visibleButtons.length === 1) {
+    switchSettingsTab(visibleButtons[0].dataset.settingsTab);
+  }
+}
+
+function renderDomainPresetButtons() {
+  if (!domainPresetGrid || !window.DiTingHotwordSettings) return;
+  domainPresetGrid.innerHTML = '';
+  window.DiTingHotwordSettings.getDomainPresets().forEach(preset => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'domain-preset-card';
+    button.dataset.presetId = preset.id;
+
+    const title = document.createElement('strong');
+    title.textContent = preset.name;
+    const description = document.createElement('span');
+    description.textContent = preset.description;
+    const action = document.createElement('em');
+    action.textContent = `${preset.word_count} 个词 · 一键载入`;
+    button.append(title, description, action);
+    button.addEventListener('click', () => applyHotwordDomainPreset(preset.id));
+    domainPresetGrid.appendChild(button);
+  });
+}
+
+function applyHotwordDomainPreset(presetId) {
+  if (!hotwordSettingsState || !window.DiTingHotwordSettings) {
+    setHotwordStatus('设置仍在加载，请稍后再试', true);
+    return;
+  }
+  const result = window.DiTingHotwordSettings.applyDomainPreset(
+    collectHotwordRows(),
+    presetId,
+    defaultHotwordScoreNumber?.value,
+  );
+  if (!result.preset) return;
+  hotwordSettingsState = { ...hotwordSettingsState, words: result.words };
+  if (hotwordsEnabled) hotwordsEnabled.checked = true;
+  renderHotwordRows();
+  setHotwordStatus(
+    result.added_count > 0
+      ? `已载入“${result.preset.name}”：新增 ${result.added_count} 个，跳过 ${result.existing_count} 个已有词；保存后生效`
+      : `“${result.preset.name}”的热词已全部存在，无需重复添加`,
+  );
+}
+
 function setSettingValue(id, value, checkbox = false) {
   const element = $(id);
   if (!element) return;
@@ -2161,6 +2427,9 @@ async function openHotwordSettings() {
   if (!hotwordModal || !window.DiTingHotwordSettings || !window.DiTingAppSettings) return;
   hotwordModal.classList.add('visible');
   hotwordModal.setAttribute('aria-hidden', 'false');
+  if (settingsSearch) settingsSearch.value = '';
+  filterSettingsNavigation('');
+  switchSettingsTab(activeSettingsTab);
   setHotwordStatus('正在加载...');
   try {
     const response = await fetch(`${API_BASE}/api/settings`);
@@ -2689,6 +2958,10 @@ function initApp() {
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
   if (btnLog) btnLog.addEventListener('click', toggleLogPanel);
   if (logPanelHeader) logPanelHeader.addEventListener('click', toggleLogPanel);
+  settingsNavButtons.forEach(button => {
+    button.addEventListener('click', () => switchSettingsTab(button.dataset.settingsTab));
+  });
+  settingsSearch?.addEventListener('input', event => filterSettingsNavigation(event.target.value));
   $('btnCloseHotwords')?.addEventListener('click', closeHotwordSettings);
   $('btnCancelHotwords')?.addEventListener('click', closeHotwordSettings);
   $('btnSaveHotwords')?.addEventListener('click', saveHotwordSettings);
@@ -2703,6 +2976,7 @@ function initApp() {
   hotwordModal?.addEventListener('click', event => {
     if (event.target === hotwordModal) closeHotwordSettings();
   });
+  renderDomainPresetButtons();
 
   console.log('[DiTing] App initialized — all event listeners registered');
 }

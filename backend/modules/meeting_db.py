@@ -63,6 +63,7 @@ def init_db():
                 display_name TEXT NOT NULL,
                 email TEXT,
                 phone TEXT,
+                avatar_data_url TEXT NOT NULL DEFAULT '',
                 role TEXT NOT NULL DEFAULT 'user',
                 status TEXT NOT NULL DEFAULT 'active',
                 password_salt TEXT NOT NULL,
@@ -150,6 +151,13 @@ def init_db():
             ON meeting_participants(user_id, meeting_id);
             """
         )
+        user_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+        if "avatar_data_url" not in user_columns:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN avatar_data_url TEXT NOT NULL DEFAULT ''"
+            )
         _migrate_reservation_participants(conn)
         existing = conn.execute("SELECT id FROM users WHERE username = ?", ("admin",)).fetchone()
         if not existing:
@@ -324,7 +332,7 @@ def create_user(data):
 
 
 def update_user(user_id, data):
-    allowed = ["display_name", "email", "phone", "role", "status"]
+    allowed = ["display_name", "email", "phone", "avatar_data_url", "role", "status"]
     fields = [field for field in allowed if field in data]
     if not fields:
         return get_user(user_id)

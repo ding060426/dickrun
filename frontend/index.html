@@ -90,7 +90,6 @@ body {
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
 .topbar-brand {
   display: flex; align-items: center; gap: 10px;
-  margin-right: 16px;
   font-weight: 800;
   letter-spacing: 0.2px;
 }
@@ -129,6 +128,79 @@ body {
 }
 .topbar-action:hover { border-color: var(--accent-blue); }
 .topbar-action.danger:hover { border-color: var(--accent-red); color: var(--accent-red); }
+.account-menu-root { position: relative; }
+.account-trigger {
+  min-width: 150px; max-width: 220px; height: 40px; padding: 4px 9px 4px 5px;
+  display: none; align-items: center; gap: 8px; text-align: left;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--bg-secondary);
+  color: var(--text-primary); cursor: pointer; font-family: inherit;
+}
+.account-trigger:hover, .account-trigger[aria-expanded="true"] { border-color: var(--accent-blue); background: var(--bg-tertiary); }
+.account-trigger-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
+.account-trigger-name { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-trigger-role { font-size: 9px; color: var(--text-muted); }
+.account-chevron { color: var(--text-muted); font-size: 10px; transition: transform 0.15s; }
+.account-trigger[aria-expanded="true"] .account-chevron { transform: rotate(180deg); }
+.account-avatar {
+  position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; overflow: hidden; border-radius: 50%;
+  background: var(--gradient-brand); color: white; font-size: 12px; font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
+}
+.account-avatar.large { width: 52px; height: 52px; font-size: 18px; }
+.account-avatar.profile { width: 84px; height: 84px; font-size: 28px; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; display: none; }
+.account-dropdown {
+  display: none; position: absolute; top: calc(100% + 8px); left: 0; width: 280px;
+  padding: 8px; border: 1px solid var(--border-active); border-radius: 12px;
+  background: var(--bg-secondary); box-shadow: 0 18px 48px rgba(15,23,42,0.16); z-index: 1200;
+}
+.account-dropdown.open { display: block; }
+.account-summary { display: flex; align-items: center; gap: 10px; padding: 8px; }
+.account-summary-copy { min-width: 0; }
+.account-summary-name { font-size: 13px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-summary-username { font-size: 10px; color: var(--text-muted); }
+.account-summary-email { margin-top: 2px; font-size: 10px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu-separator { height: 1px; background: var(--border); margin: 5px 2px; }
+.account-menu-item {
+  width: 100%; display: flex; align-items: center; gap: 9px; padding: 8px 9px;
+  border: 0; border-radius: 7px; background: transparent; color: var(--text-primary);
+  font: inherit; font-size: 11px; text-align: left; cursor: pointer;
+}
+.account-menu-item:hover { background: var(--bg-tertiary); }
+.account-menu-item.danger { color: var(--accent-red); }
+.account-menu-icon { width: 18px; text-align: center; color: var(--text-muted); }
+.profile-overlay {
+  position: fixed; inset: 0; z-index: 1300; display: none; align-items: center; justify-content: center;
+  padding: 18px; background: rgba(15,17,23,0.42); backdrop-filter: blur(7px);
+}
+.profile-overlay.visible { display: flex; }
+.profile-card {
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 36px); overflow-y: auto;
+  background: var(--bg-secondary); border: 1px solid var(--border-active); border-radius: 16px;
+  box-shadow: 0 24px 72px rgba(15,23,42,0.2);
+}
+.profile-card-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 22px 12px; }
+.profile-card-header h2 { font-size: 18px; }
+.profile-card-header p { margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+.profile-close { border: 0; background: transparent; color: var(--text-muted); font-size: 20px; cursor: pointer; }
+.profile-card-body { padding: 4px 22px 22px; }
+.profile-avatar-editor { display: flex; align-items: center; gap: 16px; padding: 12px; margin-bottom: 16px; border-radius: 12px; background: var(--bg-tertiary); }
+.profile-avatar-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.profile-avatar-actions small { color: var(--text-muted); font-size: 9px; }
+.profile-readonly { background: var(--bg-tertiary) !important; color: var(--text-muted) !important; }
+.profile-meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.profile-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.login-brand-mark { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: var(--gradient-brand); color: white; font-weight: 800; }
+.login-brand-copy { line-height: 1.25; }
+.login-brand-copy strong { display: block; font-size: 14px; }
+.login-brand-copy span { font-size: 10px; color: var(--text-muted); }
+@media (max-width: 980px) {
+  .account-trigger { min-width: 0; width: 42px; padding-right: 4px; }
+  .account-trigger-copy, .account-chevron { display: none; }
+  .topbar-nav-item { padding-left: 8px; padding-right: 8px; }
+}
 
 .home-hero {
   min-height: calc(100vh - 56px);
@@ -883,6 +955,31 @@ body {
       <div class="topbar-brand-mark">D</div>
       <span>DiTing</span>
     </div>
+    <div class="account-menu-root" id="accountMenuRoot">
+      <button class="account-trigger" id="accountMenuButton" type="button" aria-haspopup="menu" aria-expanded="false">
+        <span class="account-avatar" id="accountTriggerAvatar"><img alt=""><span class="account-avatar-fallback">U</span></span>
+        <span class="account-trigger-copy">
+          <span class="account-trigger-name" id="accountTriggerName">用户</span>
+          <span class="account-trigger-role" id="accountTriggerRole">普通用户</span>
+        </span>
+        <span class="account-chevron">▼</span>
+      </button>
+      <div class="account-dropdown" id="accountDropdown" role="menu">
+        <div class="account-summary">
+          <span class="account-avatar large" id="accountSummaryAvatar"><img alt=""><span class="account-avatar-fallback">U</span></span>
+          <div class="account-summary-copy">
+            <div class="account-summary-name" id="accountSummaryName">用户</div>
+            <div class="account-summary-username" id="accountSummaryUsername">@username</div>
+            <div class="account-summary-email" id="accountSummaryEmail">未填写邮箱</div>
+          </div>
+        </div>
+        <div class="account-menu-separator"></div>
+        <button class="account-menu-item" id="btnEditProfile" type="button" role="menuitem"><span class="account-menu-icon">✎</span>编辑个人资料</button>
+        <button class="account-menu-item" id="btnSwitchUser" type="button" role="menuitem"><span class="account-menu-icon">⇄</span>切换用户</button>
+        <div class="account-menu-separator"></div>
+        <button class="account-menu-item danger" id="btnAccountLogout" type="button" role="menuitem"><span class="account-menu-icon">↪</span>退出登录</button>
+      </div>
+    </div>
     <nav class="topbar-nav" aria-label="模块导航">
       <button class="topbar-nav-item" data-module="meeting">会议转写</button>
       <button class="topbar-nav-item" data-module="reservation">会议预约</button>
@@ -891,9 +988,7 @@ body {
     </nav>
   </div>
   <div class="topbar-right">
-    <span class="topbar-user" id="topbarUser">未登录</span>
     <button class="topbar-action" id="topbarLogin">登录</button>
-    <button class="topbar-action danger" id="topbarLogout" style="display:none;">退出</button>
   </div>
 </header>
 
@@ -908,6 +1003,10 @@ body {
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
+    <div class="login-brand">
+      <div class="login-brand-mark">D</div>
+      <div class="login-brand-copy"><strong>DiTing 会议工作台</strong><span>使用你的账号进入个人会议空间</span></div>
+    </div>
     <h2 id="loginTitle">会议控制台登录</h2>
     <p>支持本地 SQLite 与 Supabase 的会议管理账号</p>
     <div id="loginFormWrap">
@@ -942,6 +1041,38 @@ body {
       <button class="btn btn-primary" type="submit" style="width:100%;">注册</button>
       <div class="login-error" id="registerError"></div>
       <div class="switch-link">已有账号？<a id="showLogin">返回登录</a></div>
+    </form>
+  </div>
+</div>
+
+<div class="profile-overlay" id="profileOverlay" aria-hidden="true">
+  <div class="profile-card" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+    <div class="profile-card-header">
+      <div><h2 id="profileTitle">个人资料</h2><p>管理当前账号在会议和同事列表中显示的信息</p></div>
+      <button class="profile-close" id="btnCloseProfile" type="button" aria-label="关闭">×</button>
+    </div>
+    <form class="profile-card-body" id="profileForm">
+      <div class="profile-avatar-editor">
+        <span class="account-avatar profile" id="profileAvatarPreview"><img alt="头像预览"><span class="account-avatar-fallback">U</span></span>
+        <div class="profile-avatar-actions">
+          <button class="btn btn-secondary" id="btnChooseAvatar" type="button">上传新头像</button>
+          <button class="btn btn-secondary" id="btnClearAvatar" type="button">移除头像</button>
+          <input id="profileAvatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          <small>图片会在浏览器中裁剪压缩，最大保存 256KB</small>
+        </div>
+      </div>
+      <div class="form-row"><label for="profileDisplayName">显示名称</label><input id="profileDisplayName" maxlength="60" required></div>
+      <div class="profile-meta-row">
+        <div class="form-row"><label for="profileUsername">用户名</label><input class="profile-readonly" id="profileUsername" readonly></div>
+        <div class="form-row"><label for="profileRole">账号角色</label><input class="profile-readonly" id="profileRole" readonly></div>
+      </div>
+      <div class="form-row"><label for="profileEmail">邮箱</label><input id="profileEmail" type="email" maxlength="254" placeholder="name@example.com"></div>
+      <div class="form-row"><label for="profilePhone">电话</label><input id="profilePhone" maxlength="32" placeholder="联系电话（可选）"></div>
+      <div class="login-error" id="profileError"></div>
+      <div class="profile-actions">
+        <button class="btn btn-secondary" id="btnCancelProfile" type="button">取消</button>
+        <button class="btn btn-primary" id="btnSaveProfile" type="submit">保存资料</button>
+      </div>
     </form>
   </div>
 </div>
@@ -1305,9 +1436,12 @@ const moduleOverlay = $('moduleOverlay');
 const mainApp = $('mainApp');
 const btnBack = $('btnBack');
 const homeHero = $('homeHero');
-const topbarUser = $('topbarUser');
 const topbarLogin = $('topbarLogin');
-const topbarLogout = $('topbarLogout');
+const accountMenuRoot = $('accountMenuRoot');
+const accountMenuButton = $('accountMenuButton');
+const accountDropdown = $('accountDropdown');
+const profileOverlay = $('profileOverlay');
+const profileForm = $('profileForm');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1340,6 +1474,7 @@ let logVisible = false;
 // Auth and management
 let authToken = localStorage.getItem('diting_auth_token') || '';
 let currentUser = null;
+let pendingAvatarDataUrl = '';
 
 function authHeaders() {
   return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
@@ -1351,6 +1486,152 @@ async function apiFetch(path, options = {}) {
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
   return data;
+}
+
+function accountRoleLabel(role) {
+  return role === 'admin' ? '管理员' : '普通用户';
+}
+
+function accountInitials(user) {
+  const value = (user?.display_name || user?.username || 'U').trim();
+  return value ? Array.from(value)[0].toUpperCase() : 'U';
+}
+
+function renderAvatar(container, user, avatarOverride) {
+  if (!container) return;
+  const image = container.querySelector('img');
+  const fallback = container.querySelector('.account-avatar-fallback');
+  const avatar = avatarOverride !== undefined ? avatarOverride : (user?.avatar_data_url || '');
+  if (fallback) fallback.textContent = accountInitials(user);
+  if (image && avatar) {
+    image.src = avatar;
+    image.style.display = 'block';
+    if (fallback) fallback.style.display = 'none';
+    image.onerror = () => {
+      image.style.display = 'none';
+      if (fallback) fallback.style.display = '';
+    };
+  } else if (image) {
+    image.removeAttribute('src');
+    image.style.display = 'none';
+    if (fallback) fallback.style.display = '';
+  }
+}
+
+function renderCurrentAccount() {
+  if (!currentUser) return;
+  const displayName = currentUser.display_name || currentUser.username;
+  if ($('accountTriggerName')) $('accountTriggerName').textContent = displayName;
+  if ($('accountTriggerRole')) $('accountTriggerRole').textContent = accountRoleLabel(currentUser.role);
+  if ($('accountSummaryName')) $('accountSummaryName').textContent = displayName;
+  if ($('accountSummaryUsername')) $('accountSummaryUsername').textContent = `@${currentUser.username}`;
+  if ($('accountSummaryEmail')) $('accountSummaryEmail').textContent = currentUser.email || '未填写邮箱';
+  renderAvatar($('accountTriggerAvatar'), currentUser);
+  renderAvatar($('accountSummaryAvatar'), currentUser);
+}
+
+function setAccountMenuOpen(open) {
+  const shouldOpen = Boolean(open && currentUser);
+  if (accountDropdown) accountDropdown.classList.toggle('open', shouldOpen);
+  if (accountMenuButton) accountMenuButton.setAttribute('aria-expanded', String(shouldOpen));
+}
+
+function openProfileEditor() {
+  if (!currentUser || !profileOverlay) return;
+  setAccountMenuOpen(false);
+  pendingAvatarDataUrl = currentUser.avatar_data_url || '';
+  $('profileDisplayName').value = currentUser.display_name || currentUser.username;
+  $('profileUsername').value = currentUser.username || '';
+  $('profileRole').value = accountRoleLabel(currentUser.role);
+  $('profileEmail').value = currentUser.email || '';
+  $('profilePhone').value = currentUser.phone || '';
+  if ($('profileError')) $('profileError').textContent = '';
+  renderAvatar($('profileAvatarPreview'), currentUser, pendingAvatarDataUrl);
+  profileOverlay.classList.add('visible');
+  profileOverlay.setAttribute('aria-hidden', 'false');
+  $('profileDisplayName').focus();
+}
+
+function closeProfileEditor() {
+  if (!profileOverlay) return;
+  profileOverlay.classList.remove('visible');
+  profileOverlay.setAttribute('aria-hidden', 'true');
+  if ($('profileAvatarInput')) $('profileAvatarInput').value = '';
+  if ($('profileError')) $('profileError').textContent = '';
+}
+
+function loadImageElement(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('无法读取这张图片'));
+    image.src = url;
+  });
+}
+
+async function compressAvatar(file) {
+  if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error('请选择 PNG、JPEG 或 WebP 图片');
+  }
+  if (file.size > 5 * 1024 * 1024) throw new Error('原始图片不能超过5MB');
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImageElement(objectUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const context = canvas.getContext('2d');
+    const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+    const sourceX = (image.naturalWidth - sourceSize) / 2;
+    const sourceY = (image.naturalHeight - sourceSize) / 2;
+    context.fillStyle = '#f0f4fa';
+    context.fillRect(0, 0, 256, 256);
+    context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 256, 256);
+    for (const quality of [0.86, 0.72, 0.58]) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      if (dataUrl.length < 350000) return dataUrl;
+    }
+    throw new Error('压缩后的头像仍然过大');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function handleAvatarSelection(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    pendingAvatarDataUrl = await compressAvatar(file);
+    renderAvatar($('profileAvatarPreview'), currentUser, pendingAvatarDataUrl);
+    if ($('profileError')) $('profileError').textContent = '';
+  } catch (error) {
+    if ($('profileError')) $('profileError').textContent = error.message;
+  }
+}
+
+async function saveCurrentProfile(event) {
+  event.preventDefault();
+  const saveButton = $('btnSaveProfile');
+  if ($('profileError')) $('profileError').textContent = '';
+  if (saveButton) saveButton.disabled = true;
+  try {
+    const data = await apiFetch('/api/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({
+        display_name: $('profileDisplayName').value.trim(),
+        email: $('profileEmail').value.trim(),
+        phone: $('profilePhone').value.trim(),
+        avatar_data_url: pendingAvatarDataUrl,
+      }),
+    });
+    setLoggedIn(data.user);
+    closeProfileEditor();
+    showToast('个人资料已更新');
+  } catch (error) {
+    if ($('profileError')) $('profileError').textContent = error.message;
+  } finally {
+    if (saveButton) saveButton.disabled = false;
+  }
 }
 
 function setLoggedIn(user, token) {
@@ -1402,13 +1683,13 @@ function updateTopbar() {
     item.classList.toggle('active', item.dataset.module === currentModule);
   });
   if (currentUser) {
-    if (topbarUser) topbarUser.textContent = `${currentUser.display_name || currentUser.username} · ${currentUser.role}`;
+    if (accountMenuButton) accountMenuButton.style.display = 'flex';
     if (topbarLogin) topbarLogin.style.display = 'none';
-    if (topbarLogout) topbarLogout.style.display = '';
+    renderCurrentAccount();
   } else {
-    if (topbarUser) topbarUser.textContent = '未登录';
+    if (accountMenuButton) accountMenuButton.style.display = 'none';
     if (topbarLogin) topbarLogin.style.display = '';
-    if (topbarLogout) topbarLogout.style.display = 'none';
+    setAccountMenuOpen(false);
   }
 }
 
@@ -1591,6 +1872,8 @@ function showRegisterForm() {
 
 async function logout() {
   try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+  setAccountMenuOpen(false);
+  closeProfileEditor();
   authToken = '';
   currentUser = null;
   reservationFriends = [];
@@ -1600,6 +1883,14 @@ async function logout() {
   renderCalendar([]);
   localStorage.removeItem('diting_auth_token');
   showHome();
+}
+
+async function switchUser() {
+  await logout();
+  if ($('loginUsername')) $('loginUsername').value = '';
+  if ($('loginPassword')) $('loginPassword').value = '';
+  showLogin();
+  $('loginUsername')?.focus();
 }
 
 function toggleManagementPanel() {
@@ -3387,7 +3678,38 @@ function initApp() {
   if (showRegister) showRegister.addEventListener('click', showRegisterForm);
   if (showLoginLink) showLoginLink.addEventListener('click', showLoginForm);
   if (topbarLogin) topbarLogin.addEventListener('click', showLogin);
-  if (topbarLogout) topbarLogout.addEventListener('click', logout);
+  if (accountMenuButton) {
+    accountMenuButton.addEventListener('click', () => {
+      setAccountMenuOpen(accountMenuButton.getAttribute('aria-expanded') !== 'true');
+    });
+  }
+  if ($('btnEditProfile')) $('btnEditProfile').addEventListener('click', openProfileEditor);
+  if ($('btnSwitchUser')) $('btnSwitchUser').addEventListener('click', switchUser);
+  if ($('btnAccountLogout')) $('btnAccountLogout').addEventListener('click', logout);
+  if (profileForm) profileForm.addEventListener('submit', saveCurrentProfile);
+  if ($('btnCloseProfile')) $('btnCloseProfile').addEventListener('click', closeProfileEditor);
+  if ($('btnCancelProfile')) $('btnCancelProfile').addEventListener('click', closeProfileEditor);
+  if ($('btnChooseAvatar')) $('btnChooseAvatar').addEventListener('click', () => $('profileAvatarInput')?.click());
+  if ($('btnClearAvatar')) {
+    $('btnClearAvatar').addEventListener('click', () => {
+      pendingAvatarDataUrl = '';
+      renderAvatar($('profileAvatarPreview'), currentUser, '');
+    });
+  }
+  if ($('profileAvatarInput')) $('profileAvatarInput').addEventListener('change', handleAvatarSelection);
+  if (profileOverlay) {
+    profileOverlay.addEventListener('click', event => {
+      if (event.target === profileOverlay) closeProfileEditor();
+    });
+  }
+  document.addEventListener('click', event => {
+    if (accountMenuRoot && !accountMenuRoot.contains(event.target)) setAccountMenuOpen(false);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (profileOverlay?.classList.contains('visible')) closeProfileEditor();
+    else setAccountMenuOpen(false);
+  });
 
   document.querySelectorAll('.topbar-nav-item').forEach(item => {
     item.addEventListener('click', () => switchModule(item.dataset.module));

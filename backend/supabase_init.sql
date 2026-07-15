@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     display_name TEXT NOT NULL,
     email TEXT DEFAULT '',
     phone TEXT DEFAULT '',
+    avatar_data_url TEXT NOT NULL DEFAULT '',
     role TEXT NOT NULL DEFAULT 'user',
     status TEXT NOT NULL DEFAULT 'active',
     password_salt TEXT NOT NULL,
@@ -43,6 +44,10 @@ CREATE TABLE IF NOT EXISTS meeting_reservations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 兼容已初始化的项目，可重复执行。
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS avatar_data_url TEXT NOT NULL DEFAULT '';
 
 -- 预约参会成员（权威关系表；JSON 字段仅保留兼容性）
 CREATE TABLE IF NOT EXISTS meeting_participants (

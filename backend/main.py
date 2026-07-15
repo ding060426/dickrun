@@ -17,6 +17,7 @@ import time
 import uuid
 import struct
 import base64
+import binascii
 import threading
 import concurrent.futures
 import traceback
@@ -336,6 +337,55 @@ def _require_user(authorization: str | None):
     return user
 
 
+PROFILE_FIELDS = {"display_name", "email", "phone", "avatar_data_url"}
+ALLOWED_AVATAR_PREFIXES = (
+    "data:image/png;base64,",
+    "data:image/jpeg;base64,",
+    "data:image/webp;base64,",
+)
+MAX_AVATAR_BYTES = 256 * 1024
+
+
+def _validated_profile_update(data: dict) -> dict:
+    profile = {field: data[field] for field in PROFILE_FIELDS if field in data}
+    if "display_name" in profile:
+        display_name = str(profile["display_name"] or "").strip()
+        if not display_name:
+            raise ValueError("显示名称不能为空")
+        if len(display_name) > 60:
+            raise ValueError("显示名称不能超过60个字符")
+        profile["display_name"] = display_name
+    if "email" in profile:
+        email = str(profile["email"] or "").strip()
+        if len(email) > 254 or (email and "@" not in email):
+            raise ValueError("邮箱格式不正确")
+        profile["email"] = email
+    if "phone" in profile:
+        phone = str(profile["phone"] or "").strip()
+        if len(phone) > 32:
+            raise ValueError("手机号不能超过32个字符")
+        profile["phone"] = phone
+    if "avatar_data_url" in profile:
+        avatar = profile["avatar_data_url"] or ""
+        if not isinstance(avatar, str):
+            raise ValueError("头像数据格式不正确")
+        if avatar:
+            prefix = next(
+                (item for item in ALLOWED_AVATAR_PREFIXES if avatar.startswith(item)),
+                None,
+            )
+            if not prefix:
+                raise ValueError("头像仅支持 PNG、JPEG 或 WebP")
+            try:
+                decoded = base64.b64decode(avatar[len(prefix):], validate=True)
+            except (binascii.Error, ValueError) as error:
+                raise ValueError("头像数据格式不正确") from error
+            if not decoded or len(decoded) > MAX_AVATAR_BYTES:
+                raise ValueError("头像不能超过256KB")
+        profile["avatar_data_url"] = avatar
+    return profile
+
+
 # ===========================================================================
 # Meeting management routes
 # ===========================================================================
@@ -378,6 +428,18 @@ async def auth_me(authorization: str | None = Header(None)):
     return {"user": _require_user(authorization)}
 
 
+@app.put("/api/auth/me")
+async def auth_update_me(
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    try:
+        return {"user": db.update_user(user["id"], _validated_profile_update(data))}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.post("/api/auth/logout")
 async def auth_logout(authorization: str | None = Header(None)):
     db.logout(_token_from_header(authorization))
@@ -410,8 +472,25 @@ async def api_update_user(
     authorization: str | None = Header(None),
 ):
     user = _require_user(authorization)
-    if user.get("role") != "admin" and user.get("id") != user_id:
-        raise HTTPException(status_code=403, detail="Permission denied")
+    if user.get("role") != "admin":
+        if user.get("id") != user_id:
+            raise HTTPException(status_code=403, detail="Permission denied")
+        if set(data) - PROFILE_FIELDS:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can change roles or account status",
+            )
+        try:
+            data = _validated_profile_update(data)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+    else:
+        profile_data = {field: data[field] for field in PROFILE_FIELDS if field in data}
+        if profile_data:
+            try:
+                data = {**data, **_validated_profile_update(profile_data)}
+            except ValueError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
     return {"user": db.update_user(user_id, data)}
 
 

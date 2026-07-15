@@ -118,6 +118,7 @@ def create_user(data):
     client.table("users").insert({
         "id": user_id, "username": username, "display_name": display_name,
         "email": data.get("email") or "", "phone": data.get("phone") or "",
+        "avatar_data_url": data.get("avatar_data_url") or "",
         "role": data.get("role") or "user", "status": data.get("status") or "active",
         "password_salt": salt, "password_hash": password_hash,
         "created_at": timestamp, "updated_at": timestamp,
@@ -126,7 +127,7 @@ def create_user(data):
 
 
 def update_user(user_id, data):
-    allowed = ["display_name", "email", "phone", "role", "status"]
+    allowed = ["display_name", "email", "phone", "avatar_data_url", "role", "status"]
     fields = {field: data[field] for field in allowed if field in data}
     if not fields:
         return get_user(user_id)

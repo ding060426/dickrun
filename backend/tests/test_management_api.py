@@ -100,6 +100,80 @@ class ManagementApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/api/meetings/reservations", paths)
         self.assertIn("/api/meetings/analysis", paths)
 
+    async def test_user_can_update_their_current_profile(self):
+        registered = await main.auth_register(
+            {"username": "profile-owner", "password": "secret123"}
+        )
+        login = await main.auth_login(
+            {"username": "profile-owner", "password": "secret123"}
+        )
+        authorization = f"Bearer {login['token']}"
+        avatar = (
+            "data:image/png;base64,"
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMA"
+            "ASsJTYQAAAAASUVORK5CYII="
+        )
+
+        updated = await main.auth_update_me(
+            {
+                "display_name": "资料用户",
+                "email": "profile@example.com",
+                "phone": "13800138000",
+                "avatar_data_url": avatar,
+            },
+            authorization,
+        )
+        current = await main.auth_me(authorization)
+
+        self.assertEqual(updated["user"]["id"], registered["user"]["id"])
+        self.assertEqual(current["user"]["display_name"], "资料用户")
+        self.assertEqual(current["user"]["email"], "profile@example.com")
+        self.assertEqual(current["user"]["phone"], "13800138000")
+        self.assertEqual(current["user"]["avatar_data_url"], avatar)
+
+    async def test_user_cannot_promote_or_disable_their_own_account(self):
+        registered = await main.auth_register(
+            {"username": "ordinary-user", "password": "secret123"}
+        )
+        login = await main.auth_login(
+            {"username": "ordinary-user", "password": "secret123"}
+        )
+        authorization = f"Bearer {login['token']}"
+
+        with self.assertRaises(HTTPException) as denied:
+            await main.api_update_user(
+                registered["user"]["id"],
+                {"role": "admin", "status": "deleted"},
+                authorization,
+            )
+
+        self.assertEqual(denied.exception.status_code, 403)
+        current = await main.auth_me(authorization)
+        self.assertEqual(current["user"]["role"], "user")
+        self.assertEqual(current["user"]["status"], "active")
+
+    async def test_profile_rejects_unsafe_avatar_data(self):
+        await main.auth_register(
+            {"username": "avatar-owner", "password": "secret123"}
+        )
+        login = await main.auth_login(
+            {"username": "avatar-owner", "password": "secret123"}
+        )
+        authorization = f"Bearer {login['token']}"
+
+        with self.assertRaises(HTTPException) as denied:
+            await main.auth_update_me(
+                {
+                    "display_name": "Avatar Owner",
+                    "avatar_data_url": "data:text/html;base64,PHNjcmlwdD4=",
+                },
+                authorization,
+            )
+
+        self.assertEqual(denied.exception.status_code, 400)
+        current = await main.auth_me(authorization)
+        self.assertEqual(current["user"]["avatar_data_url"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

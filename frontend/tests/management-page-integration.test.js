@@ -27,6 +27,17 @@ assert.match(html, /organizer\?\.display_name/);
 assert.match(html, /participants \|\| \[\]/);
 assert.match(html, /can_manage/);
 assert.match(html, /new Date\(startTime\)\.toISOString\(\)/);
+assert.match(html, /id="accountMenuButton"/);
+assert.match(html, /async function saveCurrentProfile\(/);
+assert.match(html, /id="profileAvatarInput"/);
+assert.match(html, /async function switchUser\(/);
+assert.match(html, /await logout\(\)/);
+assert.match(html, /apiFetch\('\/api\/auth\/me'/);
+assert.match(html, /canvas\.toDataURL\('image\/jpeg'/);
+assert.ok(
+  html.indexOf('id="profileOverlay"') < html.indexOf('id="mainApp"'),
+  'profile editor must stay outside the hidden main app container',
+);
 
 const moduleScript = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 assert.ok(moduleScript, 'inline module script should exist');

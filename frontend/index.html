@@ -973,6 +973,301 @@ body {
   border-color: var(--accent-blue); color: var(--accent-blue);
   background: rgba(74,144,217,0.1);
 }
+/* 鈹€鈹€ Settings Workspace 鈹€鈹€ */
+.hotword-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 7, 12, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1200;
+}
+.hotword-modal.visible { display: flex; }
+.hotword-dialog {
+  width: min(1180px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 48px));
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border-active);
+  border-radius: 16px;
+  background: rgba(24, 27, 36, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+.settings-sidebar {
+  min-width: 0;
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-right: 1px solid var(--border);
+  background: rgba(20, 24, 31, 0.98);
+}
+.settings-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 6px 8px;
+}
+.settings-sidebar-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-active);
+  border-radius: 9px;
+  color: var(--accent-blue);
+  background: rgba(65, 137, 230, 0.1);
+  font-size: 12px;
+  font-weight: 800;
+}
+.settings-sidebar-title strong { display: block; font-size: 14px; color: var(--text-primary); }
+.settings-sidebar-title small { display: block; margin-top: 2px; font-size: 9px; color: var(--text-muted); }
+.settings-search {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+.settings-search:focus { border-color: var(--accent-blue); }
+.settings-nav-label {
+  padding: 0 8px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.settings-nav { display: flex; flex-direction: column; gap: 5px; }
+.settings-nav-button {
+  width: 100%;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: 140ms ease;
+}
+.settings-nav-button:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.035); }
+.settings-nav-button.active {
+  border-color: rgba(65, 137, 230, 0.25);
+  color: var(--text-primary);
+  background: rgba(65, 137, 230, 0.12);
+}
+.settings-nav-icon {
+  width: 30px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+.settings-nav-button.active .settings-nav-icon { color: var(--accent-blue); background: rgba(65, 137, 230, 0.16); }
+.settings-workspace { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.hotword-dialog-header,
+.hotword-dialog-footer {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.hotword-dialog-footer { border-top: 1px solid var(--border); border-bottom: 0; }
+.hotword-dialog-body { flex: 1; min-height: 0; padding: 24px 28px; overflow-y: auto; }
+.settings-page-heading { margin-bottom: 20px; }
+.settings-page-heading h2 { margin: 0; color: var(--text-primary); font-size: 22px; }
+.settings-page-heading p { margin: 6px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+.settings-section {
+  max-width: 840px;
+}
+.settings-section-title { margin-bottom: 9px; font-size: 12px; font-weight: 700; color: var(--text-primary); }
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.settings-field.wide { grid-column: 1 / -1; }
+.settings-inline { display: flex; align-items: center; gap: 8px; }
+.settings-inline > *:first-child { flex: 1; }
+.settings-model-status {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgba(65, 137, 230, 0.08);
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.mic-test-meter { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-primary); }
+.mic-test-meter > span { display: block; width: 0; height: 100%; background: var(--accent-green); transition: width 80ms linear; }
+.hotword-setting-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.hotword-setting-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-card);
+}
+.hotword-setting-card label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+.hotword-score-controls { display: grid; grid-template-columns: 1fr 70px; gap: 8px; margin-top: 9px; }
+.hotword-input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+.hotword-input:focus { border-color: var(--accent-blue); }
+.hotword-list-header,
+.hotword-row {
+  display: grid;
+  grid-template-columns: 34px minmax(160px, 1fr) 88px 38px;
+  gap: 8px;
+  align-items: center;
+}
+.hotword-list-header { padding: 0 4px 5px; font-size: 10px; color: var(--text-muted); }
+.hotword-list { display: flex; flex-direction: column; gap: 6px; max-height: 310px; overflow-y: auto; }
+.hotword-row {
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 17, 23, 0.48);
+}
+.hotword-row.disabled { opacity: 0.55; }
+.hotword-remove { padding: 5px 0; color: var(--accent-red); }
+.hotword-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+.hotword-note { margin-top: 10px; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
+.hotword-save-status { min-height: 16px; font-size: 10px; color: var(--text-muted); }
+.domain-preset-section {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(65, 137, 230, 0.045);
+}
+.domain-preset-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.domain-preset-heading strong { display: block; color: var(--text-primary); font-size: 12px; }
+.domain-preset-heading span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 9px; }
+.domain-preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.domain-preset-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: 140ms ease;
+}
+.domain-preset-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
+.domain-preset-card.selected {
+  border-color: var(--accent-blue);
+  background: rgba(65, 137, 230, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(65, 137, 230, 0.18);
+}
+.domain-preset-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.domain-preset-card strong { display: block; color: var(--text-primary); font-size: 11px; }
+.domain-preset-card span { display: block; min-height: 28px; margin-top: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
+.domain-preset-card em { display: block; margin-top: 7px; color: var(--accent-blue); font-size: 9px; font-style: normal; }
+.domain-preset-check {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 10px;
+}
+.domain-preset-card.selected .domain-preset-check { border-color: var(--accent-blue); background: var(--accent-blue); color: white; }
+.domain-selection-notice {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(65, 137, 230, 0.35);
+  border-radius: 8px;
+  background: rgba(65, 137, 230, 0.09);
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.domain-selection-notice[hidden] { display: none; }
+.domain-selection-notice strong { color: var(--accent-blue); }
+.domain-selection-notice small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 9px; }
+.diarization-upload-options {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.diarization-upload-options select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 10px;
+}
+@media (max-width: 820px) {
+  .hotword-dialog {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .settings-sidebar { padding: 10px; gap: 9px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .settings-sidebar-title, .settings-nav-label { display: none; }
+  .settings-nav { flex-direction: row; }
+  .settings-nav-button { justify-content: center; padding: 7px; }
+  .settings-nav-icon { display: none; }
+  .hotword-dialog-body { padding: 18px; }
+}
+@media (max-width: 620px) {
+  .hotword-setting-grid, .settings-grid { grid-template-columns: 1fr; }
+  .domain-preset-grid { grid-template-columns: 1fr 1fr; }
+  .hotword-list-header,
+  .hotword-row { grid-template-columns: 30px minmax(120px, 1fr) 72px 34px; }
+}
 </style>
 </head>
 <body>
@@ -1262,6 +1557,7 @@ body {
   <button class="btn btn-secondary" id="btnMic">录音</button>
   <button class="btn btn-secondary" id="btnUpload">上传</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
+    <button class="btn btn-secondary" id="btnHotwords" data-i18n="controls.settings">璁剧疆</button>
   <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);" title="离线上传时自动区分说话人">
     <input type="checkbox" id="enableDiarization" checked> 说话人分离
   </label>
@@ -1360,6 +1656,159 @@ body {
   </div>
 </div>
 
+
+<div class="hotword-modal" id="hotwordModal" aria-hidden="true">
+  <section class="hotword-dialog" role="dialog" aria-modal="true" aria-labelledby="hotwordDialogTitle">
+    <aside class="settings-sidebar" data-i18n-aria-label="settings.search_aria" aria-label="璁剧疆鍒嗙被">
+      <div class="settings-sidebar-title">
+        <span class="settings-sidebar-mark">DT</span>
+        <div><strong data-i18n="settings.sidebar_title">璁剧疆</strong><small data-i18n="settings.sidebar_subtitle">璇嗗埆銆佽澶囦笌棰嗗煙鐑瘝</small></div>
+      </div>
+      <input class="settings-search" id="settingsSearch" type="search" data-i18n-placeholder="settings.search_placeholder" placeholder="鎼滅储璁剧疆..." data-i18n-aria-label="settings.search_aria" aria-label="鎼滅储璁剧疆鍒嗙被">
+      <div class="settings-nav-label" data-i18n="settings.category">璇煶璇嗗埆</div>
+      <nav class="settings-nav" id="settingsNav" role="tablist" data-i18n-aria-label="settings.search_aria" aria-label="璁剧疆鍒嗙被">
+        <button class="settings-nav-button active" id="settingsTabRecognition" type="button" role="tab" data-settings-tab="recognition" data-settings-search="璇嗗埆 妯″瀷 鏂囦欢 鍒嗘 VAD Silero" aria-controls="settingsPanelRecognition" aria-selected="true">
+          <span class="settings-nav-icon">ASR</span><span data-i18n="settings.recognition.tab">璇嗗埆涓庡垎娈?/span>
+        </button>
+        <button class="settings-nav-button" id="settingsTabMicrophone" type="button" role="tab" data-settings-tab="microphone" data-settings-search="楹﹀厠椋?璁惧 寤惰繜 鍥炲０ 鍣０ 澧炵泭 VAD" aria-controls="settingsPanelMicrophone" aria-selected="false" tabindex="-1">
+          <span class="settings-nav-icon">MIC</span><span data-i18n="settings.microphone.tab">楹﹀厠椋?/span>
+        </button>
+        <button class="settings-nav-button" id="settingsTabHotwords" type="button" role="tab" data-settings-tab="hotwords" data-settings-search="鐑瘝 棰嗗煙 棰勮 鎷奸煶 鏉冮噸 涓撲笟璇? aria-controls="settingsPanelHotwords" aria-selected="false" tabindex="-1">
+          <span class="settings-nav-icon">Aa</span><span data-i18n="settings.hotwords.tab">鐑瘝涓庨璁?/span>
+        </button>
+      </nav>
+    </aside>
+    <div class="settings-workspace">
+    <div class="hotword-dialog-header">
+      <div>
+        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">璇嗗埆涓庡垎娈?/div>
+        <div id="settingsPageDescription" style="font-size:10px;color:var(--text-muted);">閰嶇疆瀹炴椂涓庢渶缁堣浆鍐欐ā鍨嬶紝浠ュ強鏂囦欢璇煶鍒囧垎鍙傛暟</div>
+      </div>
+      <button class="btn btn-secondary" id="btnCloseHotwords" data-i18n-aria-label="controls.close" aria-label="鍏抽棴璁剧疆" data-i18n="controls.close">鍏抽棴</button>
+    </div>
+    <div class="hotword-dialog-body">
+      <div class="settings-panel settings-section active" id="settingsPanelRecognition" role="tabpanel" data-settings-panel="recognition" aria-labelledby="settingsTabRecognition" aria-hidden="false">
+        <div class="settings-page-heading">
+          <h2 data-i18n="settings.recognition.tab">璇嗗埆涓庡垎娈?/h2>
+          <p data-i18n="settings.recognition.intro">閫夋嫨閫傚悎瀹炴椂棰勮鍜屾渶缁堣浆鍐欑殑鏈湴妯″瀷锛屽苟璋冩暣闀块煶棰戠殑 VAD 鍒囧垎鏂瑰紡銆?/p>
+        </div>
+        <div class="settings-section-title" data-i18n="settings.recognition.section">璇嗗埆妯″瀷涓庢枃浠跺垏鍒?/div>
+        <div class="settings-grid">
+          <label class="settings-field"><span data-i18n="settings.recognition.live_model">瀹炴椂棰勮妯″瀷</span>
+            <select class="hotword-input" id="liveAsrProfile">
+              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms 路 鏈€浣庡欢杩?/option>
+              <option value="balanced" data-i18n="settings.profile.balanced">480 ms 路 骞宠　</option>
+              <option value="meeting" data-i18n="settings.profile.meeting">960 ms 路 浼氳榛樿</option>
+              <option value="quality" data-i18n="settings.profile.quality">1920 ms 路 楂樼簿搴?/option>
+            </select>
+          </label>
+          <label class="settings-field"><span data-i18n="settings.recognition.final_model">鏈€缁堣浆鍐欐ā鍨?/span>
+            <select class="hotword-input" id="finalAsrProfile">
+              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms 路 鏈€浣庡欢杩?/option>
+              <option value="balanced" data-i18n="settings.profile.balanced">480 ms 路 骞宠　</option>
+              <option value="meeting" data-i18n="settings.profile.meeting">960 ms 路 浼氳榛樿</option>
+              <option value="quality" data-i18n="settings.profile.quality">1920 ms 路 楂樼簿搴?/option>
+            </select>
+          </label>
+          <label class="settings-field wide"><span data-i18n="settings.recognition.final_pass">鏈€缁堝畬鏁存枃浠朵簩娆¤瘑鍒?/span><input type="checkbox" id="finalTranscriptionEnabled"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.threshold">Silero 闃堝€?/span><input class="hotword-input" id="fileVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_silence">鏈€鐭潤闊筹紙绉掞級</span><input class="hotword-input" id="fileVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_speech">鏈€鐭闊筹紙绉掞級</span><input class="hotword-input" id="fileVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.pre_padding">鍙ラ缂撳啿锛坢s锛?/span><input class="hotword-input" id="fileVadPrePadding" type="number" min="0" max="2000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.post_padding">鍙ュ熬缂撳啿锛坢s锛?/span><input class="hotword-input" id="fileVadPostPadding" type="number" min="0" max="3000" step="50"></label>
+        </div>
+        <div class="settings-model-status" id="modelProfileStatus" data-i18n="settings.model_loading">姝ｅ湪璇诲彇鏈湴妯″瀷...</div>
+      </div>
+
+      <div class="settings-panel settings-section" id="settingsPanelMicrophone" role="tabpanel" data-settings-panel="microphone" aria-labelledby="settingsTabMicrophone" aria-hidden="true">
+        <div class="settings-page-heading">
+          <h2 data-i18n="settings.microphone.tab">楹﹀厠椋?/h2>
+          <p data-i18n="settings.microphone.intro">绠＄悊杈撳叆璁惧銆佸疄鏃舵柇鍙ョ瓥鐣ュ拰娴忚鍣ㄤ晶闊抽澧炲己閫夐」銆?/p>
+        </div>
+        <div class="settings-section-title" data-i18n="settings.microphone.section">楹﹀厠椋庤澶囦笌寤惰繜</div>
+        <div class="settings-grid">
+          <label class="settings-field wide"><span data-i18n="settings.microphone.input">杈撳叆璁惧</span>
+            <div class="settings-inline">
+              <select class="hotword-input" id="microphoneDevice"><option value="" data-i18n="settings.microphone.system_default">绯荤粺榛樿楹﹀厠椋?/option></select>
+              <button class="btn btn-secondary" type="button" id="btnRefreshMics" data-i18n="controls.refresh">鍒锋柊</button>
+              <button class="btn btn-secondary" type="button" id="btnTestMic" data-i18n="controls.test">娴嬭瘯</button>
+            </div>
+          </label>
+          <div class="settings-field wide">
+            <span id="micTestStatus" data-i18n="settings.microphone.not_tested">灏氭湭娴嬭瘯楹﹀厠椋?/span>
+            <div class="mic-test-meter"><span id="micTestMeter"></span></div>
+          </div>
+          <label class="settings-field"><span data-i18n="settings.microphone.profile">瀹炴椂鍒囧彞妗ｄ綅</span>
+            <select class="hotword-input" id="microphoneLiveProfile">
+              <option value="meeting" data-i18n="settings.microphone.meeting">浼氳</option><option value="dictation" data-i18n="settings.microphone.dictation">鍚啓</option><option value="oncall" data-i18n="settings.microphone.oncall">鎸佺画寰呮満</option>
+            </select>
+          </label>
+          <label class="settings-field"><span data-i18n="settings.microphone.vad_gating">VAD 闂ㄦ帶闊抽锛堝皬澹扮幆澧冨缓璁叧闂級</span><input type="checkbox" id="microphoneVadGating"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.pre_roll">鍙ラ棰勭暀锛坢s锛?/span><input class="hotword-input" id="microphonePreRoll" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.endpoint_grace">鏂彞绛夊緟锛坢s锛?/span><input class="hotword-input" id="microphoneEndpointGrace" type="number" min="0" max="5000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.tail_pad">灏鹃儴闈欓煶锛坢s锛?/span><input class="hotword-input" id="microphoneTailPad" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.vad_threshold">瀹炴椂 VAD 闃堝€?/span><input class="hotword-input" id="microphoneVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_silence">鏈€鐭潤闊筹紙绉掞級</span><input class="hotword-input" id="microphoneVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_speech">鏈€鐭闊筹紙绉掞級</span><input class="hotword-input" id="microphoneVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.echo">鍥炲０娑堥櫎</span><input type="checkbox" id="microphoneEchoCancellation"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.noise">鍣０鎶戝埗</span><input type="checkbox" id="microphoneNoiseSuppression"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.gain">鑷姩澧炵泭</span><input type="checkbox" id="microphoneAutoGain"></label>
+        </div>
+      </div>
+
+      <div class="settings-panel settings-section" id="settingsPanelHotwords" role="tabpanel" data-settings-panel="hotwords" aria-labelledby="settingsTabHotwords" aria-hidden="true">
+        <div class="settings-page-heading">
+          <h2 data-i18n="settings.hotwords.heading">鐑瘝涓庨鍩熼璁?/h2>
+          <p data-i18n="settings.hotwords.intro">鍙悓鏃堕€夋嫨澶氫釜棰嗗煙鎴栫淮鎶よ嚜瀹氫箟璇嶆潯銆傞鍩熼璁句笉浼氳鐩栧凡鏈夌儹璇嶇殑鏉冮噸銆?/p>
+        </div>
+        <div class="domain-preset-section">
+          <div class="domain-preset-heading">
+            <div><strong data-i18n="settings.hotwords.presets">棰嗗煙棰勮锛堝彲澶氶€夛級</strong><span data-i18n="settings.hotwords.preset_hint">鐐瑰嚮閫変腑锛屽啀娆＄偣鍑诲彇娑堬紱寤鸿鍙惎鐢ㄥ綋鍓嶄細璁浉鍏崇殑 1鈥? 涓鍩?/span></div>
+          </div>
+          <div class="domain-preset-grid" id="domainPresetGrid"></div>
+          <div class="domain-selection-notice" id="domainSelectionNotice" role="status" hidden>
+            <div><strong data-i18n="settings.hotwords.selected">宸查€夐鍩燂細</strong><span id="domainSelectionNames"></span></div>
+            <small data-i18n="settings.hotwords.selected_hint">瀵瑰簲鐑瘝宸插湪涓嬫柟鑷姩鍕鹃€夛紱鍙栨秷棰嗗煙鍚庯紝璇嶆潯浼氫繚鐣欎絾鍙栨秷鍕鹃€夈€傜偣鍑讳繚瀛樺悗搴旂敤鍒版柊璇嗗埆浼氳瘽銆?/small>
+          </div>
+        </div>
+        <div class="settings-section-title" data-i18n="settings.hotwords.section">鐑瘝涓庢ā绯婃嫾闊?/div>
+      <div class="hotword-setting-grid">
+        <div class="hotword-setting-card">
+          <label><span data-i18n="settings.hotwords.enable">鍚敤瑙ｇ爜鐑瘝澧炲己</span><input type="checkbox" id="hotwordsEnabled"></label>
+          <div class="hotword-note" data-i18n="settings.hotwords.enable_note">鍚敤 modified beam search锛屽苟灏嗘瘡涓儹璇嶇殑鏉冮噸娉ㄥ叆 X-ASR 瑙ｇ爜鍣ㄣ€?/div>
+        </div>
+        <div class="hotword-setting-card">
+          <label><span data-i18n="settings.hotwords.fuzzy">鍚敤妯＄硦鎷奸煶绾犻敊</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
+          <div class="hotword-note" data-i18n="settings.hotwords.fuzzy_note">鏀寔骞崇繕鑸屻€乶/l 鍜屽墠鍚庨蓟闊筹紱鍙鐞嗚嚦灏戜袱涓眽瀛楃殑涓枃鐑瘝銆?/div>
+        </div>
+        <div class="hotword-setting-card" style="grid-column:1/-1;">
+          <label><span data-i18n="settings.hotwords.default_score">鏂扮儹璇嶉粯璁ゆ潈閲?/span><span id="defaultScoreLabel">5.0</span></label>
+          <div class="hotword-score-controls">
+            <input type="range" id="defaultHotwordScore" min="0.5" max="12" step="0.5" value="5">
+            <input class="hotword-input" type="number" id="defaultHotwordScoreNumber" min="0.1" max="20" step="0.5" value="5">
+          </div>
+        </div>
+      </div>
+      <div class="hotword-list-header"><span data-i18n="settings.hotwords.enabled">鍚敤</span><span data-i18n="settings.hotwords.spelling">鏍囧噯鍐欐硶</span><span data-i18n="settings.hotwords.score">鏉冮噸</span><span></span></div>
+      <div class="hotword-list" id="hotwordList"></div>
+      <div class="hotword-add">
+        <input class="hotword-input" id="newHotwordInput" data-i18n-placeholder="settings.hotwords.add_placeholder" placeholder="杈撳叆涓撲笟璇嶃€佷汉鍚嶆垨缂╁啓锛屼緥濡?璐炬壃娓?/ OpenAI">
+        <button class="btn btn-secondary" id="btnAddHotword" data-i18n="controls.add">娣诲姞</button>
+      </div>
+      <div class="hotword-note" data-i18n="settings.hotwords.note">鑻辨枃榛樿闄愬埗涓?2.5锛岄伩鍏嶈繃搴﹀亸缃紱浣犱粛鍙负鍗曚釜璇嶆樉寮忚皟鏁淬€備腑鏂囧悓闊虫浛鎹㈤噰鐢ㄦ渶闀胯瘝浼樺厛锛屽崟瀛椾笉浼氬弬涓庢ā绯婂尮閰嶃€?/div>
+      </div>
+    </div>
+    <div class="hotword-dialog-footer">
+      <div class="hotword-save-status" id="hotwordSaveStatus"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="btnCancelHotwords" data-i18n="controls.cancel">鍙栨秷</button>
+        <button class="btn btn-primary" id="btnSaveHotwords" data-i18n="controls.save_apply">淇濆瓨骞跺簲鐢?/button>
+      </div>
+    </div>
+    </div>
+  </section>
+</div>
+
 <div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true" role="status" aria-live="polite">
   <div class="mic-orb-wrap" id="micOrbWrap">
     <div class="mic-orb-ring"></div>
@@ -1393,6 +1842,8 @@ body {
 <script src="./mic-level.js"></script>
 <script src="./live-protocol.js"></script>
 <script src="./management-transcription.js"></script>
+<script src="./app-settings.js"></script>
+<script src="./hotword-settings.js"></script>
 <script type="module">
 // ============================================================
 // 会悟 v3.0 - Frontend with wavesurfer.js
@@ -1465,6 +1916,25 @@ const currentUserDisplay = $('currentUserDisplay');
 const managementPanel = $('managementPanel');
 const moduleOverlay = $('moduleOverlay');
 const mainApp = $('mainApp');
+const hotwordModal = $('hotwordModal');
+const hotwordList = $('hotwordList');
+const hotwordsEnabled = $('hotwordsEnabled');
+const fuzzyPinyinEnabled = $('fuzzyPinyinEnabled');
+const defaultHotwordScore = $('defaultHotwordScore');
+const defaultHotwordScoreNumber = $('defaultHotwordScoreNumber');
+const defaultScoreLabel = $('defaultScoreLabel');
+const hotwordSaveStatus = $('hotwordSaveStatus');
+const modelProfileStatus = $('modelProfileStatus');
+const microphoneDevice = $('microphoneDevice');
+const micTestStatus = $('micTestStatus');
+const micTestMeter = $('micTestMeter');
+const settingsSearch = $('settingsSearch');
+const settingsPageDescription = $('settingsPageDescription');
+const settingsNavButtons = Array.from(document.querySelectorAll('[data-settings-tab]'));
+const settingsPanels = Array.from(document.querySelectorAll('[data-settings-panel]'));
+const domainPresetGrid = $('domainPresetGrid');
+const domainSelectionNotice = $('domainSelectionNotice');
+const domainSelectionNames = $('domainSelectionNames');
 const btnBack = $('btnBack');
 const homeHero = $('homeHero');
 const topbarLogin = $('topbarLogin');
@@ -1494,6 +1964,16 @@ let micSequence = 0;
 let micStreamId = null;
 let micStopTimer = null;
 let micSegmentStartIndex = 0;
+let hotwordSettingsState = null;
+let appSettingsState = null;
+let micTestStream = null;
+let micTestAudioContext = null;
+let micTestAnimationFrame = null;
+let activeSettingsTab = 'recognition';
+
+let logVisible = false;
+
+// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// AudioPlaybackManager (wavesurfer.js based)
 let micDisplayLevel = 0;
 let micLevelLastUpdate = 0;
 let micLevelAnimationFrame = null;
@@ -3295,6 +3775,597 @@ function setMicOrbMessage(title, subtitle) {
   if (micOrbSubtitle && subtitle) micOrbSubtitle.textContent = subtitle;
 }
 
+const SETTINGS_TABS = {
+  recognition: {
+    titleKey: 'settings.recognition.tab',
+    descriptionKey: 'settings.recognition.description',
+  },
+  microphone: {
+    titleKey: 'settings.microphone.tab',
+    descriptionKey: 'settings.microphone.description',
+  },
+  hotwords: {
+    titleKey: 'settings.hotwords.tab',
+    descriptionKey: 'settings.hotwords.description',
+  },
+};
+
+function switchSettingsTab(tabId) {
+  if (!SETTINGS_TABS[tabId]) return;
+  activeSettingsTab = tabId;
+  settingsNavButtons.forEach(button => {
+    const active = button.dataset.settingsTab === tabId;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+  settingsPanels.forEach(panel => {
+    const active = panel.dataset.settingsPanel === tabId;
+    panel.classList.toggle('active', active);
+    panel.setAttribute('aria-hidden', String(!active));
+  });
+  const metadata = SETTINGS_TABS[tabId];
+  const title = $('hotwordDialogTitle');
+  if (title) title.textContent = t(metadata.titleKey);
+  if (settingsPageDescription) settingsPageDescription.textContent = t(metadata.descriptionKey);
+  const body = hotwordModal?.querySelector('.hotword-dialog-body');
+  if (body) body.scrollTop = 0;
+}
+
+function filterSettingsNavigation(query) {
+  const normalized = String(query || '').trim().toLocaleLowerCase();
+  const visibleButtons = settingsNavButtons.filter(button => {
+    const haystack = `${button.textContent} ${button.dataset.settingsSearch || ''}`.toLocaleLowerCase();
+    const visible = !normalized || haystack.includes(normalized);
+    button.hidden = !visible;
+    return visible;
+  });
+  const activeVisible = visibleButtons.some(button => button.dataset.settingsTab === activeSettingsTab);
+  if (!activeVisible && visibleButtons.length === 1) {
+    switchSettingsTab(visibleButtons[0].dataset.settingsTab);
+  }
+}
+
+function refreshLocalizedInterface(language = null) {
+  if (language) i18n.setLanguage(language);
+  else i18n.apply();
+  if (languageSelect) languageSelect.value = i18n.language;
+  document.title = `${t('app.name')} - ${t('app.subtitle')}`;
+  updateConnectionStatus(currentConnectionState);
+  if (!currentMeetingId && !uploadFileId && allSegments.length === 0 && meetingTitleDisplay) {
+    meetingTitleDisplay.textContent = t('status.no_meeting');
+  }
+  if (audioStatusText && (audioManager.activeIndex == null || audioManager.activeIndex < 0)) {
+    audioStatusText.textContent = t('transcript.no_audio');
+  }
+  const btnStart = $('btnStart');
+  if (btnStart) btnStart.textContent = isPlaying ? t('controls.playing') : t('controls.demo');
+  const btnMic = $('btnMic');
+  if (btnMic) btnMic.textContent = isRecording ? t('controls.stop') : t('controls.mic');
+  const btnUpload = $('btnUpload');
+  if (btnUpload && !btnUpload.disabled) btnUpload.textContent = t('controls.upload');
+  const defaultMicOption = Array.from(microphoneDevice?.options || [])
+    .find(option => option.value === '');
+  if (defaultMicOption) defaultMicOption.textContent = t('settings.microphone.system_default');
+  if (appSettingsState?.models) renderModelProfiles(appSettingsState.models);
+  switchSettingsTab(activeSettingsTab);
+  renderDomainPresetButtons();
+  if (allSegments.filter(Boolean).length > 0) updateLogicPanel();
+}
+
+function renderDomainPresetButtons() {
+  if (!domainPresetGrid || !window.DiTingHotwordSettings) return;
+  domainPresetGrid.innerHTML = '';
+  window.DiTingHotwordSettings.getDomainPresets().forEach(preset => {
+    const localizedName = t(`settings.domain.${preset.id}.name`, {}, preset.name);
+    const localizedDescription = t(
+      `settings.domain.${preset.id}.description`,
+      {},
+      preset.description,
+    );
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'domain-preset-card';
+    button.dataset.presetId = preset.id;
+    button.dataset.wordCount = String(preset.word_count);
+    button.setAttribute('aria-pressed', 'false');
+
+    const heading = document.createElement('div');
+    heading.className = 'domain-preset-card-head';
+    const title = document.createElement('strong');
+    title.textContent = localizedName;
+    const check = document.createElement('b');
+    check.className = 'domain-preset-check';
+    check.setAttribute('aria-hidden', 'true');
+    check.textContent = '鉁?;
+    heading.append(title, check);
+    const description = document.createElement('span');
+    description.textContent = localizedDescription;
+    const action = document.createElement('em');
+    action.dataset.presetAction = 'true';
+    button.append(heading, description, action);
+    button.addEventListener('click', () => toggleHotwordDomainPreset(preset.id));
+    domainPresetGrid.appendChild(button);
+  });
+  updateDomainPresetSelectionUi();
+}
+
+function updateDomainPresetSelectionUi() {
+  const presets = window.DiTingHotwordSettings?.getDomainPresets() || [];
+  const presetNames = new Map(presets.map(preset => [
+    preset.id,
+    t(`settings.domain.${preset.id}.name`, {}, preset.name),
+  ]));
+  domainPresetGrid?.querySelectorAll('[data-preset-id]').forEach(button => {
+    const selected = selectedDomainPresetIds.has(button.dataset.presetId);
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    const action = button.querySelector('[data-preset-action]');
+    if (action) {
+      action.textContent = selected
+        ? t('settings.hotwords.preset_disable')
+        : t('settings.hotwords.preset_enable', { count: button.dataset.wordCount });
+    }
+  });
+  const selectedNames = Array.from(selectedDomainPresetIds)
+    .map(id => presetNames.get(id))
+    .filter(Boolean);
+  if (domainSelectionNames) {
+    domainSelectionNames.textContent = selectedNames.join(i18n.language === 'zh-CN' ? '銆? : ', ');
+  }
+  if (domainSelectionNotice) domainSelectionNotice.hidden = selectedNames.length === 0;
+}
+
+function syncDomainPresetSelection() {
+  if (!window.DiTingHotwordSettings) return;
+  selectedDomainPresetIds = new Set(
+    window.DiTingHotwordSettings.getSelectedDomainPresetIds(collectHotwordRows()),
+  );
+  updateDomainPresetSelectionUi();
+}
+
+function toggleHotwordDomainPreset(presetId) {
+  if (!hotwordSettingsState || !window.DiTingHotwordSettings) {
+    setHotwordStatus(t('settings.hotwords.loading'), true);
+    return;
+  }
+  const selected = !selectedDomainPresetIds.has(presetId);
+  const result = window.DiTingHotwordSettings.setDomainPresetSelection(
+    collectHotwordRows(),
+    presetId,
+    selected,
+    Array.from(selectedDomainPresetIds),
+    defaultHotwordScoreNumber?.value,
+  );
+  if (!result.preset) return;
+  hotwordSettingsState = { ...hotwordSettingsState, words: result.words };
+  if (selected && hotwordsEnabled) hotwordsEnabled.checked = true;
+  renderHotwordRows();
+  const localizedName = t(`settings.domain.${presetId}.name`, {}, result.preset.name);
+  setHotwordStatus(
+    selected
+      ? t('settings.hotwords.preset_selected', { name: localizedName, count: result.added_count })
+      : t('settings.hotwords.preset_deselected', { name: localizedName }),
+  );
+}
+
+function setSettingValue(id, value, checkbox = false) {
+  const element = $(id);
+  if (!element) return;
+  if (checkbox) element.checked = Boolean(value);
+  else element.value = String(value ?? '');
+}
+
+function renderRuntimeSettings(settings) {
+  const recognition = settings.recognition;
+  const microphone = settings.microphone;
+  setSettingValue('liveAsrProfile', recognition.live_asr_profile);
+  setSettingValue('finalAsrProfile', recognition.final_asr_profile);
+  setSettingValue('finalTranscriptionEnabled', recognition.final_transcription_enabled, true);
+  setSettingValue('fileVadThreshold', recognition.file_vad_threshold);
+  setSettingValue('fileVadMinSilence', recognition.file_vad_min_silence);
+  setSettingValue('fileVadMinSpeech', recognition.file_vad_min_speech);
+  setSettingValue('fileVadPrePadding', recognition.file_vad_pre_padding_ms);
+  setSettingValue('fileVadPostPadding', recognition.file_vad_post_padding_ms);
+  setSettingValue('microphoneLiveProfile', microphone.live_profile);
+  setSettingValue('microphoneVadGating', microphone.vad_gating, true);
+  setSettingValue('microphonePreRoll', microphone.pre_roll_ms);
+  setSettingValue('microphoneEndpointGrace', microphone.endpoint_grace_ms);
+  setSettingValue('microphoneTailPad', microphone.tail_pad_ms);
+  setSettingValue('microphoneVadThreshold', microphone.vad_threshold);
+  setSettingValue('microphoneVadMinSilence', microphone.vad_min_silence);
+  setSettingValue('microphoneVadMinSpeech', microphone.vad_min_speech);
+  setSettingValue('microphoneEchoCancellation', microphone.echo_cancellation, true);
+  setSettingValue('microphoneNoiseSuppression', microphone.noise_suppression, true);
+  setSettingValue('microphoneAutoGain', microphone.auto_gain_control, true);
+  renderModelProfiles(settings.models);
+}
+
+function renderModelProfiles(models = {}) {
+  const available = Array.isArray(models.available_profiles) ? models.available_profiles : [];
+  ['liveAsrProfile', 'finalAsrProfile'].forEach(id => {
+    const select = $(id);
+    if (!select) return;
+    Array.from(select.options).forEach(option => {
+      option.disabled = available.length > 0 && !available.includes(option.value);
+      const baseLabel = t(option.dataset.i18n, {}, option.textContent.replace(/ 路 (鏈儴缃瞸Not deployed)$/, ''));
+      option.textContent = baseLabel
+        + (option.disabled ? ` 路 ${t('settings.model_not_deployed')}` : '');
+    });
+  });
+  if (!modelProfileStatus) return;
+  const live = models.live || {};
+  const finalModel = models.final || {};
+  if (!live.chunk_ms) {
+    modelProfileStatus.textContent = t('settings.model_still_loading');
+    return;
+  }
+  const fallback = live.fallback || finalModel.fallback ? t('settings.model_fallback') : '';
+  modelProfileStatus.textContent = t('settings.model_status', {
+    live: live.chunk_ms,
+    final: finalModel.chunk_ms || live.chunk_ms,
+    provider: models.file_vad_provider || 'Silero VAD',
+    fallback,
+  });
+}
+
+function collectRuntimeSettings() {
+  if (!window.DiTingAppSettings) return null;
+  return window.DiTingAppSettings.normalizeAppSettings({
+    recognition: {
+      live_asr_profile: $('liveAsrProfile')?.value,
+      final_asr_profile: $('finalAsrProfile')?.value,
+      final_transcription_enabled: $('finalTranscriptionEnabled')?.checked !== false,
+      file_vad_threshold: $('fileVadThreshold')?.value,
+      file_vad_min_silence: $('fileVadMinSilence')?.value,
+      file_vad_min_speech: $('fileVadMinSpeech')?.value,
+      file_vad_pre_padding_ms: $('fileVadPrePadding')?.value,
+      file_vad_post_padding_ms: $('fileVadPostPadding')?.value,
+    },
+    microphone: {
+      device_id: microphoneDevice?.value || '',
+      live_profile: $('microphoneLiveProfile')?.value,
+      vad_gating: $('microphoneVadGating')?.checked === true,
+      echo_cancellation: $('microphoneEchoCancellation')?.checked !== false,
+      noise_suppression: $('microphoneNoiseSuppression')?.checked === true,
+      auto_gain_control: $('microphoneAutoGain')?.checked === true,
+      pre_roll_ms: $('microphonePreRoll')?.value,
+      endpoint_grace_ms: $('microphoneEndpointGrace')?.value,
+      tail_pad_ms: $('microphoneTailPad')?.value,
+      vad_threshold: $('microphoneVadThreshold')?.value,
+      vad_min_silence: $('microphoneVadMinSilence')?.value,
+      vad_min_speech: $('microphoneVadMinSpeech')?.value,
+    },
+  });
+}
+
+async function refreshMicrophoneDevices() {
+  if (!microphoneDevice || !navigator.mediaDevices?.enumerateDevices) return;
+  const selected = microphoneDevice.value || appSettingsState?.microphone?.device_id || '';
+  const devices = (await navigator.mediaDevices.enumerateDevices())
+    .filter(device => device.kind === 'audioinput');
+  microphoneDevice.innerHTML = `<option value="">${t('settings.microphone.system_default')}</option>`;
+  devices.forEach((device, index) => {
+    const option = document.createElement('option');
+    option.value = device.deviceId;
+    option.textContent = device.label || t('settings.microphone.generic', { count: index + 1 });
+    microphoneDevice.appendChild(option);
+  });
+  microphoneDevice.value = devices.some(device => device.deviceId === selected) ? selected : '';
+}
+
+async function stopMicrophoneTest() {
+  if (micTestAnimationFrame !== null) cancelAnimationFrame(micTestAnimationFrame);
+  micTestAnimationFrame = null;
+  micTestStream?.getTracks().forEach(track => track.stop());
+  micTestStream = null;
+  if (micTestAudioContext && micTestAudioContext.state !== 'closed') await micTestAudioContext.close();
+  micTestAudioContext = null;
+  if (micTestMeter) micTestMeter.style.width = '0%';
+  const button = $('btnTestMic');
+  if (button) button.textContent = t('controls.test');
+}
+
+async function toggleMicrophoneTest() {
+  if (micTestStream) {
+    await stopMicrophoneTest();
+    if (micTestStatus) micTestStatus.textContent = t('settings.microphone.test_stopped');
+    return;
+  }
+  const runtime = collectRuntimeSettings();
+  if (!runtime || !navigator.mediaDevices?.getUserMedia) return;
+  try {
+    micTestStream = await navigator.mediaDevices.getUserMedia(
+      window.DiTingAppSettings.buildMediaConstraints(runtime.microphone),
+    );
+    await refreshMicrophoneDevices();
+    micTestAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = micTestAudioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    micTestAudioContext.createMediaStreamSource(micTestStream).connect(analyser);
+    const values = new Float32Array(analyser.fftSize);
+    const render = () => {
+      analyser.getFloatTimeDomainData(values);
+      let sum = 0;
+      for (const value of values) sum += value * value;
+      const rms = Math.sqrt(sum / values.length);
+      const db = rms > 0 ? 20 * Math.log10(rms) : -96;
+      const percent = Math.max(0, Math.min(100, (db + 60) * 1.7));
+      if (micTestMeter) micTestMeter.style.width = `${percent.toFixed(1)}%`;
+      if (micTestStatus) micTestStatus.textContent = t('settings.microphone.input_level', {
+        db: db.toFixed(1),
+        device: micTestStream.getAudioTracks()[0]?.label || t('settings.microphone.tab'),
+      });
+      micTestAnimationFrame = requestAnimationFrame(render);
+    };
+    const button = $('btnTestMic');
+    if (button) button.textContent = t('controls.stop');
+    render();
+  } catch (error) {
+    await stopMicrophoneTest();
+    if (micTestStatus) micTestStatus.textContent = t('settings.microphone.test_failed', { message: error.message });
+  }
+}
+
+function setHotwordStatus(message, isError = false) {
+  if (!hotwordSaveStatus) return;
+  hotwordSaveStatus.textContent = message || '';
+  hotwordSaveStatus.style.color = isError ? 'var(--accent-red)' : 'var(--text-muted)';
+}
+
+function setDefaultHotwordScore(value) {
+  if (!window.DiTingHotwordSettings) return;
+  const score = window.DiTingHotwordSettings.clamp(value);
+  if (defaultHotwordScore) defaultHotwordScore.value = String(Math.min(12, score));
+  if (defaultHotwordScoreNumber) defaultHotwordScoreNumber.value = String(score);
+  if (defaultScoreLabel) defaultScoreLabel.textContent = score.toFixed(1);
+  if (hotwordSettingsState) hotwordSettingsState.default_score = score;
+}
+
+function createHotwordRow(item) {
+  const row = document.createElement('div');
+  row.className = `hotword-row${item.enabled ? '' : ' disabled'}`;
+
+  const enabled = document.createElement('input');
+  enabled.type = 'checkbox';
+  enabled.checked = item.enabled !== false;
+  enabled.dataset.field = 'enabled';
+  enabled.setAttribute('aria-label', `鍚敤 ${item.text}`);
+  enabled.addEventListener('change', () => {
+    row.classList.toggle('disabled', !enabled.checked);
+    syncDomainPresetSelection();
+  });
+
+  const textInput = document.createElement('input');
+  textInput.className = 'hotword-input';
+  textInput.value = item.text;
+  textInput.maxLength = 80;
+  textInput.dataset.field = 'text';
+  textInput.setAttribute('aria-label', '鐑瘝鏍囧噯鍐欐硶');
+  textInput.addEventListener('input', syncDomainPresetSelection);
+
+  const scoreInput = document.createElement('input');
+  scoreInput.className = 'hotword-input';
+  scoreInput.type = 'number';
+  scoreInput.min = '0.1';
+  scoreInput.max = '20';
+  scoreInput.step = '0.5';
+  scoreInput.value = String(item.score);
+  scoreInput.dataset.field = 'score';
+  scoreInput.setAttribute('aria-label', `${item.text} 鏉冮噸`);
+
+  const remove = document.createElement('button');
+  remove.className = 'btn btn-secondary hotword-remove';
+  remove.type = 'button';
+  remove.textContent = '脳';
+  remove.setAttribute('aria-label', `鍒犻櫎 ${item.text}`);
+  remove.addEventListener('click', () => {
+    row.remove();
+    syncDomainPresetSelection();
+  });
+
+  row.append(enabled, textInput, scoreInput, remove);
+  return row;
+}
+
+function renderHotwordRows() {
+  if (!hotwordList || !hotwordSettingsState) return;
+  hotwordList.innerHTML = '';
+  hotwordSettingsState.words.forEach(item => hotwordList.appendChild(createHotwordRow(item)));
+  syncDomainPresetSelection();
+  setHotwordStatus(t('settings.hotwords.count', { count: hotwordSettingsState.words.length }));
+}
+
+async function openHotwordSettings() {
+  if (!hotwordModal || !window.DiTingHotwordSettings || !window.DiTingAppSettings) return;
+  hotwordModal.classList.add('visible');
+  hotwordModal.setAttribute('aria-hidden', 'false');
+  if (settingsSearch) settingsSearch.value = '';
+  filterSettingsNavigation('');
+  switchSettingsTab(activeSettingsTab);
+  setHotwordStatus(t('settings.loading'));
+  try {
+    const response = await fetch(`${API_BASE}/api/settings`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(data);
+    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data.hotwords);
+    appSettingsState.hotwords = hotwordSettingsState;
+    renderRuntimeSettings(appSettingsState);
+    await refreshMicrophoneDevices();
+    if (hotwordsEnabled) hotwordsEnabled.checked = hotwordSettingsState.enabled;
+    if (fuzzyPinyinEnabled) fuzzyPinyinEnabled.checked = hotwordSettingsState.fuzzy_pinyin_enabled;
+    setDefaultHotwordScore(hotwordSettingsState.default_score);
+    renderHotwordRows();
+  } catch (error) {
+    console.error('[Hotwords] Load failed:', error);
+    setHotwordStatus(t('settings.hotwords.load_failed', { message: error.message }), true);
+  }
+}
+
+function closeHotwordSettings() {
+  if (!hotwordModal) return;
+  stopMicrophoneTest();
+  hotwordModal.classList.remove('visible');
+  hotwordModal.setAttribute('aria-hidden', 'true');
+}
+
+function addHotwordToEditor() {
+  const input = $('newHotwordInput');
+  const text = input?.value.trim();
+  if (!text || !hotwordList || !window.DiTingHotwordSettings) return;
+  const duplicate = Array.from(hotwordList.querySelectorAll('[data-field="text"]'))
+    .some(element => element.value.trim().toLocaleLowerCase() === text.toLocaleLowerCase());
+  if (duplicate) {
+    setHotwordStatus(t('settings.hotwords.duplicate'), true);
+    return;
+  }
+  const score = window.DiTingHotwordSettings.scoreForNewWord(
+    text,
+    defaultHotwordScoreNumber?.value,
+  );
+  hotwordList.appendChild(createHotwordRow({ text, score, enabled: true }));
+  input.value = '';
+  syncDomainPresetSelection();
+  setHotwordStatus(t('settings.hotwords.added'));
+}
+
+function collectHotwordRows() {
+  if (!hotwordList) return [];
+  return Array.from(hotwordList.querySelectorAll('.hotword-row')).map(row => ({
+    text: row.querySelector('[data-field="text"]')?.value || '',
+    score: row.querySelector('[data-field="score"]')?.value,
+    enabled: row.querySelector('[data-field="enabled"]')?.checked !== false,
+  }));
+}
+
+async function saveHotwordSettings() {
+  if (!hotwordSettingsState || !window.DiTingHotwordSettings) return;
+  const saveButton = $('btnSaveHotwords');
+  const hotwordPayload = window.DiTingHotwordSettings.buildPayload({
+    ...hotwordSettingsState,
+    enabled: hotwordsEnabled?.checked !== false,
+    fuzzy_pinyin_enabled: fuzzyPinyinEnabled?.checked !== false,
+    default_score: defaultHotwordScoreNumber?.value,
+  }, collectHotwordRows());
+  const runtimePayload = collectRuntimeSettings();
+  const payload = { ...runtimePayload, hotwords: hotwordPayload };
+  if (saveButton) saveButton.disabled = true;
+  setHotwordStatus(t('settings.hotwords.saving'));
+  try {
+    const response = await fetch(`${API_BASE}/api/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
+    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(data);
+    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data.hotwords);
+    appSettingsState.hotwords = hotwordSettingsState;
+    renderRuntimeSettings(appSettingsState);
+    renderHotwordRows();
+    const activeCount = data.hotwords?.active_count ?? hotwordSettingsState.words.length;
+    const savedMessage = data.reloading_models
+      ? t('settings.hotwords.saved_reloading', { count: activeCount })
+      : t('settings.hotwords.saved', { count: activeCount });
+    setHotwordStatus(savedMessage);
+    showToast(savedMessage);
+  } catch (error) {
+    console.error('[Hotwords] Save failed:', error);
+    setHotwordStatus(t('settings.hotwords.save_failed', { message: error.message }), true);
+  } finally {
+    if (saveButton) saveButton.disabled = false;
+  }
+}
+
+// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// Live Mic Recording
+// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
+function updateMicLevel(rms, peak) {
+  if (!window.DiTingMicLevel) return;
+  micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
+  micLevelLastUpdate = performance.now();
+}
+
+function renderMicLevel(timestamp) {
+  if (!micOrbPanel?.classList.contains('visible') || !window.DiTingMicLevel) {
+    micLevelAnimationFrame = null;
+    return;
+  }
+  if (timestamp - micLevelLastUpdate > 100) {
+    micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
+  }
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const phase = reduceMotion ? 0 : timestamp / 180;
+  const scales = window.DiTingMicLevel.buildBarScales(
+    micDisplayLevel,
+    phase,
+    micLevelBars.length,
+  );
+  micLevelBars.forEach((bar, index) => {
+    bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
+  });
+  const orb = window.DiTingMicLevel.buildOrbStyle(micDisplayLevel);
+  if (micOrbWrap) {
+    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-ring-opacity', orb.ringOpacity.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-shadow', `${orb.shadow.toFixed(1)}px`);
+    micOrbWrap.style.setProperty('--orb-blur', `${orb.blur.toFixed(1)}px`);
+    micOrbWrap.style.setProperty('--orb-glow-opacity', orb.glowOpacity.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-shadow', `${orb.coreShadow.toFixed(1)}px`);
+  }
+  micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
+}
+
+function setMicVisualizerState(state) {
+  if (!micOrbPanel) return;
+  const active = state === 'recording' || state === 'finalizing';
+  micOrbPanel.classList.toggle('visible', active);
+  micOrbPanel.classList.toggle('listening', state === 'recording');
+  micOrbPanel.classList.toggle('finalizing', state === 'finalizing');
+  micOrbPanel.setAttribute('aria-hidden', active ? 'false' : 'true');
+  if (micOrbTitle) micOrbTitle.textContent = state === 'finalizing'
+    ? t('mic.orb_finalizing')
+    : t('mic.orb_listening');
+  if (micOrbSubtitle) micOrbSubtitle.textContent = state === 'finalizing'
+    ? t('mic.orb_finalizing_hint')
+    : t('mic.orb_hint');
+  if (active) {
+    if (micLevelAnimationFrame === null) {
+      micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
+    }
+    return;
+  }
+  if (micLevelAnimationFrame !== null) cancelAnimationFrame(micLevelAnimationFrame);
+  micLevelAnimationFrame = null;
+  micDisplayLevel = 0;
+  micLevelLastUpdate = 0;
+  micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
+  const orb = window.DiTingMicLevel?.buildOrbStyle(0);
+  if (micOrbWrap && orb) {
+    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
+  }
+}
+
+function setMicOrbMessage(title, subtitle) {
+  if (micOrbTitle && title) micOrbTitle.textContent = title;
+  if (micOrbSubtitle && subtitle) micOrbSubtitle.textContent = subtitle;
+}
+
+async function ensureAppSettingsLoaded() {
+  if (appSettingsState || !window.DiTingAppSettings) return appSettingsState;
+  try {
+    const response = await fetch(`${API_BASE}/api/settings`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(await response.json());
+  } catch (error) {
+    console.warn('[Settings] Falling back to local defaults:', error);
+    appSettingsState = window.DiTingAppSettings.normalizeAppSettings({});
+  }
+  return appSettingsState;
+}
 async function toggleMic() {
   const btnMic = $('btnMic');
   const micStatusEl = micStatus;
@@ -3763,6 +4834,28 @@ function initApp() {
   if ($('btnEditProfile')) $('btnEditProfile').addEventListener('click', openProfileEditor);
   if ($('btnSwitchUser')) $('btnSwitchUser').addEventListener('click', switchUser);
   if ($('btnAccountLogout')) $('btnAccountLogout').addEventListener('click', logout);
+// Keyboard shortcuts
+
+initApp();
+// Run immediately 鈥?DOM is already parsed (module scripts are deferred)
+
+}
+  console.log('[DiTing] App initialized 鈥?all event listeners registered');
+
+  });
+  settingsNavButtons.forEach(button => {
+    button.addEventListener('click', () => switchSettingsTab(button.dataset.settingsTab));
+  });
+  if (settingsSearch) settingsSearch.addEventListener('input', event => filterSettingsNavigation(event.target.value));
+  if ($('btnCloseHotwords')) $('btnCloseHotwords').addEventListener('click', closeHotwordSettings);
+  if ($('btnCancelHotwords')) $('btnCancelHotwords').addEventListener('click', closeHotwordSettings);
+  if ($('btnSaveHotwords')) $('btnSaveHotwords').addEventListener('click', saveHotwordSettings);
+  if ($('btnRefreshMics')) $('btnRefreshMics').addEventListener('click', refreshMicrophoneDevices);
+  if ($('btnTestMic')) $('btnTestMic').addEventListener('click', toggleMicrophoneTest);
+  if ($('btnAddHotword')) $('btnAddHotword').addEventListener('click', addHotwordToEditor);
+  if (hotwordModal) hotwordModal.addEventListener('click', event => {
+    if (event.target === hotwordModal) closeHotwordSettings();
+  });
   if (profileForm) profileForm.addEventListener('submit', saveCurrentProfile);
   if ($('btnCloseProfile')) $('btnCloseProfile').addEventListener('click', closeProfileEditor);
   if ($('btnCancelProfile')) $('btnCancelProfile').addEventListener('click', closeProfileEditor);
@@ -3781,6 +4874,12 @@ function initApp() {
   }
   document.addEventListener('click', event => {
     if (accountMenuRoot && !accountMenuRoot.contains(event.target)) setAccountMenuOpen(false);
+  if (e.code === 'Space' && !e.target.closest('input,textarea')) {
+  }
+    return;
+    closeHotwordSettings();
+  if (e.code === 'Escape' && hotwordModal?.classList.contains('visible')) {
+document.addEventListener('keydown', (e) => {
   });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;

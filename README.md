@@ -93,7 +93,8 @@ python start.py
 打开前端后点击顶部 `Mic`，允许浏览器使用麦克风即可。浏览器通过
 `AudioWorklet` 连续采集音频，按实际设备采样率降采样为 16 kHz 单声道
 `pcm_s16le`，再以二进制 WebSocket 帧发送到 `/ws/live`。停止录音时会等待
-最后一句完成后再关闭连接，不会丢弃尾部文字。
+最后一句完成后再关闭连接，不会丢弃尾部文字。录音期间底部会显示由真实
+RMS/峰值驱动的彩色声量动画；声量测量只用于本地显示，不会额外上传数据。
 
 当前本地若后端使用非默认端口，可这样打开：
 
@@ -117,7 +118,7 @@ python backend/tests/smoke_live_websocket.py path/to/meeting.wav --url ws://127.
 | 逻辑校验 | ✅ | 数据冲突检测 (数字/百分比对比) |
 | 不确定性估计 | ✅ | 低置信度区段标记 |
 | 音频波形可视化 | ✅ | wavesurfer.js + WAV 编码 |
-| 实时录音转写 | ✅ | AudioWorklet 连续采集 + 16 kHz 二进制 PCM + partial/final |
+| 实时录音转写 | ✅ | AudioWorklet 连续采集 + 声量动画 + 16 kHz 二进制 PCM + partial/final |
 | Eval_Ali 评测 | ✅ | CER 计算 / 热词提取 |
 | 说话人日志/分段 | 🔜 | LocalMeet 已有 pyannote segmentation + 3D-Speaker 离线实现，尚未迁入本项目 |
 | 重叠语音双路分离 | 🔜 | LocalMeet 已有 MossFormer2 离线 GPU 实现；不放入低延迟实时预览主链路 |

@@ -7,10 +7,15 @@ class DiTingPcmProcessor extends AudioWorkletProcessor {
     this.count = 0;
     this.pending = [];
     this.enabled = true;
+    this.levelSumSquares = 0;
+    this.levelPeak = 0;
+    this.levelSamples = 0;
+    this.levelWindowSamples = Math.max(512, Math.round(sampleRate * 0.04));
     this.port.onmessage = (event) => {
       if (event.data?.type === 'capture.stop') {
         this.enabled = false;
         this.flush();
+        this.port.postMessage({ type: 'audio.level', rms: 0, peak: 0 });
       }
     };
   }
@@ -23,7 +28,11 @@ class DiTingPcmProcessor extends AudioWorkletProcessor {
     // requested. Average each source-rate bucket and maintain a fractional
     // clock across render quanta so no microphone frames are discarded.
     for (let index = 0; index < channel.length; index += 1) {
-      this.sum += channel[index];
+      const sample = channel[index];
+      this.levelSumSquares += sample * sample;
+      this.levelPeak = Math.max(this.levelPeak, Math.abs(sample));
+      this.levelSamples += 1;
+      this.sum += sample;
       this.count += 1;
       this.clock += this.targetRate;
       if (this.clock >= sampleRate) {
@@ -33,6 +42,17 @@ class DiTingPcmProcessor extends AudioWorkletProcessor {
         this.sum = 0;
         this.count = 0;
       }
+    }
+
+    if (this.levelSamples >= this.levelWindowSamples) {
+      this.port.postMessage({
+        type: 'audio.level',
+        rms: Math.sqrt(this.levelSumSquares / this.levelSamples),
+        peak: this.levelPeak,
+      });
+      this.levelSumSquares = 0;
+      this.levelPeak = 0;
+      this.levelSamples = 0;
     }
 
     if (this.pending.length >= 640) this.flush();

@@ -276,6 +276,67 @@ body {
 .btn-secondary:hover { border-color: var(--border-active); }
 .btn-secondary.active { border-color: var(--accent-blue); background: rgba(74,144,217,0.1); }
 .btn-danger { background: rgba(224,85,106,0.15); color: var(--accent-red); border: 1px solid rgba(224,85,106,0.3); }
+.mic-level-meter {
+  --mic-level: 0;
+  position: relative;
+  width: 0;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  opacity: 0;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  background: rgba(13, 16, 25, 0.82);
+  transition: width 0.24s ease, padding 0.24s ease, opacity 0.2s ease, border-color 0.2s ease;
+}
+.mic-level-meter.active {
+  width: 94px;
+  padding: 0 10px;
+  opacity: 1;
+  border-color: rgba(139, 108, 232, 0.38);
+  box-shadow: 0 0 18px rgba(74, 144, 217, 0.12);
+}
+.mic-level-glow {
+  position: absolute;
+  inset: 3px 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(93, 183, 255, 0.48), rgba(139, 108, 232, 0.2) 48%, transparent 72%);
+  opacity: var(--mic-glow-opacity, 0.18);
+  filter: blur(7px);
+  transform: scale(var(--mic-glow-scale, 0.72));
+  transition: opacity 0.08s linear, transform 0.08s linear;
+}
+.mic-level-bars {
+  position: relative;
+  z-index: 1;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.mic-level-bar {
+  width: 3px;
+  height: 20px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #6ee7ff 0%, #7196ff 45%, #b878ff 72%, #ff78b8 100%);
+  transform: scaleY(0.12);
+  transform-origin: center;
+  opacity: 0.72;
+  transition: transform 0.07s linear, opacity 0.12s ease;
+  box-shadow: 0 0 5px rgba(113, 150, 255, 0.35);
+}
+.mic-level-meter.finalizing .mic-level-bar {
+  opacity: 0.42;
+  transition-duration: 0.16s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mic-level-meter,
+  .mic-level-glow,
+  .mic-level-bar { transition: none; }
+}
 .progress-bar {
   flex: 1; height: 4px;
   background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;
@@ -455,6 +516,17 @@ body {
   <button class="btn btn-secondary" id="btnReset">Reset</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">Mic</button>
+  <div class="mic-level-meter" id="micLevelMeter" aria-hidden="true">
+    <div class="mic-level-glow"></div>
+    <div class="mic-level-bars">
+      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
+      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
+      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
+      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
+      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
+      <span class="mic-level-bar"></span>
+    </div>
+  </div>
   <button class="btn btn-secondary" id="btnUpload">Upload</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
@@ -477,6 +549,7 @@ body {
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Scripts                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
+<script src="./mic-level.js"></script>
 <script type="module">
 // ============================================================
 // DiTing v3.0 - Frontend with wavesurfer.js
@@ -539,6 +612,9 @@ const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
 const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
+const micLevelMeter = $('micLevelMeter');
+const micLevelGlow = micLevelMeter?.querySelector('.mic-level-glow');
+const micLevelBars = Array.from(micLevelMeter?.querySelectorAll('.mic-level-bar') || []);
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -559,6 +635,9 @@ let micWs = null;
 let micAudioContext = null;
 let micWorklet = null;
 let micStopTimer = null;
+let micDisplayLevel = 0;
+let micLevelLastUpdate = 0;
+let micLevelAnimationFrame = null;
 let isRecording = false;
 
 // Log stream
@@ -1445,6 +1524,57 @@ function finishUploadUI(status) {
 // Live Mic Recording
 // ═══════════════════════════════════════════════════════════
 
+function updateMicLevel(rms, peak) {
+  if (!window.DiTingMicLevel) return;
+  micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
+  micLevelLastUpdate = performance.now();
+}
+
+function renderMicLevel(timestamp) {
+  if (!micLevelMeter?.classList.contains('active') || !window.DiTingMicLevel) {
+    micLevelAnimationFrame = null;
+    return;
+  }
+  if (timestamp - micLevelLastUpdate > 100) {
+    micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
+  }
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const phase = reduceMotion ? 0 : timestamp / 180;
+  const scales = window.DiTingMicLevel.buildBarScales(
+    micDisplayLevel,
+    phase,
+    micLevelBars.length,
+  );
+  micLevelBars.forEach((bar, index) => {
+    bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
+  });
+  micLevelMeter.style.setProperty('--mic-level', micDisplayLevel.toFixed(3));
+  if (micLevelGlow) {
+    micLevelGlow.style.setProperty('--mic-glow-opacity', (0.18 + micDisplayLevel * 0.72).toFixed(3));
+    micLevelGlow.style.setProperty('--mic-glow-scale', (0.72 + micDisplayLevel * 0.5).toFixed(3));
+  }
+  micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
+}
+
+function setMicVisualizerState(state) {
+  if (!micLevelMeter) return;
+  const active = state === 'recording' || state === 'finalizing';
+  micLevelMeter.classList.toggle('active', active);
+  micLevelMeter.classList.toggle('finalizing', state === 'finalizing');
+  if (active) {
+    if (micLevelAnimationFrame === null) {
+      micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
+    }
+    return;
+  }
+  if (micLevelAnimationFrame !== null) cancelAnimationFrame(micLevelAnimationFrame);
+  micLevelAnimationFrame = null;
+  micDisplayLevel = 0;
+  micLevelLastUpdate = 0;
+  micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
+  micLevelMeter.style.setProperty('--mic-level', '0');
+}
+
 async function toggleMic() {
   const btnMic = $('btnMic');
   const micStatusEl = micStatus;
@@ -1516,10 +1646,13 @@ async function toggleMic() {
     micWorklet.port.onmessage = (event) => {
       if (event.data?.type === 'audio.pcm' && micWs?.readyState === WebSocket.OPEN) {
         micWs.send(event.data.payload);
+      } else if (event.data?.type === 'audio.level') {
+        updateMicLevel(event.data.rms, event.data.peak);
       }
     };
     source.connect(micWorklet).connect(silent).connect(micAudioContext.destination);
     isRecording = true;
+    setMicVisualizerState('recording');
     if (btnMic) { btnMic.textContent = 'Stop'; btnMic.classList.add('active'); }
     if (micStatusEl) {
       micStatusEl.textContent = `${micAudioContext.sampleRate}Hz → 16kHz`;
@@ -1536,6 +1669,7 @@ async function toggleMic() {
 
 function stopMicRecording() {
   isRecording = false;
+  setMicVisualizerState('finalizing');
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   micWorklet?.port.postMessage({ type: 'capture.stop' });
   if (micStatus) {
@@ -1562,6 +1696,7 @@ async function cleanupMicRecording() {
     await micAudioContext.close();
   }
   micAudioContext = null;
+  setMicVisualizerState('idle');
   if (micWs) {
     if (micWs.readyState === WebSocket.OPEN) micWs.close(1000, 'capture complete');
     micWs = null;

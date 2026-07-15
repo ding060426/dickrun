@@ -17,6 +17,20 @@ import numpy as np
 from .asr_engine import ASRResult
 
 
+DEFAULT_ENDPOINT_GRACE_MS = 800
+
+
+def get_live_endpoint_grace_ms() -> int:
+    """Return the configurable post-VAD silence grace period."""
+    raw_value = os.getenv("DITING_LIVE_ENDPOINT_GRACE_MS", "").strip()
+    if not raw_value:
+        return DEFAULT_ENDPOINT_GRACE_MS
+    try:
+        return max(0, int(raw_value))
+    except ValueError:
+        return DEFAULT_ENDPOINT_GRACE_MS
+
+
 class LiveAudioProtocolError(ValueError):
     """Raised when a microphone PCM frame violates the public wire contract."""
 
@@ -144,7 +158,12 @@ def create_live_vad(model_dir: Path | None = None) -> VoiceActivityDetector:
 
 
 class LiveAudioSession:
-    """Convert 16 kHz mono PCM frames into partial and final ASR results."""
+    """Convert PCM frames into ASR results with resumable VAD boundaries.
+
+    Silero's speech-end signal is treated as a candidate boundary. The active
+    ASR stream stays open for a short grace period so a natural thinking pause
+    can resume without losing the decoder context.
+    """
 
     SAMPLE_RATE = 16000
     MAX_FRAME_BYTES = 512 * 1024
@@ -155,15 +174,22 @@ class LiveAudioSession:
         *,
         vad: VoiceActivityDetector,
         pre_roll_ms: int = 200,
+        endpoint_grace_ms: int = DEFAULT_ENDPOINT_GRACE_MS,
     ):
         if pre_roll_ms < 0:
             raise ValueError("pre_roll_ms must be non-negative")
+        if endpoint_grace_ms < 0:
+            raise ValueError("endpoint_grace_ms must be non-negative")
         self.engine = engine
         self.vad = vad
         self._pre_roll_limit = round(self.SAMPLE_RATE * pre_roll_ms / 1000)
+        self._endpoint_grace_samples = round(
+            self.SAMPLE_RATE * endpoint_grace_ms / 1000
+        )
         self._pre_roll: list[np.ndarray] = []
         self._pre_roll_samples = 0
         self._speech_active = False
+        self._pending_endpoint_samples: int | None = None
         self._closed = False
         self._last_partial_text = ""
         self.received_samples = 0
@@ -182,6 +208,11 @@ class LiveAudioSession:
         self.received_samples += len(samples)
         state = self.vad.push(samples)
 
+        if self._pending_endpoint_samples is not None and (
+            state.speech_started or state.is_speech
+        ):
+            self._pending_endpoint_samples = None
+
         if not self._speech_active:
             if not (state.speech_started or state.is_speech):
                 self._remember_pre_roll(samples)
@@ -197,10 +228,19 @@ class LiveAudioSession:
             self._last_partial_text = result.text
 
         if state.speech_ended:
+            self._pending_endpoint_samples = 0
+        elif self._pending_endpoint_samples is not None and not state.is_speech:
+            self._pending_endpoint_samples += len(samples)
+
+        if (
+            self._pending_endpoint_samples is not None
+            and self._pending_endpoint_samples >= self._endpoint_grace_samples
+        ):
             final = self.engine.finalize_utterance(reset_stream=True)
             if final and final.text.strip():
                 events.append(final)
             self._speech_active = False
+            self._pending_endpoint_samples = None
             self._last_partial_text = ""
 
         return events

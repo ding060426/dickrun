@@ -48,6 +48,7 @@ try:
         LiveAudioSession,
         create_live_vad,
         find_silero_vad_model,
+        get_live_endpoint_grace_ms,
     )
     HAS_XASR = True
     logger.info("X-ASR module loaded")
@@ -235,6 +236,11 @@ async def get_xasr_status():
             "provider": "sherpa-silero-vad" if vad_model else "asr-endpoint-fallback",
             "available": vad_model is not None,
             "model_path": str(vad_model) if vad_model else None,
+            "endpoint_policy": (
+                "silero-vad-with-resume-grace"
+                if vad_model else "sherpa-asr-endpoint-fallback"
+            ),
+            "endpoint_grace_ms": get_live_endpoint_grace_ms() if vad_model else 0,
         },
         "hotwords_count": len(xasr_engine.hotword_corrector.hotwords) if xasr_engine.hotword_corrector else 0,
         "features": {
@@ -693,19 +699,28 @@ async def ws_live(websocket: WebSocket):
     logger.info("Live WebSocket connected")
 
     engine = None
+    has_silero_vad = False
     if xasr_engine and xasr_engine.is_model_available:
+        has_silero_vad = find_silero_vad_model(xasr_engine.model_dir) is not None
         engine = XASREngine(
             hotwords=DEMO_MEETING["hotwords"],
             enable_logic_validation=True,
             enable_hotword_correction=True,
             enable_uncertainty=True,
-            enable_endpoint_detection=True,
+            # The live path must have one endpoint owner. Silero supplies the
+            # adaptive boundary; sherpa endpointing remains only as fallback.
+            enable_endpoint_detection=not has_silero_vad,
             provider="cpu",
             num_threads=1,
         )
 
     session = None
     vad_provider = "unavailable"
+    endpoint_grace_ms = get_live_endpoint_grace_ms() if has_silero_vad else 0
+    endpoint_policy = (
+        "silero-vad-with-resume-grace"
+        if has_silero_vad else "sherpa-asr-endpoint-fallback"
+    )
     try:
         backend_type = "X-ASR v2.0" if (engine and engine.is_model_available) else "Demo"
         await manager.send_json(websocket, {
@@ -756,6 +771,7 @@ async def ws_live(websocket: WebSocket):
                         engine,
                         vad=vad,
                         pre_roll_ms=200,
+                        endpoint_grace_ms=endpoint_grace_ms,
                     )
                     await manager.send_json(websocket, {
                         "type": "configured",
@@ -764,6 +780,8 @@ async def ws_live(websocket: WebSocket):
                             "channels": 1,
                             "sample_format": "pcm_s16le",
                             "vad": vad_provider,
+                            "endpoint_policy": endpoint_policy,
+                            "endpoint_grace_ms": endpoint_grace_ms,
                         },
                     })
                 elif action == "process_chunk":
@@ -776,6 +794,7 @@ async def ws_live(websocket: WebSocket):
                             engine,
                             vad=vad,
                             pre_roll_ms=200,
+                            endpoint_grace_ms=endpoint_grace_ms,
                         )
                     audio_b64 = msg.get("audio", "")
                     if audio_b64:

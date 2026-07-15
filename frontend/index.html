@@ -242,7 +242,7 @@ body {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 900px; height: 900px;
+  width: 600px; height: 600px;
   z-index: 0;
   pointer-events: none;
 }
@@ -250,7 +250,7 @@ body {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 900px; height: 900px;
+  width: 600px; height: 600px;
   z-index: 1;
   pointer-events: none;
 }
@@ -265,7 +265,7 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   position: relative;
-  z-index: 2;
+  z-index: 10;
 }
 .home-hero h1.hero-logo-image {
   margin: 0;
@@ -288,6 +288,8 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
   letter-spacing: 0.08em;
+  position: relative;
+  z-index: 10;
 }
 .legacy-meeting-header { display: none !important; }
 
@@ -1019,8 +1021,8 @@ body {
 
 <section class="home-hero" id="homeHero">
   <div class="hero-visual">
-    <canvas class="freq-ring" id="freqRing" width="900" height="900"></canvas>
-    <canvas class="particle-canvas" id="particleCanvas" width="900" height="900"></canvas>
+    <canvas class="freq-ring" id="freqRing" width="600" height="600"></canvas>
+    <canvas class="particle-canvas" id="particleCanvas" width="600" height="600"></canvas>
     <div class="volume-orb" id="volumeOrb"></div>
     <h1 class="hero-logo-image" aria-label="会悟">
       <img src="assets/huiwu-cover.svg" alt="会悟">
@@ -3501,14 +3503,14 @@ async function startVolumeMeter() {
   const canvas = $('freqRing');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const cx = 450, cy = 450;
-  const innerR = 210, outerR = 400;
+  const cx = 300, cy = 300;
+  const innerR = 140, outerR = 270;
 
   const pCanvas = $('particleCanvas');
   const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
   let particles = [];
   const MAX_PARTICLES = 80;
-  const orbR = 200;
+  const orbR = 135;
 
   function spawnParticle(level) {
     const angle = Math.random() * Math.PI * 2;
@@ -3548,7 +3550,7 @@ async function startVolumeMeter() {
     function tick() {
       if (!volumeAnalyser) return;
       volumeAnalyser.getByteFrequencyData(dataArray);
-      ctx.clearRect(0, 0, 900, 900);
+      ctx.clearRect(0, 0, 600, 600);
 
       let sum = 0;
       for (let j = 0; j < binCount; j++) sum += dataArray[j];
@@ -3572,7 +3574,7 @@ async function startVolumeMeter() {
       ctx.stroke();
 
       if (pCtx) {
-        pCtx.clearRect(0, 0, 900, 900);
+        pCtx.clearRect(0, 0, 600, 600);
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i];
           p.x += p.vx;

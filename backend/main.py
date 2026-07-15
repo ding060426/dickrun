@@ -35,7 +35,7 @@ BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BACKEND_DIR)
 
 # ── Logging ─────────────────────────────────────────────────────
-from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
+from utils.logger import init_logging, get_logger, get_recent_logs as get_recent_log_entries, log_buffer
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -65,8 +65,16 @@ try:
     HAS_POSTPROCESSOR = True
     logger.info("Text post-processor loaded")
 except ImportError as e:
-    logger.warning(f"Text post-processor not available: {e}")
-    HAS_POSTPROCESSOR = False
+    try:
+        from modules.text_post_processor import process_asr_text
+        def postprocess_text(text: str):
+            final = process_asr_text(text)
+            return final, {"original_text": text, "final_text": final, "corrections": []}
+        HAS_POSTPROCESSOR = True
+        logger.info("Text post-processor loaded via new pipeline")
+    except ImportError:
+        logger.warning(f"Text post-processor not available: {e}")
+        HAS_POSTPROCESSOR = False
 
 # ===========================================================================
 # Lifespan: Load X-ASR in background
@@ -274,9 +282,9 @@ async def add_hotwords(data: dict):
 # ===========================================================================
 
 @app.get("/api/logs/recent")
-async def get_recent_logs(n: int = Query(50, ge=1, le=500)):
+async def api_get_recent_logs(n: int = Query(50, ge=1, le=500)):
     """Get recent log entries (for frontend debug panel)."""
-    return {"logs": get_recent_logs(n), "count": len(log_buffer)}
+    return {"logs": get_recent_log_entries(n), "count": len(log_buffer)}
 
 
 @app.get("/api/logs/download")
@@ -333,6 +341,108 @@ async def get_eval_meeting(meeting_id: str):
         "far_wavs": mtg.get('far_wavs', []),
         "transcript_sample": mtg.get('far_transcript', [])[:20],
         "total_utterances": len(mtg.get('far_transcript', [])),
+    }
+
+
+# ===========================================================================
+# Speaker endpoints (v3.1)
+# ===========================================================================
+
+@app.get("/api/speakers")
+async def get_speakers():
+    """List all enrolled speakers."""
+    if not xasr_engine or not xasr_engine.speaker_identifier:
+        return {"speakers": [], "count": 0, "available": False}
+    speakers = xasr_engine.speaker_identifier.list_speakers()
+    return {
+        "speakers": speakers,
+        "count": len(speakers),
+        "available": True,
+    }
+
+
+@app.post("/api/speakers/enroll")
+async def enroll_speaker(data: dict):
+    """Enroll a new speaker (requires audio upload via multipart)."""
+    return {
+        "ok": False,
+        "message": "Use POST /api/audio/upload with enroll_speaker=true&speaker_name=NAME",
+        "alternate": "GET /api/speakers/enroll_from_eval to auto-enroll from Eval_Ali dataset",
+    }
+
+
+@app.get("/api/speakers/enroll_from_eval")
+async def enroll_from_eval():
+    """Auto-enroll all speakers from Eval_Ali near-field dataset (25 speakers)."""
+    if not xasr_engine or not xasr_engine.speaker_identifier:
+        # Try to init speaker identifier on-demand
+        if xasr_engine:
+            try:
+                from modules.speaker_diarization import SpeakerIdentifier
+                xasr_engine.speaker_identifier = SpeakerIdentifier(embed_dim=256)
+            except Exception as e:
+                return {"ok": False, "count": 0, "error": str(e)}
+        else:
+            return {"ok": False, "count": 0, "error": "X-ASR engine not loaded"}
+
+    count = xasr_engine.speaker_identifier.enroll_from_eval_ali()
+    return {
+        "ok": count > 0,
+        "count": count,
+        "speakers": xasr_engine.speaker_identifier.list_speakers(),
+    }
+
+
+# ===========================================================================
+# Domain & Cognitive endpoints (v3.1)
+# ===========================================================================
+
+@app.get("/api/domain/taxonomy")
+async def get_domain_taxonomy():
+    """Get the full domain taxonomy."""
+    from modules.domain_taxonomy import DOMAIN_TAXONOMY, get_all_domains
+    domains = []
+    for domain_name in get_all_domains():
+        info = DOMAIN_TAXONOMY[domain_name]
+        domains.append({
+            "name": domain_name,
+            "description": info.get("description", ""),
+            "sub_domains": info.get("sub_domains", []),
+            "keyword_count": len(info.get("keywords", [])),
+        })
+    return {"domains": domains, "count": len(domains)}
+
+
+@app.post("/api/domain/infer")
+async def infer_domain(data: dict):
+    """Infer meeting domain from a list of hotwords/terms."""
+    hotwords = data.get("hotwords", data.get("terms", []))
+    if not hotwords:
+        return {"error": "No hotwords provided", "domain": None}
+
+    from modules.cognitive_engine import DomainInferrer
+    inferrer = DomainInferrer()
+    result = inferrer.infer(hotwords)
+    return result
+
+
+@app.get("/api/cognitive/status")
+async def get_cognitive_status():
+    """Get cognitive enhancement system status."""
+    from modules.llm_client import get_llm_client
+    llm = get_llm_client()
+
+    return {
+        "llm_available": llm.is_available,
+        "llm_provider": type(llm).__name__,
+        "speaker_identification": bool(
+            xasr_engine and xasr_engine.speaker_identifier
+            and xasr_engine.speaker_identifier.has_enrolled()
+        ),
+        "enrolled_speakers": len(
+            xasr_engine.speaker_identifier.enrolled
+        ) if (xasr_engine and xasr_engine.speaker_identifier) else 0,
+        "domain_taxonomy": len(DOMAIN_TAXONOMY) if 'DOMAIN_TAXONOMY' in dir() else 5,
     }
 
 
@@ -407,6 +517,7 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
         "index": index,
         "text": result.text,
         "raw_text": result.raw_text,
+        "speaker_id": getattr(result, 'speaker_id', 'unknown'),
         "start_sec": result.start_sec,
         "end_sec": result.end_sec,
         "asr_confidence": round(float(result.asr_confidence), 3),
@@ -529,7 +640,6 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                         results = xasr_engine.process_file(
                             tmp_path, on_segment=on_segment, on_progress=on_progress, cancel_event=cancel_event
                         )
-                        # Build final segments list with audio
                         if cancel_event.is_set():
                             logger.info(f"Processing cancelled after ASR: {file.filename}")
                             asyncio.run_coroutine_threadsafe(
@@ -541,6 +651,7 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                             )
                             return
 
+                        # Build final segments list with audio
                         final_segments = []
                         for i, r in enumerate(results):
                             seg = _result_to_dict(r, i + 1)
@@ -552,6 +663,41 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
                             seg["audio_wav_base64"] = audio_b64
                             final_segments.append(seg)
+                        # Build speaker distribution stats
+                        speaker_stats = {}
+                        for r in results:
+                            sid = getattr(r, 'speaker_id', 'unknown')
+                            speaker_stats[sid] = speaker_stats.get(sid, 0) + 1
+
+                        # Generate meeting summary (v3.1)
+                        meeting_summary = None
+                        meeting_domain = None
+                        meeting_hotwords = []
+                        if xasr_engine and xasr_engine.enable_cognitive:
+                            meeting_domain = xasr_engine.get_meeting_domain()
+                            meeting_hotwords = xasr_engine.get_meeting_hotwords()
+                            try:
+                                from modules.cognitive_engine import MeetingSummarizer
+                                summarizer = MeetingSummarizer()
+                                meeting_data = {
+                                    "title": file.filename,
+                                    "segments": [
+                                        {"speaker": r.speaker_id if hasattr(r, 'speaker_id') else "unknown",
+                                         "text": r.text, "terms": getattr(r, 'terms', [])}
+                                        for r in results
+                                    ],
+                                    "domain": meeting_domain,
+                                    "participants": [
+                                        {"id": name, "name": name, "role": info.get("role", "")}
+                                        for name, info in (xasr_engine.speaker_identifier.enrolled.items()
+                                                          if xasr_engine.speaker_identifier else {}.items())
+                                    ][:10],
+                                }
+                                meeting_summary = summarizer.summarize(meeting_data)
+                                logger.info("Meeting summary generated")
+                            except Exception as e:
+                                logger.debug(f"Summary generation skipped: {e}")
+
                         asyncio.run_coroutine_threadsafe(
                             queue.put({
                                 "type": "complete",
@@ -562,6 +708,10 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
                                     "segments_count": len(results),
                                     "segments": final_segments,
+                                    "summary": meeting_summary,
+                                    "domain": meeting_domain,
+                                    "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
+                                    "speaker_stats": speaker_stats,
                                 }
                             }),
                             loop
@@ -615,6 +765,13 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                 if xasr_engine.logic_validator:
                     xasr_engine.logic_validator.reset()
 
+                speaker_stats = {}
+                for r in results:
+                    sid = getattr(r, 'speaker_id', 'unknown')
+                    speaker_stats[sid] = speaker_stats.get(sid, 0) + 1
+                meeting_domain = xasr_engine.get_meeting_domain() if getattr(xasr_engine, 'enable_cognitive', False) else None
+                meeting_hotwords = xasr_engine.get_meeting_hotwords() if getattr(xasr_engine, 'enable_cognitive', False) else []
+
                 logger.info(f"Done: {len(segments)} segments from {file.filename}")
                 return {
                     "file_id": file_id,
@@ -623,6 +780,9 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
                     "segments_count": len(segments),
                     "segments": segments,
+                    "domain": meeting_domain,
+                    "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
+                    "speaker_stats": speaker_stats,
                 }
         else:
             # ── X-ASR unavailable ──────────────────────────────
@@ -729,7 +889,7 @@ async def ws_live(websocket: WebSocket):
             enable_logic_validation=True,
             enable_hotword_correction=True,
             enable_uncertainty=True,
-            enable_endpoint_detection=True,
+            enable_endpoint_detection=False,
             provider="cpu",
             num_threads=1,
         )
@@ -747,7 +907,6 @@ async def ws_live(websocket: WebSocket):
             logger.info("Live session started, waiting for audio chunks...")
             chunk_count = 0
             send_count = 0
-            fail_count = 0
             while True:
                 data = await websocket.receive_text()
                 msg = json.loads(data)
@@ -759,53 +918,48 @@ async def ws_live(websocket: WebSocket):
                         audio_chunk = np.frombuffer(audio_bytes, dtype=np.float32)
                         chunk_count += 1
 
-                        # Run CPU-intensive ASR in thread pool to avoid blocking event loop
                         result = await asyncio.to_thread(engine.process_chunk, audio_chunk)
 
-                        # Only send response if there's text or endpoint detected
                         if result.text or result.is_final:
-                            # For final segments, apply text post-processing
-                            postproc_info = None
                             display_text = str(result.text)
+                            postproc_info = None
                             if result.is_final and result.text and HAS_POSTPROCESSOR:
                                 try:
                                     display_text, postproc_info = await asyncio.to_thread(
                                         postprocess_text, str(result.text)
                                     )
-                                    if postproc_info and postproc_info.get('corrections'):
-                                        logger.info(f"Live postproc: '{result.text[:30]}' → '{display_text[:30]}'")
                                 except Exception as pe:
                                     logger.warning(f"Post-processing failed: {pe}")
 
                             if result.text:
                                 logger.info(f"Live chunk #{chunk_count}: text='{result.text[:50]}', final={result.is_final}")
-                            try:
-                                resp_data = {
-                                    "timestamp": float(result.timestamp),
-                                    "text": str(display_text),
-                                    "raw_text": str(result.raw_text),
-                                    "is_partial": bool(result.is_partial),
-                                    "is_final": bool(result.is_final),
-                                    "snr_db": float(result.snr_db) if result.snr_db else 25.0,
-                                    "quality_label": str(result.quality_label),
-                                    "asr_confidence": float(result.asr_confidence) if result.asr_confidence else 0.8,
-                                }
-                                # Include post-processing info for final segments
-                                if postproc_info:
-                                    resp_data["postprocessed"] = True
-                                    resp_data["original_text"] = postproc_info.get('original_text', '')
-                                    resp_data["fillers_removed"] = postproc_info.get('fillers_removed', [])
-                                    resp_data["corrections"] = postproc_info.get('corrections', [])
-                                await websocket.send_json({
-                                    "type": "live_result",
-                                    "data": resp_data
-                                })
-                                send_count += 1
-                            except Exception as send_err:
-                                fail_count += 1
-                                logger.error(f"Live send failed #{chunk_count}: {send_err} (fails={fail_count})")
+                            resp_data = {
+                                "timestamp": float(result.timestamp),
+                                "text": str(display_text),
+                                "raw_text": str(result.raw_text),
+                                "is_partial": bool(result.is_partial),
+                                "is_final": bool(result.is_final),
+                                "snr_db": float(result.snr_db) if result.snr_db else 25.0,
+                                "quality_label": str(result.quality_label),
+                                "asr_confidence": float(result.asr_confidence) if result.asr_confidence else 0.8,
+                                "speaker_id": getattr(result, 'speaker_id', 'unknown'),
+                                "corrections": result.corrections or [],
+                                "logic_flags": result.logic_flags or [],
+                                "terms": result.terms or [],
+                                "uncertain_spans": result.uncertain_spans or [],
+                            }
+                            if postproc_info:
+                                resp_data["postprocessed"] = True
+                                resp_data["original_text"] = postproc_info.get('original_text', '')
+                                resp_data["fillers_removed"] = postproc_info.get('fillers_removed', [])
+                                resp_data["corrections"] = postproc_info.get('corrections', [])
+                            await manager.send_json(websocket, {
+                                "type": "live_result",
+                                "data": resp_data
+                            })
+                            send_count += 1
                 elif msg.get("action") == "stop":
-                    logger.info(f"Live session stopped: chunks={chunk_count}, sent={send_count}, failed={fail_count}")
+                    logger.info(f"Live session stopped: chunks={chunk_count}, sent={send_count}")
                     engine.end_session()
                     break
         else:
@@ -892,7 +1046,7 @@ async def ws_logs(websocket: WebSocket):
     logger.info("Log streaming WS connected")
     try:
         while True:
-            logs = get_recent_logs(50)
+            logs = get_recent_log_entries(50)
             await websocket.send_json({"type": "logs", "data": logs})
             try:
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=2)

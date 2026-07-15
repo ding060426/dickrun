@@ -300,6 +300,133 @@ body {
   max-height: 160px; overflow-y: auto;
 }
 
+/* ── Results Panel (v3.1 — ChatGPT minimalist) ── */
+.results-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 2fr;
+  gap: 10px;
+  max-height: 210px; overflow: hidden;
+}
+.results-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color 0.2s;
+}
+.results-card:hover { border-color: rgba(255,255,255,0.12); }
+.results-card-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+  letter-spacing: 0.3px;
+}
+.results-card-body {
+  padding: 12px 14px;
+  flex: 1; overflow-y: auto;
+  font-size: 12px; line-height: 1.6;
+}
+.results-card-body::-webkit-scrollbar { width: 3px; }
+.results-card-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+/* Domain card */
+.domain-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px; font-weight: 600;
+  background: rgba(74,144,217,0.12);
+  color: #6db3f2;
+  margin-bottom: 8px;
+}
+.domain-meta {
+  font-size: 11px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.domain-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); }
+.domain-sub { margin-top: 6px; }
+.domain-sub-tag {
+  display: inline-block;
+  padding: 2px 8px; margin: 2px 4px 2px 0;
+  border-radius: 10px; font-size: 10px;
+  background: rgba(255,255,255,0.04); color: var(--text-secondary);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.domain-matched {
+  margin-top: 6px; font-size: 10px; color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Hotword card */
+.hotword-tag {
+  display: inline-block;
+  padding: 3px 9px; margin: 2px 4px 2px 0;
+  border-radius: 10px; font-size: 11px;
+  background: rgba(255,255,255,0.03);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  cursor: default;
+}
+.hotword-tag.top {
+  background: rgba(80,184,108,0.08); color: #6cc98a;
+}
+
+/* Speaker card */
+.speaker-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0;
+}
+.speaker-row + .speaker-row { border-top: 1px solid rgba(255,255,255,0.04); }
+.speaker-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.speaker-name {
+  font-size: 11px; font-weight: 500; min-width: 50px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-primary);
+}
+.speaker-bars { flex: 1; }
+.speaker-bar-bg {
+  height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;
+}
+.speaker-bar-fill {
+  height: 100%; border-radius: 2px; transition: width 0.6s ease;
+}
+.speaker-count {
+  font-size: 10px; color: var(--text-muted); min-width: 50px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Summary card */
+.summary-text {
+  line-height: 1.7; color: var(--text-secondary);
+  font-size: 12px; margin-bottom: 8px;
+}
+.summary-section { margin-bottom: 8px; }
+.summary-section-title {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  letter-spacing: 0.5px; margin-bottom: 4px;
+  text-transform: uppercase; opacity: 0.7;
+}
+.summary-topic-tag {
+  display: inline-block;
+  padding: 2px 7px; margin: 1px 3px 3px 0;
+  border-radius: 8px; font-size: 10px;
+  background: rgba(74,144,217,0.08); color: #6db3f2;
+}
+.summary-action-item {
+  font-size: 11px; padding: 4px 0; line-height: 1.5;
+}
+.summary-action-item + .summary-action-item { border-top: 1px solid rgba(255,255,255,0.04); }
+.summary-empty {
+  color: var(--text-muted); opacity: 0.5;
+  text-align: center; padding: 18px 0; font-size: 11px;
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed; top: 70px; right: 20px;
@@ -543,6 +670,43 @@ body {
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- 分析结果面板 (v3.1)                                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="results-panel" id="resultsPanel">
+  <!-- 领域卡片 -->
+  <div class="results-card">
+    <div class="results-card-header">会议领域</div>
+    <div class="results-card-body" id="domainCard">
+      <div class="summary-empty">分析中…</div>
+    </div>
+  </div>
+
+  <!-- 热词卡片 -->
+  <div class="results-card">
+    <div class="results-card-header">关键术语</div>
+    <div class="results-card-body" id="hotwordCard">
+      <div class="summary-empty">提取中…</div>
+    </div>
+  </div>
+
+  <!-- 说话人卡片 -->
+  <div class="results-card">
+    <div class="results-card-header">说话人分布</div>
+    <div class="results-card-body" id="speakerCard">
+      <div class="summary-empty">识别中…</div>
+    </div>
+  </div>
+
+  <!-- 摘要卡片 -->
+  <div class="results-card">
+    <div class="results-card-header">会议摘要</div>
+    <div class="results-card-body" id="summaryCard">
+      <div class="summary-empty">会议处理完成后将自动生成摘要…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
@@ -651,6 +815,10 @@ const micOrbWrap = $('micOrbWrap');
 const micOrbWave = $('micOrbWave');
 const micOrbTitle = $('micOrbTitle');
 const micOrbSubtitle = $('micOrbSubtitle');
+const domainCard = $('domainCard');
+const hotwordCard = $('hotwordCard');
+const speakerCard = $('speakerCard');
+const summaryCard = $('summaryCard');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1186,6 +1354,180 @@ function updateLogicPanel() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 分析结果面板渲染 (v3.1)
+// ═══════════════════════════════════════════════════════════
+
+const SPEAKER_COLORS = ['#4A90D9', '#E8743C', '#50B86C', '#e8b83c', '#8b6ce8', '#e0556a'];
+
+function resetResultsPanel() {
+  if (domainCard) domainCard.innerHTML = '<div class="summary-empty">分析中…</div>';
+  if (hotwordCard) hotwordCard.innerHTML = '<div class="summary-empty">提取中…</div>';
+  if (speakerCard) speakerCard.innerHTML = '<div class="summary-empty">识别中…</div>';
+  if (summaryCard) summaryCard.innerHTML = '<div class="summary-empty">会议处理完成后将自动生成摘要…</div>';
+}
+
+function renderResultsPanel(data) {
+  if (!data) return;
+
+  // 1. 领域
+  if (data.domain) {
+    renderDomainCard(data.domain);
+  } else {
+    if (domainCard) domainCard.innerHTML = '<div class="summary-empty">尚未识别</div>';
+  }
+
+  // 2. 热词
+  renderHotwordCard(data.hotwords || []);
+
+  // 3. 说话人分布
+  renderSpeakerCard(data.speaker_stats || {});
+
+  // 4. 摘要
+  if (data.summary) {
+    renderSummaryCard(data.summary);
+  }
+}
+
+function renderDomainCard(domain) {
+  const card = document.getElementById('domainCard');
+  if (!card) return;
+
+  if (!domain || !domain.domain) {
+    card.innerHTML = '<div class="summary-empty">未检测到领域</div>';
+    return;
+  }
+
+  const pct = domain.confidence ? Math.round(domain.confidence * 100) : '--';
+  const methodLabel = domain.method === 'llm' ? 'LLM 推理' : (domain.method === 'demo' ? '演示' : '规则匹配');
+
+  let h = `<div class="domain-badge">${escapeHTML(domain.domain)}</div>`;
+  h += `<div class="domain-meta">`;
+  h += `<span>置信度 ${pct}%</span>`;
+  h += `<span class="dot"></span>`;
+  h += `<span>${methodLabel}</span>`;
+  h += `</div>`;
+
+  if (domain.sub_domains && domain.sub_domains.length > 0) {
+    h += '<div class="domain-sub">';
+    domain.sub_domains.forEach(sd => { h += `<span class="domain-sub-tag">${escapeHTML(sd)}</span>`; });
+    h += '</div>';
+  }
+
+  if (domain.matched_terms && domain.matched_terms.length > 0) {
+    h += '<div class="domain-matched">匹配词：' + domain.matched_terms.slice(0, 6).map(t => escapeHTML(t)).join(' · ') + '</div>';
+  }
+
+  if (domain.reason) {
+    h += `<div class="domain-matched" style="margin-top:2px;">${escapeHTML(domain.reason)}</div>`;
+  }
+
+  card.innerHTML = h;
+}
+
+function renderHotwordCard(hotwords) {
+  const card = document.getElementById('hotwordCard');
+  if (!card) return;
+
+  if (!hotwords || hotwords.length === 0) {
+    card.innerHTML = '<div class="summary-empty">暂未提取到关键术语</div>';
+    return;
+  }
+
+  const top = hotwords.slice(0, 20);
+  let h = '';
+  top.forEach((hw, i) => {
+    const cls = i < 5 ? 'hotword-tag top' : 'hotword-tag';
+    const label = typeof hw === 'string' ? hw : (hw.word || hw);
+    h += `<span class="${cls}">${escapeHTML(label)}</span>`;
+  });
+  if (hotwords.length > 20) {
+    h += `<span class="hotword-tag" style="opacity:0.4;">+${hotwords.length - 20}</span>`;
+  }
+
+  card.innerHTML = h;
+}
+
+function renderSpeakerCard(stats) {
+  const card = document.getElementById('speakerCard');
+  if (!card) return;
+
+  if (!stats || Object.keys(stats).length === 0) {
+    card.innerHTML = '<div class="summary-empty">暂未识别说话人</div>';
+    return;
+  }
+
+  const entries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((s, e) => s + e[1], 0);
+
+  let h = '';
+  entries.forEach(([name, count], i) => {
+    const pct = Math.round(count / total * 100);
+    const color = SPEAKER_COLORS[i % SPEAKER_COLORS.length];
+    h += `<div class="speaker-row">
+      <div class="speaker-dot" style="background:${color};"></div>
+      <div class="speaker-name" title="${escapeHTML(name)}">${escapeHTML(name)}</div>
+      <div class="speaker-bars"><div class="speaker-bar-bg"><div class="speaker-bar-fill" style="width:${pct}%;background:${color};"></div></div></div>
+      <div class="speaker-count">${count} 段 (${pct}%)</div>
+    </div>`;
+  });
+
+  card.innerHTML = h;
+}
+
+function renderSummaryCard(summary) {
+  const card = document.getElementById('summaryCard');
+  if (!card) return;
+
+  const hasContent = (summary.summary && summary.summary.trim()) ||
+    (summary.topics && summary.topics.length > 0) ||
+    (summary.action_items && summary.action_items.length > 0);
+
+  if (!hasContent) {
+    card.innerHTML = '<div class="summary-empty">暂未生成摘要</div>';
+    return;
+  }
+
+  let h = '';
+
+  if (summary.summary && summary.summary.trim()) {
+    h += `<div class="summary-text">${escapeHTML(summary.summary)}</div>`;
+  }
+
+  if (summary.topics && summary.topics.length > 0) {
+    h += '<div class="summary-section"><div class="summary-section-title">讨论主题</div>';
+    summary.topics.forEach(t => {
+      const text = typeof t === 'string' ? t : (t.topic || t);
+      h += `<span class="summary-topic-tag">${escapeHTML(text)}</span>`;
+    });
+    h += '</div>';
+  }
+
+  if (summary.decisions && summary.decisions.length > 0) {
+    h += '<div class="summary-section"><div class="summary-section-title">会议决策</div>';
+    summary.decisions.forEach(d => {
+      const text = typeof d === 'string' ? d : (d.decision || '');
+      h += `<div class="summary-action-item" style="border-left:2px solid var(--accent-yellow);padding-left:8px;">${escapeHTML(text)}</div>`;
+    });
+    h += '</div>';
+  }
+
+  if (summary.action_items && summary.action_items.length > 0) {
+    h += '<div class="summary-section"><div class="summary-section-title">待办事项</div>';
+    summary.action_items.forEach(a => {
+      const task = typeof a === 'string' ? a : (a.task || '');
+      const assignee = typeof a === 'object' ? (a.assignee || '') : '';
+      const deadline = typeof a === 'object' ? (a.deadline || '') : '';
+      const detail = assignee ? `${task} — ${assignee}` : task;
+      const suffix = deadline ? ` (${deadline})` : '';
+      h += `<div class="summary-action-item">${escapeHTML(detail)}${escapeHTML(suffix)}</div>`;
+    });
+    h += '</div>';
+  }
+
+  card.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════════
 // Demo Mode
 // ═══════════════════════════════════════════════════════════
 
@@ -1290,6 +1632,7 @@ function handleUploadHTTPResponse(result, generation = resetGeneration) {
     if (segmentCounter) segmentCounter.textContent = `${result.segments.length}/${result.segments.length}`;
     updateStats(result.segments_count || result.segments.length);
     updateLogicPanel();
+    renderResultsPanel(result);
     showToast(`完成：${result.segments_count || result.segments.length} 个片段`);
     finishUploadUI('complete');
   } else if (result.status === 'demo_mode') {
@@ -1573,6 +1916,7 @@ function handleUploadWSMessage(msg) {
         }
       }
       updateStats(allSegments.filter(Boolean).length);
+      renderResultsPanel(msg.data);
       finishUploadUI('complete');
       break;
 
@@ -1926,6 +2270,7 @@ function resetAll() {
   allSegments = [];
   demoData = null;
   audioManager.reset();
+  resetResultsPanel();
 
   const btnStart = $('btnStart');
   if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }

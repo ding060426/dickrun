@@ -60,6 +60,7 @@ class ASRResult:
     timestamp: float = 0.0
     start_sec: float = 0.0      # segment start time in audio
     end_sec: float = 0.0        # segment end time in audio
+    speaker_id: str = "unknown"  # v3.1: identified speaker
 
     # Audio waveform data (raw float32 numpy array, not serialized to JSON)
     audio_data: Optional[np.ndarray] = field(default=None, repr=False)
@@ -97,12 +98,12 @@ def _energy_vad(
     sample_rate: int,
     frame_ms: int = 25,
     hop_ms: int = 10,
-    energy_threshold_ratio: float = 0.03,
-    min_speech_frames: int = 25,     # ~250ms min speech
-    min_silence_frames: int = 50,    # ~500ms min silence gap (merge short pauses)
-    pre_padding_ms: float = 300,     # padding before speech
-    post_padding_ms: float = 300,    # padding after speech
-    min_segment_duration: float = 2.0,  # merge segments shorter than this with neighbors
+    energy_threshold_ratio: float = 0.06,  # raised from 0.03 → filter background noise
+    min_speech_frames: int = 15,           # ~150ms min speech (was 25=250ms)
+    min_silence_frames: int = 30,          # ~300ms gap → sentence break (was 50=500ms)
+    pre_padding_ms: float = 200,           # reduced from 300ms
+    post_padding_ms: float = 200,          # reduced from 300ms
+    min_segment_duration: float = 0.8,     # allow shorter independent segments (was 2.0s)
 ) -> List[tuple]:
     """
     Detect speech segments using energy-based VAD.
@@ -236,7 +237,10 @@ class XASREngine:
         enable_hotword_correction: bool = True,
         enable_uncertainty: bool = True,
         enable_endpoint_detection: bool = True,
+        enable_text_postprocess: bool = True,
+        enable_cognitive: bool = True,
         model_dir: str = None,
+        eval_ali_root: str = None,
         provider: str = "cpu",
         sample_rate: int = 16000,
         num_threads: int = 2,
@@ -254,7 +258,11 @@ class XASREngine:
             enable_hotword_correction: Enable hotword correction
             enable_uncertainty: Enable uncertainty estimation
             enable_endpoint_detection: Enable sherpa-onnx endpoint detection
+            enable_text_postprocess: Enable post-ASR text cleaning pipeline
+            enable_cognitive: Enable cognitive enhancement (speaker ID + domain
+                inference + content prediction) — LLM API recommended
             model_dir: Model directory
+            eval_ali_root: Eval_Ali dataset root for speaker enrollment
             provider: ONNX inference backend (cpu / cuda / coreml)
             sample_rate: Audio sample rate
             num_threads: Inference threads
@@ -267,6 +275,8 @@ class XASREngine:
         self.enable_hotword_correction = enable_hotword_correction
         self.enable_uncertainty = enable_uncertainty
         self.enable_endpoint_detection = enable_endpoint_detection
+        self.enable_text_postprocess = enable_text_postprocess
+        self.enable_cognitive = enable_cognitive
         self.speaker_id = speaker_id
         self._sample_rate = sample_rate
         self._num_threads = num_threads
@@ -303,6 +313,33 @@ class XASREngine:
         self.hotword_corrector = HotwordCorrector(hotwords or []) if enable_hotword_correction else None
         self.logic_validator = LogicValidator() if enable_logic_validation else None
         self.uncertainty_estimator = UncertaintyEstimator() if enable_uncertainty else None
+
+        # Speaker identification (v3.1)
+        self.speaker_identifier = None
+        self.speaker_diarizer = None
+        if enable_cognitive:
+            try:
+                from modules.speaker_diarization import SpeakerIdentifier, SpeakerDiarizer
+                self.speaker_identifier = SpeakerIdentifier(embed_dim=256)
+                self.speaker_diarizer = SpeakerDiarizer()
+                # Do not scan Eval_Ali at startup unless a root is explicitly supplied.
+                # Large datasets make server startup slow; /api/speakers/enroll_from_eval
+                # can enroll on demand.
+                enrolled = self.speaker_identifier.enroll_from_eval_ali(eval_ali_root) if eval_ali_root else 0
+                if enrolled > 0:
+                    logger.info(f"SpeakerIdentifier: enrolled {enrolled} speakers from Eval_Ali")
+                elif self.speaker_identifier.has_enrolled():
+                    logger.info(f"SpeakerIdentifier: {len(self.speaker_identifier.enrolled)} speakers in registry")
+                else:
+                    logger.info("SpeakerIdentifier: no speakers enrolled")
+            except ImportError as e:
+                logger.debug(f"Speaker identification not available: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to init speaker modules: {e}")
+
+        # Domain/cognitive state (v3.1)
+        self._meeting_domain: Optional[dict] = None
+        self._meeting_hotwords: List[str] = []
 
         # Session state
         self._session_active = False
@@ -369,6 +406,8 @@ class XASREngine:
         logger.info(f"=== Processing audio file: {os.path.basename(file_path)} ===")
 
         t0 = time.time()
+        self._meeting_domain = None
+        self._meeting_hotwords = []
 
         # 1. Load audio
         if on_progress:
@@ -383,11 +422,30 @@ class XASREngine:
             return []
         if on_progress:
             on_progress("vad", 0.05)
-        segments = _energy_vad(data, sr)
+        segments = _energy_vad(
+            data, sr,
+            energy_threshold_ratio=0.06,   # filter out background hum & light breathing
+            min_speech_frames=15,          # ~150ms — catch short utterances, skip clicks
+            min_silence_frames=30,         # ~300ms — cut at natural pauses
+            pre_padding_ms=200,
+            post_padding_ms=200,
+            min_segment_duration=0.8,      # keep brief but meaningful phrases
+        )
         total_segments = len(segments)
         logger.info(f"VAD found {total_segments} speech segments")
 
-        # 3. Process each speech segment
+        # 3. Speaker diarization (v3.1 — cluster-based, before per-segment processing)
+        speaker_labels = None
+        if self.speaker_diarizer and len(segments) > 1:
+            try:
+                diar_segments = self.speaker_diarizer.diarize(data, sr)
+                if diar_segments:
+                    logger.info(f"Speaker diarization found {len(set(d['speaker'] for d in diar_segments))} speakers")
+                    speaker_labels = diar_segments
+            except Exception as e:
+                logger.debug(f"Speaker diarization failed (non-fatal): {e}")
+
+        # 4. Process each speech segment
         self.start_session()
         results = []
 
@@ -409,6 +467,15 @@ class XASREngine:
                 logger.debug(f"  Segment {seg_idx}: too short ({seg_dur:.2f}s), skipping")
                 continue
 
+            # Assign speaker label from diarization BEFORE processing
+            if speaker_labels:
+                seg_mid = (start_s + end_s) / 2
+                # Find which diarization segment covers this VAD segment's midpoint
+                for ds in speaker_labels:
+                    if ds["start"] <= seg_mid <= ds["end"]:
+                        self.set_speaker(ds["speaker"])
+                        break
+
             logger.debug(f"  Segment {seg_idx}: {start_s:.1f}s - {end_s:.1f}s ({seg_dur:.1f}s)")
 
             # Process this segment with a fresh ASR stream
@@ -416,10 +483,19 @@ class XASREngine:
 
             if result and result.text.strip():
                 results.append(result)
-                if on_segment:
+                if on_segment and not (cancel_event is not None and cancel_event.is_set()):
                     on_segment(result, len(results), total_segments)
 
-        # 4. Done
+        if cancel_event is not None and cancel_event.is_set():
+            self.end_session()
+            logger.info("Processing cancelled before cognitive enhancement")
+            return results
+
+        # 4. Cognitive enhancement: domain inference + hotword extraction (v3.1)
+        if self.enable_cognitive and results:
+            self._apply_cognitive_enhancement(results)
+
+        # 5. Done
         self.end_session()
         elapsed = time.time() - t0
         logger.info(
@@ -446,6 +522,20 @@ class XASREngine:
         rt60 = estimate_rt60(audio, sr)
         self._current_snr = snr_db
         self._current_rt60 = rt60
+
+        # Speaker identification (v3.1)
+        if self.speaker_identifier and self.speaker_identifier.has_enrolled():
+            try:
+                embedding = self.speaker_identifier.extract_embedding(audio, sr)
+                spk_name, spk_conf = self.speaker_identifier.identify(embedding)
+                if spk_name and spk_conf > 0.5:
+                    self.set_speaker(spk_name)
+                    logger.debug(f"Speaker identified: {spk_name} (confidence={spk_conf:.2f})")
+                else:
+                    # Unknown speaker, keep as-is
+                    pass
+            except Exception as e:
+                logger.debug(f"Speaker identification skipped: {e}")
 
         seg_dur = len(audio) / sr
 
@@ -624,6 +714,7 @@ class XASREngine:
             return ASRResult(
                 text="", raw_text="",
                 is_partial=True, is_final=False,
+                speaker_id=self.speaker_id,
                 snr_db=self._current_snr, quality_label="medium",
             )
 
@@ -739,6 +830,7 @@ class XASREngine:
             is_partial=is_partial, is_final=is_final,
             timestamp=time.time(),
             start_sec=start_sec, end_sec=end_sec,
+            speaker_id=self.speaker_id,
             asr_confidence=asr_confidence,
             snr_db=round(self._current_snr, 1),
             rt60=round(self._current_rt60, 2),
@@ -791,6 +883,111 @@ class XASREngine:
     def set_speaker(self, speaker_id: str):
         """Switch speaker."""
         self.speaker_id = speaker_id
+
+    def get_speaker(self) -> str:
+        return self.speaker_id
+
+    # ------------------------------------------------------------------
+    # Cognitive enhancement (v3.1)
+    # ------------------------------------------------------------------
+
+    def _apply_cognitive_enhancement(self, results: List[ASRResult]):
+        """
+        Post-processing cognitive enhancement:
+          1. Extract hotwords from all transcribed segments
+          2. Infer meeting domain from hotwords
+          3. Load domain-specific terminology
+        """
+        try:
+            # 1. Collect all terms and texts
+            all_terms = []
+            all_texts = []
+            for r in results:
+                if hasattr(r, 'terms') and r.terms:
+                    all_terms.extend(r.terms)
+                if r.text:
+                    all_texts.append(r.text)
+
+            if not all_texts:
+                return
+
+            # 2. Extract hotwords using jieba (if available)
+            try:
+                from modules.hotword_engine import HotwordExtractor
+                extractor = HotwordExtractor()
+                extracted = extractor.extract(all_texts, top_n=30)
+                # Lower threshold — TF-IDF scores for meeting terms are typically 0.3–3.0
+                new_hotwords = [h["word"] for h in extracted if h["score"] > 0.3]
+                # Always populate _meeting_hotwords so the frontend always renders
+                self._meeting_hotwords = [h["word"] for h in extracted[:20]]
+                if new_hotwords:
+                    self.add_hotwords(new_hotwords)
+                    logger.info(f"Auto-extracted {len(new_hotwords)} hotwords: {new_hotwords[:10]}...")
+                    all_terms.extend(new_hotwords)
+                elif extracted:
+                    logger.info(f"Extracted {len(extracted)} low-score terms, passing top to frontend")
+            except ImportError:
+                logger.debug("jieba not available — skipping auto hotword extraction")
+            except Exception as e:
+                logger.debug(f"Hotword extraction failed: {e}")
+
+            # 3. Domain inference
+            unique_terms = list(set(all_terms))
+            if unique_terms:
+                try:
+                    from modules.domain_taxonomy import match_domain
+                    domain_matches = match_domain(unique_terms)
+                    if domain_matches:
+                        top_domain, top_score, matched = domain_matches[0]
+                        self._meeting_domain = {
+                            "domain": top_domain,
+                            "score": top_score,
+                            "matched_terms": matched[:10],
+                            "all_candidates": [
+                                {"domain": d, "score": s}
+                                for d, s, _ in domain_matches[:3]
+                            ],
+                        }
+                        logger.info(f"Domain inferred: {top_domain} (score={top_score:.2f})")
+
+                        # Load domain-specific hotwords
+                        from modules.domain_taxonomy import get_domain_keywords
+                        domain_kw = get_domain_keywords(top_domain)
+                        if domain_kw:
+                            # Add top 50 domain keywords
+                            self.add_hotwords(domain_kw[:50])
+                            logger.info(f"Loaded {min(50, len(domain_kw))} domain keywords for '{top_domain}'")
+                except Exception as e:
+                    logger.debug(f"Domain inference failed: {e}")
+
+            # 4. LLM-based content prediction (if LLM available)
+            try:
+                from modules.llm_client import get_llm_client
+                llm = get_llm_client()
+                if llm.is_available:
+                    # Build context from last few segments
+                    recent_context = [r.text for r in results[-5:] if r.text]
+                    if recent_context and len(recent_context) >= 2:
+                        predicted = llm.extract_keywords(
+                            " ".join(recent_context),
+                            max_count=10
+                        )
+                        if predicted:
+                            self.add_hotwords(predicted)
+                            logger.debug(f"LLM predicted terms: {predicted[:5]}...")
+            except Exception as e:
+                logger.debug(f"LLM content prediction skipped: {e}")
+
+        except Exception as e:
+            logger.warning(f"Cognitive enhancement failed (non-fatal): {e}")
+
+    def get_meeting_domain(self) -> Optional[dict]:
+        """Get the inferred meeting domain (after process_file completes)."""
+        return self._meeting_domain
+
+    def get_meeting_hotwords(self) -> List[str]:
+        """Get auto-extracted meeting hotwords."""
+        return self._meeting_hotwords
 
     @property
     def is_model_available(self) -> bool:

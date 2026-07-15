@@ -84,7 +84,7 @@ try:
     logger.info("X-ASR module loaded")
 except ImportError as e:
     logger.warning(f"X-ASR module load failed: {e}")
-    logger.warning("Will use demo mode only")
+    logger.warning("Transcription endpoints will report X-ASR as unavailable")
     HAS_XASR = False
 
 # ── Eval_Ali ────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ def _load_xasr_engine():
     """Build and atomically publish the configured live/final ASR runtimes."""
     global xasr_engine, final_xasr_engine, xasr_pool, xasr_loading
     if not HAS_XASR:
-        logger.info("X-ASR not available, demo mode only")
+        logger.info("X-ASR not available; transcription is disabled")
         return
     xasr_loading = True
     logger.info("Loading configured X-ASR live/final runtimes...")
@@ -268,57 +268,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===========================================================================
-# Demo Data (unchanged - used for demo mode)
-# ===========================================================================
-
-DEMO_MEETING = {
-    "title": "2024Q3 Product Review",
-    "date": "2024-07-14 14:00",
-    "duration": "04:30",
-    "participants": [
-        {"id": "SPK_1", "name": "Zhang San", "role": "PM", "color": "#4A90D9"},
-        {"id": "SPK_2", "name": "Li Si", "role": "Tech Lead", "color": "#E8743C"},
-        {"id": "SPK_3", "name": "Wang Wu", "role": "Ops", "color": "#50B86C"},
-    ],
-    "hotwords": [
-        "BERT", "Transformer", "A/B Test", "Conversion", "Multimodal",
-        "Full Users", "New Users", "Q3", "OKR", "Fine-tuning",
-        "Attention", "Recommendation", "Review", "Budget", "User Base"
-    ],
-    "segments": [
-        {
-            "start": 0.0, "end": 5.5, "speaker": "SPK_1", "snr_db": 28, "quality": "high",
-            "raw_text": "Today we review Q3 conversion data, we fine-tuned BERT-based recommendation model, conversion went from 10% to 15%.",
-            "display_text": "Today we review Q3 conversion data, we fine-tuned BERT-based recommendation model, conversion went from 10% to 15%.",
-            "corrections": [{"pos": 21, "original": "bat", "corrected": "BERT", "method": "pinyin_match"}],
-            "terms": ["Q3", "BERT", "Recommendation", "Fine-tuning", "Conversion"],
-            "data_points": [{"value": "10%", "type": "baseline"}, {"value": "15%", "type": "result"}],
-            "logic_flags": []
-        },
-        {
-            "start": 6.0, "end": 12.0, "speaker": "SPK_2", "snr_db": 26, "quality": "high",
-            "raw_text": "Wait, my backend data shows conversion is only 8%, that doesn't match your numbers.",
-            "display_text": "Wait, my backend data shows conversion is only 8%, that doesn't match your numbers.",
-            "corrections": [], "terms": ["Conversion"],
-            "data_points": [{"value": "8%", "type": "conflict"}],
-            "logic_flags": [{"type": "data_conflict", "severity": "warning",
-                             "message": "Data conflict: Zhang San claims 15% vs Li Si claims 8%",
-                             "conflict_with": {"speaker": "SPK_1", "time": "00:02", "claim": "15%"},
-                             "resolution": "Pending - may be different metric definitions"}]
-        },
-    ],
-    "summary": {
-        "topics": ["Q3 conversion data alignment - resolved (Full Users vs New Users)"],
-        "todos": [{"assignee": "Zhang San", "task": "Unify conversion metrics", "deadline": "by 07/21"}],
-        "low_confidence_spots": [],
-        "stats": {"total_segments": 2, "logic_flags": 1, "low_confidence": 0, "resolved": 0, "overall_confidence": 0.85}
-    }
-}
-
 hotword_config_store = HotwordConfigStore(
     HOTWORDS_CONFIG_PATH,
-    DEMO_MEETING["hotwords"],
+    [],
 )
 
 # ===========================================================================
@@ -682,12 +634,6 @@ async def get_xasr_status():
         },
         "loading": xasr_loading,
     }
-
-
-@app.get("/api/meeting/demo")
-async def get_demo_meeting():
-    """Return demo meeting data."""
-    return DEMO_MEETING
 
 
 @app.get("/api/hotwords")
@@ -1159,26 +1105,24 @@ async def upload_audio(
             except Exception:
                 pass
 
-            logger.warning(f"X-ASR not available for {file.filename}, returning demo")
+            error_message = "X-ASR model is not loaded; transcription cannot start"
+            logger.warning("%s: %s", error_message, file.filename)
             if queue:
                 await queue.put({
                     "type": "complete",
                     "data": {
                         "file_id": file_id,
                         "filename": file.filename,
-                        "status": "demo_mode",
-                        "engine": "Demo (model not loaded)",
-                        "message": "Place ONNX models in backend/xasr/models/",
-                        "demo_data": DEMO_MEETING,
+                        "status": "error",
+                        "error": error_message,
                     }
                 })
 
             return {
                 "file_id": file_id,
                 "filename": file.filename,
-                "status": "demo_mode",
-                "engine": "Demo (model not loaded)",
-                "demo_data": DEMO_MEETING,
+                "status": "error",
+                "error": error_message,
             }
 
     except UploadTooLargeError as e:
@@ -1232,54 +1176,6 @@ async def rename_meeting_speaker(meeting_id: str, speaker_id: str, data: dict):
 # WebSocket endpoints
 # ===========================================================================
 
-@app.websocket("/ws/meeting")
-async def ws_meeting(websocket: WebSocket):
-    """Demo meeting playback via WebSocket."""
-    await manager.connect(websocket)
-    logger.info("Demo WebSocket connected")
-    try:
-        await manager.send_json(websocket, {
-            "type": "meeting_start",
-            "data": {
-                "title": DEMO_MEETING["title"],
-                "date": DEMO_MEETING["date"],
-                "participants": DEMO_MEETING["participants"],
-                "hotwords": DEMO_MEETING["hotwords"],
-            }
-        })
-
-        for i, seg in enumerate(DEMO_MEETING["segments"]):
-            await asyncio.sleep(0.3)
-            await manager.send_json(websocket, {
-                "type": "transcript_segment",
-                "data": {
-                    "segment": seg,
-                    "segment_index": i,
-                    "total_segments": len(DEMO_MEETING["segments"]),
-                    "current_time": f"{int(seg['end']//60):02d}:{int(seg['end']%60):02d}",
-                    "cumulative_stats": {
-                        "segments_processed": i + 1,
-                        "logic_flags": sum(1 for s in DEMO_MEETING["segments"][:i+1] if s.get("logic_flags")),
-                        "low_confidence": sum(1 for s in DEMO_MEETING["segments"][:i+1] if s.get("uncertain_spans")),
-                        "corrections": sum(len(s.get("corrections", [])) for s in DEMO_MEETING["segments"][:i+1]),
-                    }
-                }
-            })
-
-        await asyncio.sleep(0.5)
-        await manager.send_json(websocket, {
-            "type": "meeting_summary", "data": DEMO_MEETING["summary"]
-        })
-        await manager.send_json(websocket, {
-            "type": "meeting_end",
-            "data": {"total_duration": DEMO_MEETING["duration"], "stats": DEMO_MEETING["summary"]["stats"]}
-        })
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        logger.debug("Demo WebSocket disconnected")
-
-
 @app.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
     """Low-latency preview plus durable recording and canonical final ASR."""
@@ -1327,7 +1223,14 @@ async def ws_live(websocket: WebSocket):
         )
 
     try:
-        backend_type = "X-ASR v2.0" if (engine and engine.is_model_available) else "Demo"
+        if not (engine and engine.is_model_available):
+            await manager.send_json(websocket, {
+                "type": "error",
+                "message": "X-ASR model is not loaded; live transcription is unavailable",
+            })
+            return
+
+        backend_type = "X-ASR v2.0"
         await manager.send_json(websocket, {
             "type": "ready",
             "engine": backend_type,
@@ -1494,22 +1397,6 @@ async def ws_live(websocket: WebSocket):
                     })
                     normal_stop = True
                     break
-        else:
-            # Demo fallback
-            while True:
-                data = await websocket.receive_text()
-                msg = json.loads(data)
-                if msg.get("action") == "stop":
-                    break
-                await manager.send_json(websocket, {
-                    "type": "live_result",
-                    "data": {
-                        "timestamp": time.time(),
-                        "snr_estimate": 22,
-                        "partial_text": "[Demo] X-ASR model not loaded",
-                        "confidence": 0.75,
-                    }
-                })
     except WebSocketDisconnect:
         pass
     except Exception as e:

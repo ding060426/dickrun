@@ -397,6 +397,96 @@ body {
 .btn-secondary:hover { border-color: var(--border-active); }
 .btn-secondary.active { border-color: var(--accent-blue); background: rgba(74,144,217,0.1); }
 .btn-danger { background: rgba(224,85,106,0.15); color: var(--accent-red); border: 1px solid rgba(224,85,106,0.3); }
+.mic-orb-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  width: 240px;
+  min-height: 150px;
+  padding: 18px 18px 14px;
+  border: 1px solid rgba(74,144,217,0.28);
+  border-radius: 24px;
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 18px 60px rgba(42,63,143,0.22), inset 0 1px 0 rgba(255,255,255,0.7);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 950;
+  transform: translateX(-50%) translateY(18px) scale(0.96);
+  transition: opacity 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+}
+.mic-orb-panel.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.mic-orb-panel.listening { border-color: rgba(139,108,232,0.52); }
+.mic-orb-panel.finalizing { border-color: rgba(224,185,85,0.52); }
+.mic-orb-wrap {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mic-orb-ring,
+.mic-orb-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transform: scale(var(--orb-scale, 1));
+  transition: transform 0.08s linear, opacity 0.08s linear;
+}
+.mic-orb-ring {
+  border: 1px solid rgba(139,108,232,0.48);
+  opacity: var(--orb-ring-opacity, 0.35);
+  box-shadow: 0 0 var(--orb-shadow, 18px) rgba(139,108,232,0.42);
+}
+.mic-orb-glow {
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.98), rgba(112,190,255,0.95) 18%, rgba(139,108,232,0.74) 48%, rgba(74,144,217,0.18) 72%, transparent 100%);
+  filter: blur(var(--orb-blur, 0.5px));
+  opacity: var(--orb-glow-opacity, 0.82);
+}
+.mic-orb-core {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 28%, #fff 0%, #bfe8ff 22%, #7a8cff 52%, #6b46e8 100%);
+  box-shadow: inset -10px -12px 24px rgba(28,18,86,0.38), inset 8px 8px 16px rgba(255,255,255,0.28), 0 0 var(--orb-core-shadow, 20px) rgba(74,144,217,0.58);
+  transform: scale(var(--orb-core-scale, 1));
+  transition: transform 0.08s linear, box-shadow 0.08s linear;
+}
+.mic-orb-wave {
+  height: 28px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.mic-orb-wave span {
+  width: 3px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #70beff, #8b6ce8);
+  opacity: 0.42;
+  transform: scaleY(0.12);
+  transition: transform 0.08s linear, opacity 0.08s linear;
+}
+.mic-orb-panel.listening .mic-orb-wave span { opacity: 0.82; }
+.mic-orb-panel.finalizing .mic-orb-wave span { opacity: 0.34; }
+.mic-orb-title { font-size: 13px; font-weight: 700; text-align: center; }
+.mic-orb-subtitle { margin-top: 2px; font-size: 11px; color: var(--text-muted); text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .mic-orb-panel,
+  .mic-orb-ring,
+  .mic-orb-glow,
+  .mic-orb-core,
+  .mic-orb-wave span { transition: none; }
+}
 .progress-bar {
   flex: 1; height: 4px;
   background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;
@@ -934,7 +1024,7 @@ body {
       <div class="empty-state" id="emptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:150px;color:var(--text-muted);gap:8px;">
         <div style="font-size:40px;opacity:0.3;">Mic</div>
         <div>等待会议开始...</div>
-        <div style="font-size:11px;">点击 [演示] 或上传音频文件</div>
+        <div style="font-size:11px;">请录音或上传音频文件</div>
       </div>
     </div>
   </div>
@@ -988,7 +1078,6 @@ body {
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
-  <button class="btn btn-primary" id="btnStart">演示</button>
   <button class="btn btn-secondary" id="btnReset">重置</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">录音</button>
@@ -1082,6 +1171,21 @@ body {
   </div>
 </div>
 
+<div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true" role="status" aria-live="polite">
+  <div class="mic-orb-wrap" id="micOrbWrap">
+    <div class="mic-orb-ring"></div>
+    <div class="mic-orb-glow"></div>
+    <div class="mic-orb-core"></div>
+  </div>
+  <div class="mic-orb-wave" id="micOrbWave">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <div class="mic-orb-title" id="micOrbTitle">正在听你说话</div>
+  <div class="mic-orb-subtitle" id="micOrbSubtitle">音量越大，语音球越活跃</div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Debug Log Panel                                             -->
@@ -1097,6 +1201,7 @@ body {
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Scripts                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
+<script src="./mic-level.js"></script>
 <script src="./live-protocol.js"></script>
 <script src="./management-transcription.js"></script>
 <script type="module">
@@ -1158,6 +1263,12 @@ const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
 const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
+const micOrbPanel = $('micOrbPanel');
+const micOrbWrap = $('micOrbWrap');
+const micOrbWave = $('micOrbWave');
+const micOrbTitle = $('micOrbTitle');
+const micOrbSubtitle = $('micOrbSubtitle');
+const micLevelBars = Array.from(micOrbWave?.querySelectorAll('span') || []);
 const loginOverlay = $('loginOverlay');
 const loginForm = $('loginForm');
 const loginError = $('loginError');
@@ -1173,10 +1284,6 @@ const topbarLogout = $('topbarLogout');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
-let currentSegmentIndex = -1;
-let isPlaying = false;
-let playbackTimer = null;
-let demoData = null;
 
 // Upload
 let uploadWs = null;
@@ -1195,6 +1302,9 @@ let micSequence = 0;
 let micStreamId = null;
 let micStopTimer = null;
 let micSegmentStartIndex = 0;
+let micDisplayLevel = 0;
+let micLevelLastUpdate = 0;
+let micLevelAnimationFrame = null;
 
 // Log stream
 let logWs = null;
@@ -1285,6 +1395,7 @@ function switchModule(name) {
   if (moduleOverlay) moduleOverlay.classList.remove('visible');
   if (btnBack) btnBack.classList.remove('visible');
   if (homeHero) homeHero.classList.add('hidden');
+  stopVolumeMeter();
 
   const nav = $('moduleNav');
   if (nav) {
@@ -1780,7 +1891,7 @@ async function loadAnalyses() {
 
 async function saveAnalysis() {
   if (allSegments.length === 0) {
-      showToast('没有可保存的分段，请先运行演示或上传文件。');
+    showToast('没有可保存的分段，请先录音或上传文件。');
     return;
   }
   try {
@@ -2381,91 +2492,6 @@ function updateLogicPanel() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Demo Mode
-// ═══════════════════════════════════════════════════════════
-
-async function startDemo() {
-  if (isPlaying) return;
-  resetAll();
-
-  try {
-    const resp = await fetch(`${API_BASE}/api/meeting/demo`);
-    demoData = await resp.json();
-  } catch (e) {
-    console.log('Using embedded demo data');
-    demoData = getEmbeddedDemoData();
-  }
-
-  if (meetingTitleDisplay) {
-    meetingTitleDisplay.textContent = demoData.title || 'Demo Meeting';
-  }
-  allSegments = demoData.segments || [];
-
-  isPlaying = true;
-  const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = '播放中...'; btnStart.disabled = true; }
-  updateConnectionStatus('connected');
-
-  currentSegmentIndex = -1;
-  playNextDemoSegment();
-}
-
-function playNextDemoSegment() {
-  if (!isPlaying) return;
-  currentSegmentIndex++;
-  if (currentSegmentIndex >= allSegments.length) {
-    finishDemo();
-    return;
-  }
-
-  const seg = allSegments[currentSegmentIndex];
-  renderSegment(seg, currentSegmentIndex, false);  // demo: no audio, no auto-play
-  updateStats(currentSegmentIndex + 1);
-  updateProgress(currentSegmentIndex);
-  if (seg.logic_flags && seg.logic_flags.length > 0) {
-    updateLogicPanel();
-    for (const f of seg.logic_flags) {
-      if (f.severity === 'warning') showToast('逻辑冲突: ' + (f.message || '').substring(0, 60));
-    }
-  }
-
-  const delay = 1500;
-  playbackTimer = setTimeout(playNextDemoSegment, delay);
-}
-
-function finishDemo() {
-  isPlaying = false;
-  const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
-  updateConnectionStatus('completed');
-  showToast('演示完成');
-}
-
-function updateProgress(segIndex) {
-  const pct = ((segIndex + 1) / Math.max(1, allSegments.length)) * 100;
-  if (progressFill) progressFill.style.width = pct + '%';
-  if (segmentCounter) segmentCounter.textContent = `${segIndex + 1}/${allSegments.length}`;
-  const last = allSegments[segIndex];
-  if (timeDisplay) timeDisplay.textContent = formatTime(last ? (last.end_sec || last.end || 0) : 0);
-}
-
-function getEmbeddedDemoData() {
-  return {
-    "title": "Q3 产品回顾演示",
-    "date": "2024-07-14 14:00",
-    "duration": "04:30",
-    "participants": [],
-    "hotwords": ["BERT", "Q3", "Conversion"],
-    "segments": [
-      {"start":0,"end":5,"snr_db":28,"quality_label":"high","display_text":"演示分段1: 这是模拟会议数据，不含音频。"},
-      {"start":6,"end":12,"snr_db":26,"quality_label":"high","display_text":"演示分段2: 请上传真实音频文件以查看实时波形。"},
-      {"start":13,"end":18,"snr_db":27,"quality_label":"high","display_text":"演示分段3: 更多详情请查看后台日志。"},
-    ],
-    "summary": {"topics":["Demo"], "todos":[], "low_confidence_spots":[], "stats":{}}
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
 // File Upload (with real-time WebSocket + audio waveforms)
 // ═══════════════════════════════════════════════════════════
 
@@ -2487,14 +2513,6 @@ function handleUploadHTTPResponse(result) {
     updateLogicPanel();
     showToast(`完成: ${result.segments_count || result.segments.length} 个分段`);
     finishUploadUI('complete');
-  } else if (result.status === 'demo_mode') {
-    uploadWsDelivered = true;  // prevent double processing
-    showToast('X-ASR 未加载，使用演示模式');
-    if (result.demo_data) {
-      demoData = result.demo_data;
-      startDemo();
-    }
-    finishUploadUI('demo');
   } else if (result.status === 'processing') {
     // Server is processing — wait for WS or fallback timer
     console.log('[Upload] Server processing, waiting for WS...');
@@ -2568,9 +2586,6 @@ async function handleFileUpload(event) {
           showToast('错误: ' + (result.error || '未知'));
           clearTimeout(fallbackTimer);
           finishUploadUI('error');
-        } else if (result.status === 'demo_mode') {
-          clearTimeout(fallbackTimer);
-          handleUploadHTTPResponse(result);
         }
         // For 'processing'/'completed': wait for WS to deliver segments
       } catch (e) {
@@ -2755,6 +2770,73 @@ function finishUploadUI(status) {
 // Live Mic Recording
 // ═══════════════════════════════════════════════════════════
 
+function updateMicLevel(rms, peak) {
+  if (!window.DiTingMicLevel) return;
+  micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
+  micLevelLastUpdate = performance.now();
+}
+
+function renderMicLevel(timestamp) {
+  if (!micOrbPanel?.classList.contains('visible') || !window.DiTingMicLevel) {
+    micLevelAnimationFrame = null;
+    return;
+  }
+  if (timestamp - micLevelLastUpdate > 100) {
+    micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
+  }
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const phase = reduceMotion ? 0 : timestamp / 180;
+  const scales = window.DiTingMicLevel.buildBarScales(
+    micDisplayLevel,
+    phase,
+    micLevelBars.length,
+  );
+  micLevelBars.forEach((bar, index) => {
+    bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
+  });
+  const orb = window.DiTingMicLevel.buildOrbStyle(micDisplayLevel);
+  if (micOrbWrap) {
+    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-ring-opacity', orb.ringOpacity.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-shadow', `${orb.shadow.toFixed(1)}px`);
+    micOrbWrap.style.setProperty('--orb-blur', `${orb.blur.toFixed(1)}px`);
+    micOrbWrap.style.setProperty('--orb-glow-opacity', orb.glowOpacity.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-shadow', `${orb.coreShadow.toFixed(1)}px`);
+  }
+  micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
+}
+
+function setMicVisualizerState(state) {
+  if (!micOrbPanel) return;
+  const active = state === 'recording' || state === 'finalizing';
+  micOrbPanel.classList.toggle('visible', active);
+  micOrbPanel.classList.toggle('listening', state === 'recording');
+  micOrbPanel.classList.toggle('finalizing', state === 'finalizing');
+  micOrbPanel.setAttribute('aria-hidden', active ? 'false' : 'true');
+  if (active) {
+    if (micLevelAnimationFrame === null) {
+      micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
+    }
+    return;
+  }
+  if (micLevelAnimationFrame !== null) cancelAnimationFrame(micLevelAnimationFrame);
+  micLevelAnimationFrame = null;
+  micDisplayLevel = 0;
+  micLevelLastUpdate = 0;
+  micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
+  const orb = window.DiTingMicLevel?.buildOrbStyle(0);
+  if (micOrbWrap && orb) {
+    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
+  }
+}
+
+function setMicOrbMessage(title, subtitle) {
+  if (micOrbTitle && title) micOrbTitle.textContent = title;
+  if (micOrbSubtitle && subtitle) micOrbSubtitle.textContent = subtitle;
+}
+
 async function toggleMic() {
   const btnMic = $('btnMic');
   const micStatusEl = micStatus;
@@ -2801,13 +2883,16 @@ async function toggleMic() {
         }));
       } else if (msg.type === 'configured') {
         micStreamId = msg.data.stream_id || micStreamId;
+        setMicOrbMessage('正在听你说话', `实时转写 · ${msg.data.vad}`);
         if (micStatusEl) {
           micStatusEl.textContent = `实时转写 · ${msg.data.vad}`;
           micStatusEl.style.color = 'var(--accent-red)';
         }
       } else if (msg.type === 'live_result' && msg.data.text) {
+        setMicOrbMessage(msg.data.is_final ? '已识别一句' : '正在转写', '请继续说话');
         updateMicResult(msg.data);
       } else if (msg.type === 'finalizing') {
+        setMicOrbMessage('正在完成转写', '正在生成最终文本与说话人结果');
         if (micStatusEl) {
           micStatusEl.textContent = '正在生成最终转写与说话人分离...';
           micStatusEl.style.color = 'var(--accent-yellow)';
@@ -2816,12 +2901,14 @@ async function toggleMic() {
         replaceMicTranscript(msg.data);
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
+        setMicOrbMessage('转写完成', `已接收 ${seconds} 秒音频`);
         if (micStatusEl) {
           micStatusEl.textContent = `已完成 ${seconds}s`;
           micStatusEl.style.color = 'var(--accent-green)';
         }
         cleanupMicRecording();
       } else if (msg.type === 'error') {
+        setMicOrbMessage('实时转写失败', msg.message || '请重试');
         showToast(msg.message || '实时转写失败');
       }
     };
@@ -2848,10 +2935,13 @@ async function toggleMic() {
           event.data.payload,
         );
         micWs.send(frame);
+      } else if (event.data?.type === 'audio.level') {
+        updateMicLevel(event.data.rms, event.data.peak);
       }
     };
     source.connect(micWorklet).connect(silent).connect(micAudioContext.destination);
     isRecording = true;
+    setMicVisualizerState('recording');
     if (btnMic) { btnMic.textContent = '停止'; btnMic.classList.add('active'); }
     if (micStatusEl) {
       micStatusEl.textContent = `${micAudioContext.sampleRate}Hz → 16kHz`;
@@ -2868,6 +2958,7 @@ async function toggleMic() {
 
 function stopMicRecording() {
   isRecording = false;
+  setMicVisualizerState('finalizing');
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   micWorklet?.port.postMessage({ type: 'capture.stop' });
   if (micStatus) {
@@ -2894,6 +2985,7 @@ async function cleanupMicRecording() {
     await micAudioContext.close();
   }
   micAudioContext = null;
+  setMicVisualizerState('idle');
   if (micWs) {
     if (micWs.readyState === WebSocket.OPEN) micWs.close(1000, 'capture complete');
     micWs = null;
@@ -3064,16 +3156,9 @@ function connectLogStream() {
 // ═══════════════════════════════════════════════════════════
 
 function resetAll() {
-  isPlaying = false;
-  currentSegmentIndex = -1;
-  clearTimeout(playbackTimer);
   allSegments = [];
   currentMeetingId = null;
-  demoData = null;
   audioManager.reset();
-
-  const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
 
   if (transcriptBody) {
     transcriptBody.innerHTML = '';
@@ -3114,7 +3199,7 @@ async function checkBackendStatus() {
       xasrStatus.innerHTML = 'X-ASR 加载中...';
       xasrStatus.style.color = 'var(--accent-yellow)';
     } else {
-      xasrStatus.innerHTML = 'X-ASR 演示模式';
+      xasrStatus.innerHTML = 'X-ASR 未就绪';
       xasrStatus.style.color = 'var(--accent-orange)';
     }
     updateConnectionStatus('connected');
@@ -3142,7 +3227,6 @@ function initApp() {
   startVolumeMeter();
 
   // Button wiring
-  const btnStart = $('btnStart');
   const btnReset = $('btnReset');
   const btnMic = $('btnMic');
   const btnUpload = $('btnUpload');
@@ -3150,7 +3234,6 @@ function initApp() {
   const btnLog = $('btnLog');
   const logPanelHeader = $('logPanelHeader');
 
-  if (btnStart) btnStart.addEventListener('click', startDemo);
   if (btnReset) btnReset.addEventListener('click', resetAll);
   if (btnMic) btnMic.addEventListener('click', toggleMic);
   if (btnUpload) btnUpload.addEventListener('click', () => { if (fileUpload) fileUpload.click(); });
@@ -3218,10 +3301,6 @@ initApp();
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && !e.target.closest('input,textarea')) {
-    e.preventDefault();
-    if (!isPlaying) startDemo();
-  }
   if (e.code === 'KeyR' && e.ctrlKey) {
     e.preventDefault();
     resetAll();

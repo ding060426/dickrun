@@ -8,7 +8,7 @@ const storage = {
   setItem: (key, value) => saved.set(key, value),
 };
 
-const textNode = { dataset: { i18n: 'controls.demo' }, textContent: '' };
+const textNode = { dataset: { i18n: 'controls.mic' }, textContent: '' };
 const parameterNode = {
   dataset: { i18n: 'upload.complete', i18nCount: '4' },
   textContent: '',
@@ -40,7 +40,7 @@ const document = {
 const i18n = createI18n({ storage, document, navigatorLanguage: 'zh-CN' });
 assert.equal(i18n.language, 'en-US');
 i18n.apply();
-assert.equal(textNode.textContent, 'Demo');
+assert.equal(textNode.textContent, 'Mic');
 assert.equal(parameterNode.textContent, 'Complete: 4 segments');
 assert.equal(placeholderNode.placeholder, 'Search settings...');
 assert.equal(titleNode.title, 'Click to rename speaker');
@@ -50,7 +50,7 @@ assert.equal(document.documentElement.lang, 'en-US');
 i18n.setLanguage('zh');
 assert.equal(i18n.language, 'zh-CN');
 assert.equal(saved.get('diting:language'), 'zh-CN');
-assert.equal(textNode.textContent, '演示');
+assert.equal(textNode.textContent, '麦克风');
 assert.equal(placeholderNode.placeholder, '搜索设置...');
 assert.equal(document.documentElement.lang, 'zh-CN');
 assert.equal(i18n.t('upload.complete', { count: 3 }), '完成：3 个片段');

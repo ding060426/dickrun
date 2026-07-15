@@ -100,7 +100,7 @@ python start.py
 - 后端 API: [http://localhost:8765](http://localhost:8765)
 - API 文档: [http://localhost:8765/docs](http://localhost:8765/docs)
 
-如果模型未就绪，系统自动进入 Demo 模式，使用预置的模拟会议数据。
+如果模型未就绪，上传接口会明确返回错误，不会再用预置样例冒充真实转写。
 启动器会校验后端 API revision；如果 `8765` 被旧版 DiTing 占用，会明确报错并要求先关闭旧进程，
 不会再把旧服务误判为本次启动成功。
 

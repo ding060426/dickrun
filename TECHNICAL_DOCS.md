@@ -147,22 +147,22 @@ dickrun/
 | 属性 | 值 |
 |------|-----|
 | 架构 | Zipformer2 Transducer (流式) |
-| 编码器 | `encoder-160ms.onnx` — 12层 Zipformer, 80维 FBank 输入 |
-| 解码器 | `decoder-160ms.onnx` — 无状态解码器, 2002 token 词表 |
-| 连接器 | `joiner-160ms.onnx` — 声学+语言联合网络 |
+| 编码器 | `encoder-{160,480,960,1920}ms.onnx`；默认 `encoder-960ms.onnx` |
+| 解码器 | `decoder-{160,480,960,1920}ms.onnx`；默认 `decoder-960ms.onnx` |
+| 连接器 | `joiner-{160,480,960,1920}ms.onnx`；默认 `joiner-960ms.onnx` |
 | 词表 | BPE (Byte Pair Encoding), 2002 tokens, 不含标点 |
 | 语言 | 中文 + 英文混合 |
 | 采样率 | 16000 Hz, 单声道, 16-bit |
 | 帧移 | 10ms |
-| 块大小 | 160ms (= 2560 samples) |
-| 解码策略 | Greedy Search (贪心搜索) |
+| 模型档位 | 160 / 480 / 960 / 1920ms，默认 960ms |
+| 解码策略 | Modified Beam Search（热词启用时） |
 | 推理后端 | ONNX Runtime, CPU (`provider="cpu"`) |
-| 总大小 | ~300 MB |
+| 总大小 | 约 600 MB/档位 |
 | 来源 | [k2-fsa/sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) |
 
 **关键行为：**
-- **流式解码**：音频以 200ms 块输入，实时输出部分识别结果
-- **端点检测**：基于 blank frame 计数 (`enable_endpoint_detection=True`)
+- **流式解码**：实时预览与最终转写可独立选模型档位；相同档位共享预热运行时
+- **端点检测**：关闭 sherpa 内置端点；由 Silero VAD 统一管理实时句界
 - **无标点输出**：模型训练时不包含标点 token，标点在后续由专用模型恢复
 
 ### 4.2 标点恢复模型：CT-Transformer
@@ -189,34 +189,26 @@ dickrun/
 
 | 属性 | 值 |
 |------|-----|
-| 类型 | 基于短时能量 (Short-Time Energy) |
-| 算法 | RMS 能量 + 动态阈值 + 凝聚合并 |
-| 框架长度 | 25ms |
-| 跳跃长度 | 10ms |
+| 类型 | 本地 Silero VAD（sherpa-onnx） |
+| 使用范围 | 上传文件切分 + 实时麦克风句界检测 |
+| 输入 | 16kHz 单声道 float32，512 samples/window |
+| 文件降级 | 模型缺失时整段识别，不再使用手写能量切分 |
 
 ---
 
 ## 5. 核心参数配置
 
-### 5.1 VAD 参数 (`_energy_vad`)
+### 5.1 文件 Silero VAD 参数
 
 | 参数 | 默认值 | 含义 | 调优建议 |
 |------|--------|------|----------|
-| `energy_threshold_ratio` | **0.06** | 能量阈值（相对于最大能量） | 嘈杂环境提高至 0.08-0.10 |
-| `min_speech_frames` | **15** | 最小语音帧数 (~150ms) | 检测更短/更长的最小语音 |
-| `min_silence_frames` | **30** | 最小静音帧数 (~300ms) | **控制断句粒度**：越小句子越短 |
-| `pre_padding_ms` | **200** | 语音前扩展 | 防止切掉句首辅音 |
-| `post_padding_ms` | **200** | 语音后扩展 | 防止切掉句尾 |
-| `min_segment_duration` | **0.8s** | 最小段长 | 更小的值允许独立短句 |
-| `frame_ms` | 25 | 分析帧长 | 不变 |
-| `hop_ms` | 10 | 帧移 | 不变 |
+| `threshold` | **0.5** | Silero 语音概率阈值 | 嘈杂环境适度提高 |
+| `min_speech_ms` | **200** | 最短语音时长 | 小于此值的片段会被过滤 |
+| `min_silence_ms` | **500** | 最短静音时长 | 越小切分越密 |
+| `pre_padding_ms` | **250** | 语音前扩展 | 防止切掉句首辅音 |
+| `post_padding_ms` | **450** | 语音后扩展 | 防止切掉句尾 |
 
-**影响断句的关键参数：`min_silence_frames`**
-
-```
-min_silence_frames=50 (旧值 500ms):  "我们讨论了预算然后决定了下周再审一下产品策略"
-min_silence_frames=30 (新值 300ms):  "我们讨论了预算" "然后决定了下周再审一下" "产品策略"
-```
+上述参数可在前端 `Settings → File segmentation` 中调整并持久化。
 
 ### 5.2 XASREngine 构造函数
 
@@ -362,6 +354,8 @@ float32 numpy 数组 ([-1, 1])
 |------|------|------|
 | `GET` | `/api/health` | 健康检查 (X-ASR 状态、模型加载状态) |
 | `GET` | `/api/xasr/status` | X-ASR 详细状态 (模型路径、功能开关、热词数) |
+| `GET` | `/api/settings` | 获取识别模型、文件 Silero VAD、麦克风和热词的统一设置 |
+| `PUT` | `/api/settings` | 校验并持久化统一设置；必要时后台热切换 ONNX 引擎 |
 | `GET` | `/api/meeting/demo` | 获取演示会议数据 (2个预设片段) |
 | `GET` | `/api/hotwords` | 获取热词、逐词权重和模糊拼音设置 |
 | `POST` | `/api/hotwords` | 兼容接口：向现有配置追加热词 (`{"words": [...]}`) |
@@ -568,12 +562,13 @@ python -c "import sherpa_onnx; print(sherpa_onnx.__version__)"
 ### 10.2 下载模型
 
 ```bash
-# ASR 模型 (三个文件, ~300MB)
-# 从 k2-fsa/sherpa-onnx Releases 下载并放入:
+# 默认部署官方 960ms 档位（支持断点续传与原子发布）
+python backend/xasr/download_models.py --profile meeting
+
 backend/xasr/models/
-  ├── encoder-160ms.onnx
-  ├── decoder-160ms.onnx
-  ├── joiner-160ms.onnx
+  ├── encoder-960ms.onnx
+  ├── decoder-960ms.onnx
+  ├── joiner-960ms.onnx
   └── tokens.txt
 
 # 标点恢复模型 (~281MB)

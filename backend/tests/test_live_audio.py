@@ -184,6 +184,26 @@ class LiveAudioSessionTests(unittest.TestCase):
         self.assertEqual([len(chunk) for chunk in engine.chunks], [640, 640])
         self.assertEqual([item.text for item in first + second], ["partial-1", "partial-2"])
 
+    def test_ungated_microphone_forwards_quiet_frames_before_vad_triggers(self):
+        engine = _FakeEngine()
+        vad = _FakeVad([
+            VadState(is_speech=False),
+            VadState(is_speech=False),
+        ])
+        session = LiveAudioSession(
+            engine,
+            vad=vad,
+            pre_roll_ms=0,
+            gate_audio=False,
+        )
+        frame = np.full(640, 50, dtype="<i2").tobytes()
+
+        events = session.push_pcm_s16le(frame) + session.push_pcm_s16le(frame)
+
+        self.assertEqual([len(chunk) for chunk in engine.chunks], [640, 640])
+        self.assertEqual([item.text for item in events], ["partial-1", "partial-2"])
+        self.assertFalse(session.metrics()["vad_gating"])
+
     def test_brief_pause_resumes_same_utterance_without_finalizing(self):
         engine = _FakeEngine()
         vad = _FakeVad([

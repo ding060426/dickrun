@@ -38,6 +38,7 @@ sys.path.insert(0, BACKEND_DIR)
 from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
 from upload_storage import UploadTooLargeError, save_upload_to_temp
 from xasr.hotword_config import HotwordConfigStore
+from xasr.runtime_config import RuntimeConfigStore
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -45,7 +46,9 @@ logger = get_logger("main")
 # ── X-ASR ───────────────────────────────────────────────────────
 try:
     from xasr.asr_engine import XASREngine, ASRResult
+    from xasr.engine_pool import AsrEnginePool
     from xasr.live_audio import (
+        LiveAudioProfile,
         LiveAudioProtocolError,
         LiveAudioSession,
         create_live_vad,
@@ -75,7 +78,12 @@ except ImportError as e:
 # ===========================================================================
 
 xasr_engine: Optional[XASREngine] = None
+final_xasr_engine: Optional[XASREngine] = None
+xasr_pool: Optional[object] = None
 xasr_loading: bool = False
+_xasr_reload_lock = threading.Lock()
+_xasr_reload_pending = False
+_xasr_reload_worker_active = False
 PROCESSING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=max(1, int(os.getenv("DITING_PROCESSING_WORKERS", "2"))),
     thread_name_prefix="diting-asr",
@@ -86,51 +94,77 @@ RECORDINGS_DIR = Path(
 HOTWORDS_CONFIG_PATH = Path(
     os.getenv("DITING_HOTWORDS_CONFIG", os.path.join(BACKEND_DIR, "data", "hotwords.json"))
 )
+RUNTIME_CONFIG_PATH = Path(
+    os.getenv("DITING_RUNTIME_CONFIG", os.path.join(BACKEND_DIR, "data", "settings.json"))
+)
 hotword_config_store = None
+runtime_config_store = RuntimeConfigStore(RUNTIME_CONFIG_PATH)
 
 def _load_xasr_engine():
-    """Load X-ASR engine in background thread (fire-and-forget)."""
-    global xasr_engine, xasr_loading
+    """Build and atomically publish the configured live/final ASR runtimes."""
+    global xasr_engine, final_xasr_engine, xasr_pool, xasr_loading
     if not HAS_XASR:
         logger.info("X-ASR not available, demo mode only")
         return
     xasr_loading = True
-    logger.info("Loading X-ASR model in background thread (~300MB)...")
+    logger.info("Loading configured X-ASR live/final runtimes...")
     try:
-        settings = hotword_config_store.load()
-        hotwords, hotword_scores = hotword_config_store.engine_inputs(settings)
-        engine = XASREngine(
-            hotwords=hotwords,
-            hotword_scores=hotword_scores,
-            hotwords_score=settings["default_score"],
-            enable_logic_validation=True,
-            enable_hotword_correction=settings["enabled"],
-            enable_fuzzy_pinyin=settings["fuzzy_pinyin_enabled"],
-            enable_uncertainty=True,
-            # Live VAD owns utterance boundaries, avoiding two competing
-            # endpoint detectors in the same stream.
-            enable_endpoint_detection=False,
-            provider="cpu",
-            num_threads=2,
-            asr_profile=os.getenv("DITING_LIVE_ASR_PROFILE", "low-latency"),
+        runtime_settings = runtime_config_store.load()
+        hotword_settings = hotword_config_store.load()
+        pool = AsrEnginePool(
+            XASREngine.DEFAULT_MODEL_DIR,
+            base_options={
+                "enable_logic_validation": True,
+                "enable_uncertainty": True,
+                "enable_endpoint_detection": False,
+                "provider": "cpu",
+                "num_threads": 2,
+            },
         )
-        engine.warmup()
-        xasr_engine = engine
-        if engine.is_model_available:
-            logger.info("X-ASR model loaded successfully!")
-        else:
-            logger.warning("X-ASR model not found, using demo mode")
+        status = pool.reload(runtime_settings["recognition"], hotword_settings)
+        xasr_pool = pool
+        xasr_engine = pool.live_engine
+        final_xasr_engine = pool.final_engine
+        logger.info(
+            "X-ASR ready: live=%sms final=%sms shared=%s file_vad=%s",
+            status["live"]["chunk_ms"],
+            status["final"]["chunk_ms"],
+            status["shared_runtime"],
+            status["file_vad_provider"],
+        )
     except Exception as e:
         logger.error(f"X-ASR init failed: {e}")
         logger.error(traceback.format_exc())
     finally:
         xasr_loading = False
 
+
+def _xasr_reload_worker() -> None:
+    """Serialize heavyweight reloads and coalesce saves to the latest config."""
+    global _xasr_reload_pending, _xasr_reload_worker_active
+    while True:
+        with _xasr_reload_lock:
+            if not _xasr_reload_pending:
+                _xasr_reload_worker_active = False
+                return
+            _xasr_reload_pending = False
+        _load_xasr_engine()
+
+
+def _schedule_xasr_reload() -> None:
+    global _xasr_reload_pending, _xasr_reload_worker_active
+    with _xasr_reload_lock:
+        _xasr_reload_pending = True
+        if _xasr_reload_worker_active:
+            return
+        _xasr_reload_worker_active = True
+    threading.Thread(target=_xasr_reload_worker, daemon=True).start()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: fire-and-forget model loading."""
     logger.info("Starting DiTing backend server...")
-    threading.Thread(target=_load_xasr_engine, daemon=True).start()
+    _schedule_xasr_reload()
     yield
     logger.info("Shutting down DiTing backend...")
     PROCESSING_EXECUTOR.shutdown(wait=False, cancel_futures=True)
@@ -251,12 +285,17 @@ async def get_xasr_status():
     """Get X-ASR engine status with detail."""
     if not HAS_XASR:
         return {"available": False, "reason": "X-ASR module not installed", "loading": False}
-    if xasr_loading:
-        return {"available": True, "reason": "Loading model...", "model_available": False, "loading": True}
     if xasr_engine is None:
-        return {"available": False, "reason": "Engine init failed", "model_available": False, "loading": False}
+        return {
+            "available": HAS_XASR,
+            "reason": "Loading model..." if xasr_loading else "Engine init failed",
+            "model_available": False,
+            "loading": xasr_loading,
+        }
 
     vad_model = find_silero_vad_model(xasr_engine.model_dir)
+    runtime_settings = runtime_config_store.load()
+    pool_status = xasr_pool.status() if xasr_pool else {}
     return {
         "available": True,
         "model_available": xasr_engine.is_model_available,
@@ -270,7 +309,12 @@ async def get_xasr_status():
                 "silero-vad-with-resume-grace"
                 if vad_model else "sherpa-asr-endpoint-fallback"
             ),
-            "endpoint_grace_ms": get_live_endpoint_grace_ms() if vad_model else 0,
+            "endpoint_grace_ms": runtime_settings["microphone"]["endpoint_grace_ms"] if vad_model else 0,
+        },
+        "models": pool_status,
+        "file_vad": {
+            "provider": pool_status.get("file_vad_provider", "unavailable"),
+            "threshold": runtime_settings["recognition"]["file_vad_threshold"],
         },
         "hotwords_count": hotword_config_store.load()["active_count"],
         "features": {
@@ -279,7 +323,7 @@ async def get_xasr_status():
             "fuzzy_pinyin": xasr_engine.enable_fuzzy_pinyin,
             "uncertainty_estimation": xasr_engine.enable_uncertainty,
         },
-        "loading": False,
+        "loading": xasr_loading,
     }
 
 
@@ -296,16 +340,53 @@ async def get_hotwords():
 
 
 def _apply_hotword_settings(settings: dict) -> None:
-    if not xasr_engine:
+    if not xasr_pool:
         return
-    words, scores = hotword_config_store.engine_inputs(settings)
-    xasr_engine.configure_hotwords(
-        words,
-        scores=scores,
-        default_score=settings["default_score"],
-        enabled=settings["enabled"],
-        fuzzy_pinyin_enabled=settings["fuzzy_pinyin_enabled"],
-    )
+    xasr_pool.configure_hotwords(settings)
+
+
+def _complete_settings_payload() -> dict:
+    return {
+        **runtime_config_store.load(),
+        "hotwords": hotword_config_store.load(),
+        "models": xasr_pool.status() if xasr_pool else {
+            "available_profiles": [],
+            "live": {},
+            "final": {},
+            "shared_runtime": False,
+            "file_vad_provider": "unavailable",
+        },
+        "applies_to": "new_sessions",
+    }
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Return the unified recognition, microphone, and hotword settings."""
+    return _complete_settings_payload()
+
+
+@app.put("/api/settings")
+async def replace_settings(data: dict):
+    """Persist unified settings and reload model runtimes only when required."""
+    previous = runtime_config_store.load()
+    runtime_payload = {
+        "recognition": data.get("recognition", previous["recognition"]),
+        "microphone": data.get("microphone", previous["microphone"]),
+    }
+    saved_runtime = runtime_config_store.save(runtime_payload)
+    if "hotwords" in data:
+        saved_hotwords = hotword_config_store.save(data["hotwords"])
+        _apply_hotword_settings(saved_hotwords)
+
+    reload_required = previous["recognition"] != saved_runtime["recognition"]
+    if reload_required:
+        _schedule_xasr_reload()
+    return {
+        **_complete_settings_payload(),
+        "ok": True,
+        "reloading_models": reload_required,
+    }
 
 
 @app.post("/api/hotwords")
@@ -522,8 +603,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
 
         queue = upload_sessions.get(file_id)
 
-        if xasr_engine and xasr_engine.is_model_available:
-            processing_engine = xasr_engine.fork_session()
+        if xasr_pool and xasr_engine and xasr_engine.is_model_available:
+            processing_engine = xasr_pool.create_final_session()
             if queue:
                 # ── WebSocket streaming mode ──────────────────
                 await queue.put({
@@ -776,8 +857,8 @@ async def ws_live(websocket: WebSocket):
     logger.info("Live WebSocket connected")
 
     engine = (
-        xasr_engine.fork_session()
-        if xasr_engine and xasr_engine.is_model_available
+        xasr_pool.create_live_session()
+        if xasr_pool and xasr_engine and xasr_engine.is_model_available
         else None
     )
     session = None
@@ -789,7 +870,18 @@ async def ws_live(websocket: WebSocket):
 
     def build_session(profile_name=None, requested_stream_id=None):
         nonlocal vad_provider, live_profile, stream_id
-        live_profile = get_live_audio_profile(profile_name)
+        microphone_settings = runtime_config_store.load()["microphone"]
+        selected_profile = profile_name or microphone_settings["live_profile"]
+        base_profile = get_live_audio_profile(selected_profile)
+        live_profile = LiveAudioProfile(
+            name=base_profile.name,
+            pre_roll_ms=microphone_settings["pre_roll_ms"],
+            endpoint_grace_ms=microphone_settings["endpoint_grace_ms"],
+            tail_pad_ms=microphone_settings["tail_pad_ms"],
+            vad_threshold=microphone_settings["vad_threshold"],
+            vad_min_silence=microphone_settings["vad_min_silence"],
+            vad_min_speech=microphone_settings["vad_min_speech"],
+        )
         stream_id = requested_stream_id or str(uuid.uuid4())
         vad = create_live_vad(engine.model_dir, profile=live_profile)
         vad_provider = getattr(vad, "provider_name", type(vad).__name__)
@@ -800,6 +892,7 @@ async def ws_live(websocket: WebSocket):
             pre_roll_ms=live_profile.pre_roll_ms,
             endpoint_grace_ms=live_profile.endpoint_grace_ms,
             tail_pad_ms=live_profile.tail_pad_ms,
+            gate_audio=microphone_settings["vad_gating"],
             recording=recording,
         )
 
@@ -869,6 +962,7 @@ async def ws_live(websocket: WebSocket):
                             "pre_roll_ms": live_profile.pre_roll_ms,
                             "endpoint_grace_ms": live_profile.endpoint_grace_ms,
                             "tail_pad_ms": live_profile.tail_pad_ms,
+                            "vad_gating": session.metrics()["vad_gating"],
                         },
                     })
                 elif action == "process_chunk":
@@ -897,7 +991,10 @@ async def ws_live(websocket: WebSocket):
                         })
 
                     canonical_error = None
-                    if session and session.recording_result:
+                    final_enabled = runtime_config_store.load()["recognition"][
+                        "final_transcription_enabled"
+                    ]
+                    if session and session.recording_result and final_enabled:
                         recording_result = session.recording_result
                         await manager.send_json(websocket, {
                             "type": "finalizing",
@@ -908,7 +1005,7 @@ async def ws_live(websocket: WebSocket):
                             },
                         })
                         try:
-                            final_engine = xasr_engine.fork_session()
+                            final_engine = xasr_pool.create_final_session()
                             loop = asyncio.get_running_loop()
                             canonical_results = await loop.run_in_executor(
                                 PROCESSING_EXECUTOR,

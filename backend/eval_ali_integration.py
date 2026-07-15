@@ -335,7 +335,7 @@ def evaluate_against_textgrid(
     asr_full = ''.join(r.get('text', '') for r in asr_results)
     gt_full = ''.join(g.get('text', '') for g in ground_truth)
 
-    cer = _compute_cer(asr_full, gt_full)
+    cer = _compute_cer(gt_full, asr_full)
 
     # Also compute word-level metrics
     # Align segments by time overlap
@@ -350,8 +350,8 @@ def evaluate_against_textgrid(
             if asr_start <= gt_mid <= asr_end:
                 # Compute CER for this pair
                 pair_cer = _compute_cer(
-                    asr_seg.get('text', ''),
-                    gt_seg.get('text', '')
+                    gt_seg.get('text', ''),
+                    asr_seg.get('text', '')
                 )
                 if pair_cer < 0.5:
                     matched += 1

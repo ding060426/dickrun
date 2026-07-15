@@ -7,9 +7,8 @@ Pipeline:
   Audio -> VAD -> X-ASR(streaming zipformer2) -> Hotword Correction
        -> Logic Validation -> Uncertainty Estimation -> Enhanced Results
 
-Key fix (2026-07-15): Added energy-based VAD pre-segmentation so that
-process_file() produces per-utterance results instead of one giant blob.
-Each speech segment gets its own sherpa-onnx stream.
+File recognition uses the deployed local Silero VAD model so uploaded and
+canonical recordings are segmented consistently without heuristic energy cuts.
 """
 
 import os
@@ -21,6 +20,7 @@ import numpy as np
 
 from .contracts import ASRResult
 from .config import resolve_asr_profile
+from .file_vad import SileroFileVad
 from .hotwords import prepare_hotword_assets
 from .sherpa_streaming_infer import (
     SherpaRecognizerRuntime,
@@ -48,132 +48,6 @@ if not logger.handlers:
     ))
     logger.addHandler(h)
     logger.setLevel(logging.INFO)
-
-
-# ===========================================================================
-# Simple energy-based VAD
-# ===========================================================================
-
-def _energy_vad(
-    audio: np.ndarray,
-    sample_rate: int,
-    frame_ms: int = 25,
-    hop_ms: int = 10,
-    energy_threshold_ratio: float = 0.06,  # raised from 0.03 → filter background noise
-    min_speech_frames: int = 15,           # ~150ms min speech (was 25=250ms)
-    min_silence_frames: int = 30,          # ~300ms gap → sentence break (was 50=500ms)
-    pre_padding_ms: float = 200,           # reduced from 300ms
-    post_padding_ms: float = 200,          # reduced from 300ms
-    min_segment_duration: float = 0.8,     # allow shorter independent segments (was 2.0s)
-) -> List[tuple]:
-    """
-    Detect speech segments using energy-based VAD.
-
-    Returns list of (start_sec, end_sec) tuples.
-    """
-    frame_len = int(sample_rate * frame_ms / 1000)
-    hop_len = int(sample_rate * hop_ms / 1000)
-
-    if len(audio) < frame_len:
-        return [(0.0, len(audio) / sample_rate)]
-
-    # Compute short-time energy
-    n_frames = (len(audio) - frame_len) // hop_len + 1
-    energies = np.zeros(n_frames)
-    for i in range(n_frames):
-        start = i * hop_len
-        frame = audio[start:start + frame_len]
-        energies[i] = np.sqrt(np.mean(frame ** 2))
-
-    # Dynamic threshold based on energy distribution
-    if np.max(energies) > 0:
-        energies_norm = energies / np.max(energies)
-    else:
-        return [(0.0, len(audio) / sample_rate)]
-
-    threshold = max(energy_threshold_ratio, 0.5 * np.median(energies_norm))
-
-    # Find speech frames
-    is_speech = energies_norm > threshold
-
-    # Merge close speech regions
-    segments = []
-    in_speech = False
-    speech_start = 0
-    silence_count = 0
-
-    for i, speech in enumerate(is_speech):
-        if speech and not in_speech:
-            if silence_count < min_silence_frames and segments:
-                # Continue previous segment (short gap)
-                segments[-1] = (segments[-1][0], 0)
-                in_speech = True
-                silence_count = 0
-            else:
-                in_speech = True
-                speech_start = i
-                silence_count = 0
-        elif speech and in_speech:
-            silence_count = 0
-        elif not speech and in_speech:
-            silence_count += 1
-            if silence_count >= min_silence_frames:
-                in_speech = False
-                speech_end = i - silence_count
-                duration_frames = speech_end - speech_start
-                if duration_frames >= min_speech_frames:
-                    start_sec = max(0, (speech_start * hop_len - pre_padding_ms / 1000 * sample_rate) / sample_rate)
-                    end_sec = min(len(audio) / sample_rate,
-                                  (speech_end * hop_len + post_padding_ms / 1000 * sample_rate) / sample_rate)
-                    if end_sec > start_sec + 0.1:  # at least 100ms
-                        segments.append((start_sec, end_sec))
-
-    # Handle trailing speech
-    if in_speech:
-        i = len(is_speech) - 1
-        while i >= 0 and is_speech[i]:
-            i -= 1
-        duration_frames = len(is_speech) - speech_start
-        if duration_frames >= min_speech_frames:
-            start_sec = max(0, (speech_start * hop_len - pre_padding_ms / 1000 * sample_rate)) / sample_rate
-            end_sec = len(audio) / sample_rate
-            if end_sec > start_sec + 0.1:
-                segments.append((start_sec, end_sec))
-
-    # If no segments found, return the whole audio
-    if not segments:
-        return [(0.0, len(audio) / sample_rate)]
-
-    # Merge overlapping segments
-    merged = []
-    for seg in sorted(segments):
-        if merged and seg[0] <= merged[-1][1] + 1.0:  # Within 1 second: merge
-            merged[-1] = (merged[-1][0], max(merged[-1][1], seg[1]))
-        else:
-            merged.append(seg)
-
-    # Phase 2: merge short segments with neighbors
-    if min_segment_duration > 0 and merged:
-        final = []
-        i = 0
-        while i < len(merged):
-            dur = merged[i][1] - merged[i][0]
-            if dur < min_segment_duration:
-                # Try to merge with previous
-                if final and (merged[i][1] - final[-1][1]) < 2.0:
-                    final[-1] = (final[-1][0], merged[i][1])
-                # Try to merge with next
-                elif i + 1 < len(merged) and (merged[i+1][0] - merged[i][0]) < 3.0:
-                    merged[i+1] = (merged[i][0], merged[i+1][1])
-                else:
-                    final.append(merged[i])
-            else:
-                final.append(merged[i])
-            i += 1
-        merged = final
-
-    logger.info(f"VAD: detected {len(merged)} speech segments in {len(audio)/sample_rate:.1f}s audio")
-    return merged
 
 
 # ===========================================================================
@@ -212,6 +86,8 @@ class XASREngine:
         hotwords_score: float = 5.0,
         hotword_scores: Dict[str, float] = None,
         enable_fuzzy_pinyin: bool = True,
+        file_vad_options: Dict | None = None,
+        file_segmenter=None,
     ):
         """
         Initialize X-ASR engine.
@@ -255,6 +131,13 @@ class XASREngine:
         # Model paths
         model_dir = model_dir or self.DEFAULT_MODEL_DIR
         self.model_dir = model_dir
+        self._file_vad_options = dict(file_vad_options or {})
+        self.file_segmenter = file_segmenter or self._create_file_segmenter()
+        self.file_vad_provider = (
+            getattr(self.file_segmenter, "provider_name", type(self.file_segmenter).__name__)
+            if self.file_segmenter is not None
+            else "whole-file-fallback"
+        )
         tokens = os.path.join(model_dir, "tokens.txt")
         encoder = os.path.join(model_dir, f"encoder-{self.chunk_ms}ms.onnx")
         decoder = os.path.join(model_dir, f"decoder-{self.chunk_ms}ms.onnx")
@@ -365,6 +248,8 @@ class XASREngine:
             "hotwords_score": self._hotwords_score,
             "hotword_scores": dict(self._hotword_scores),
             "enable_fuzzy_pinyin": self.enable_fuzzy_pinyin,
+            "file_vad_options": dict(self._file_vad_options),
+            "file_segmenter": self.file_segmenter,
         }
         runtime_affecting = {
             "hotwords",
@@ -379,11 +264,20 @@ class XASREngine:
             "asr_profile",
             "hotwords_score",
             "hotword_scores",
+            "file_vad_options",
+            "file_segmenter",
         }
         if runtime_affecting.intersection(overrides):
             options["recognizer_runtime"] = None
         options.update(overrides)
         return XASREngine(**options)
+
+    def _create_file_segmenter(self):
+        model_path = os.path.join(self.model_dir, "silero_vad.onnx")
+        if not os.path.isfile(model_path):
+            logger.warning("Silero file VAD model missing; file recognition will use whole audio")
+            return None
+        return SileroFileVad(model_path, **self._file_vad_options)
 
     # ------------------------------------------------------------------
     # File processing (THE KEY FIX)
@@ -398,9 +292,9 @@ class XASREngine:
         """
         Process an entire audio file.
 
-        NEW APPROACH (2026-07-15):
+        File recognition pipeline:
         1. Load audio
-        2. Energy-based VAD to find speech segments
+        2. Local Silero VAD finds speech segments
         3. For each speech segment: create a fresh ASR stream, process,
            get final result
         4. Return list of per-utterance results
@@ -427,20 +321,25 @@ class XASREngine:
         duration = len(data) / sr
         logger.info(f"Audio loaded: {duration:.1f}s @ {sr}Hz, {len(data)} samples")
 
+        if len(data) == 0:
+            if on_progress:
+                on_progress("done", 1.0)
+            return []
+
         # 2. VAD segmentation
         if on_progress:
             on_progress("vad", 0.05)
-        segments = _energy_vad(
-            data, sr,
-            energy_threshold_ratio=0.06,   # filter out background hum & light breathing
-            min_speech_frames=15,          # ~150ms — catch short utterances, skip clicks
-            min_silence_frames=30,         # ~300ms — cut at natural pauses
-            pre_padding_ms=200,
-            post_padding_ms=200,
-            min_segment_duration=0.8,      # keep brief but meaningful phrases
+        segments = (
+            self.file_segmenter.detect(data, sr)
+            if self.file_segmenter is not None
+            else [(0.0, duration)]
         )
         total_segments = len(segments)
-        logger.info(f"VAD found {total_segments} speech segments")
+        logger.info(
+            "%s found %d speech segments",
+            self.file_vad_provider,
+            total_segments,
+        )
 
         # 3. Process each speech segment
         # File mode creates an isolated recognizer for every VAD slice below;

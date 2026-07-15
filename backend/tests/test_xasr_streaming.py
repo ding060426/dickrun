@@ -11,7 +11,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from xasr.asr_engine import XASREngine
+from xasr.asr_engine import ASRResult, XASREngine
 
 
 class _FakeStreamingAsr:
@@ -53,6 +53,17 @@ class _FakeRuntime:
         session = _FakeStreamingAsr()
         self.sessions.append(session)
         return session
+
+
+class _FakeFileSegmenter:
+    provider_name = "test-silero-file-vad"
+
+    def __init__(self):
+        self.calls = []
+
+    def detect(self, audio, sample_rate):
+        self.calls.append((len(audio), sample_rate))
+        return [(0.25, 0.75)]
 
 
 def _write_model_files(model_dir: str, chunk_ms: int = 160) -> None:
@@ -120,6 +131,25 @@ class XASRStreamingSessionTests(unittest.TestCase):
             results = engine.process_file("empty.wav")
 
         self.assertEqual(results, [])
+
+    def test_file_processing_uses_configured_model_segmenter(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            segmenter = _FakeFileSegmenter()
+            engine = XASREngine(model_dir=model_dir, file_segmenter=segmenter)
+            engine._load_audio = lambda _: (np.zeros(16000, dtype=np.float32), 16000)
+            engine._process_speech_segment = lambda audio, sr, start, end: ASRResult(
+                text="speech",
+                raw_text="speech",
+                is_final=True,
+                start_sec=start,
+                end_sec=end,
+            )
+
+            results = engine.process_file("meeting.wav")
+
+        self.assertEqual(segmenter.calls, [(16000, 16000)])
+        self.assertEqual([(item.start_sec, item.end_sec) for item in results], [(0.25, 0.75)])
+        self.assertEqual(engine.file_vad_provider, "test-silero-file-vad")
 
     def test_meeting_profile_selects_960ms_model_files(self):
         with tempfile.TemporaryDirectory() as model_dir:

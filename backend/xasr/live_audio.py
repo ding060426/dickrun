@@ -301,6 +301,7 @@ class LiveAudioSession:
         pre_roll_ms: int = 200,
         endpoint_grace_ms: int = DEFAULT_ENDPOINT_GRACE_MS,
         tail_pad_ms: int = 1000,
+        gate_audio: bool = True,
         recording: LiveRecording | None = None,
     ):
         if pre_roll_ms < 0:
@@ -316,6 +317,7 @@ class LiveAudioSession:
             self.SAMPLE_RATE * endpoint_grace_ms / 1000
         )
         self._tail_pad_ms = tail_pad_ms
+        self._gate_audio = bool(gate_audio)
         self._recording = recording
         self.recording_result: RecordingResult | None = None
         self._pre_roll: list[np.ndarray] = []
@@ -371,10 +373,11 @@ class LiveAudioSession:
             self._pending_endpoint_samples = None
 
         if not self._speech_active:
-            if not (state.speech_started or state.is_speech):
+            if self._gate_audio and not (state.speech_started or state.is_speech):
                 self._remember_pre_roll(samples)
                 return []
-            samples = self._take_pre_roll(samples)
+            if self._gate_audio:
+                samples = self._take_pre_roll(samples)
             self._speech_active = True
 
         events: list[ASRResult] = []
@@ -443,6 +446,7 @@ class LiveAudioSession:
             "dropped_frames": self.dropped_frames,
             "partial_results": self.partial_results,
             "final_results": self.final_results,
+            "vad_gating": self._gate_audio,
             "first_partial_ms": first_partial_ms,
             "elapsed_ms": elapsed_ms,
         }

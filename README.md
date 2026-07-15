@@ -101,6 +101,8 @@ python start.py
 - API 文档: [http://localhost:8765/docs](http://localhost:8765/docs)
 
 如果模型未就绪，系统自动进入 Demo 模式，使用预置的模拟会议数据。
+启动器会校验后端 API revision；如果 `8765` 被旧版 DiTing 占用，会明确报错并要求先关闭旧进程，
+不会再把旧服务误判为本次启动成功。
 
 ### 5. 离线多说话人会议
 
@@ -204,7 +206,7 @@ python backend/evaluate_profiles.py manifest.json --profiles low-latency meeting
 | 功能 | 状态 | 说明 |
 |------|------|------|
 | ASR 转写 | ✅ | sherpa-onnx zipformer2 流式推理 |
-| VAD + 端点检测 | ✅ | 文件：本地 Silero VAD 模型切分；实时：Silero 优先、能量 VAD 降级 + 可配置 pre-roll |
+| VAD + 端点检测 | ✅ | 文件：Silero 提供时间锚点，X-ASR 跨段保留上下文并按完整句合并；实时：Silero 优先、能量 VAD 降级 + 可配置 pre-roll |
 | 热词修正 | ✅ | 可持久化逐词权重 + modified beam search + 多音字模糊拼音 + ASCII 标准化 |
 | 文本后处理 | ✅ | 保守去口癖、标点恢复、重复清理与中文数字 ITN |
 | 逻辑校验 | ✅ | 数据冲突检测 (数字/百分比对比) |

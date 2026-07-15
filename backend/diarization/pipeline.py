@@ -211,12 +211,31 @@ class OfflineMeetingPipeline:
                 candidate.speaker_id = interval.speaker_id
                 candidate.speaker_confidence = interval.confidence
                 candidates.append(candidate)
-            if candidates:
+            if candidates and self._retains_base_text(result, candidates):
                 refined_results.extend(candidates)
                 redecoded += len(candidates)
             else:
+                if candidates:
+                    logger.warning(
+                        "Speaker-boundary re-decode lost too much text; keeping base segment %.2f-%.2f",
+                        result.start_sec,
+                        result.end_sec,
+                    )
                 refined_results.append(result)
         return refined_results, redecoded
+
+    @staticmethod
+    def _retains_base_text(base_result, candidates: list) -> bool:
+        """Reject boundary re-decodes that would visibly shorten the transcript."""
+
+        base_text = "".join((base_result.raw_text or base_result.text or "").split())
+        candidate_text = "".join(
+            (candidate.raw_text or candidate.text or "").strip()
+            for candidate in candidates
+        )
+        if len(base_text) < 6:
+            return True
+        return len(candidate_text) >= len(base_text) * 0.7
 
     @staticmethod
     def _deduplicate_adjacent(results: list) -> None:

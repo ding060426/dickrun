@@ -56,6 +56,25 @@ class _FakeEngine:
         return ASRResult(text=text, raw_text=text, start_sec=start_sec, end_sec=end_sec)
 
 
+class _LossyBoundaryEngine(_FakeEngine):
+    def process_file(self, path, on_segment=None, on_progress=None, audio_buffer=None):
+        self.shared_audio = audio_buffer
+        text = "这是一段完整且不能丢失的会议文本"
+        return [ASRResult(text=text, raw_text=text, start_sec=0, end_sec=4)]
+
+    def recognize_interval(
+        self,
+        audio_buffer,
+        start_sec,
+        end_sec,
+        *,
+        pre_padding_ms,
+        post_padding_ms,
+    ):
+        text = "甲" if start_sec < 1 else "乙"
+        return ASRResult(text=text, raw_text=text, start_sec=start_sec, end_sec=end_sec)
+
+
 class DiarizationTests(unittest.TestCase):
     def test_alignment_uses_total_overlap_and_marks_real_overlap(self):
         result = ASRResult(start_sec=0, end_sec=4)
@@ -114,6 +133,18 @@ class DiarizationTests(unittest.TestCase):
         self.assertEqual(run.results[1].text, "确认")
         self.assertEqual(len(delivered), 2)
         self.assertTrue(run.applied)
+
+    def test_boundary_redecode_keeps_base_text_when_candidates_lose_words(self):
+        engine = _LossyBoundaryEngine()
+        pipeline = OfflineMeetingPipeline(_FakeBackend())
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "meeting.wav"
+            sf.write(path, np.zeros(4 * 16000, dtype=np.float32), 16000)
+            run = pipeline.process_file(path, engine, num_speakers=2)
+
+        self.assertEqual(len(run.results), 1)
+        self.assertEqual(run.results[0].text, "这是一段完整且不能丢失的会议文本")
+        self.assertEqual(run.boundary_redecoded_segments, 0)
 
     def test_unavailable_backend_falls_back_without_failing_asr(self):
         engine = _FakeEngine()

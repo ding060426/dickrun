@@ -9,6 +9,7 @@ Usage:
 """
 
 import os
+import json
 import sys
 import subprocess
 import time
@@ -18,10 +19,23 @@ import socketserver
 import threading
 from pathlib import Path
 
+from backend.build_info import API_REVISION
+
 ROOT_DIR = Path(__file__).parent.absolute()
 FRONTEND_DIR = ROOT_DIR / "frontend"
 BACKEND_DIR = ROOT_DIR / "backend"
 XASR_MODELS_DIR = BACKEND_DIR / "xasr" / "models"
+
+
+def is_compatible_backend(health_info):
+    """Return true only for the backend contract this frontend expects."""
+
+    if not str(health_info.get("service", "")).startswith("DiTing"):
+        return False
+    try:
+        return int(health_info.get("api_revision", -1)) >= API_REVISION
+    except (TypeError, ValueError):
+        return False
 
 
 def check_xasr_models():
@@ -69,12 +83,19 @@ def start_backend():
             import urllib.request
             resp = urllib.request.urlopen("http://localhost:8765/api/health")
             data = resp.read().decode()
+            health_info = json.loads(data)
+            if not is_compatible_backend(health_info):
+                if proc.poll() is None:
+                    proc.terminate()
+                raise RuntimeError(
+                    "Port 8765 is occupied by an old or incompatible "
+                    "DiTing backend. Stop the earlier process, then start again."
+                )
             print(f"[DiTing] Backend ready -> http://localhost:8765")
             print(f"[DiTing] API Docs  -> http://localhost:8765/docs")
             print(f"[DiTing] Logs     -> backend/logs/diting.log")
 
             # Check X-ASR status
-            import json
             try:
                 status = urllib.request.urlopen("http://localhost:8765/api/xasr/status")
                 xasr_info = json.loads(status.read().decode())
@@ -86,6 +107,8 @@ def start_backend():
             except Exception:
                 pass
             return proc
+        except RuntimeError:
+            raise
         except Exception:
             time.sleep(1.0)
 

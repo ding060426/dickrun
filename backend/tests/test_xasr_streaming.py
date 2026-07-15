@@ -66,6 +66,43 @@ class _FakeFileSegmenter:
         return [(0.25, 0.75)]
 
 
+class _TimelineFileSegmenter:
+    provider_name = "test-timeline-vad"
+
+    def detect(self, audio, sample_rate):
+        return [(0.0, 2.0), (5.0, 7.0), (9.0, 11.0)]
+
+
+class _CumulativeStreamingAsr:
+    """Fake a recognizer whose missing short phrase only appears with context."""
+
+    def __init__(self, sample_rate=16000):
+        self.sample_rate = sample_rate
+        self.accepted_samples = 0
+
+    def accept_waveform(self, samples, sample_rate=16000):
+        self.accepted_samples += len(samples)
+
+    def decode(self):
+        return 1
+
+    def get_partial_result(self):
+        seconds = self.accepted_samples / self.sample_rate
+        if seconds >= 11.0:
+            return "第一句。被吞掉的短句。第三句。"
+        if seconds >= 7.0:
+            return "第一句。被吞掉的短句。"
+        if seconds >= 2.0:
+            return "第一句。"
+        return ""
+
+    def input_finished(self):
+        pass
+
+    def get_final_result(self):
+        return "第一句。被吞掉的短句。第三句。"
+
+
 def _write_model_files(model_dir: str, chunk_ms: int = 160) -> None:
     root = Path(model_dir)
     for name in (
@@ -150,6 +187,41 @@ class XASRStreamingSessionTests(unittest.TestCase):
         self.assertEqual(segmenter.calls, [(16000, 16000)])
         self.assertEqual([(item.start_sec, item.end_sec) for item in results], [(0.25, 0.75)])
         self.assertEqual(engine.file_vad_provider, "test-silero-file-vad")
+
+    def test_file_processing_preserves_context_across_vad_regions(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            _write_model_files(model_dir, chunk_ms=960)
+            engine = XASREngine(
+                model_dir=model_dir,
+                asr_profile="meeting",
+                file_segmenter=_TimelineFileSegmenter(),
+                enable_logic_validation=False,
+                enable_hotword_correction=False,
+                enable_uncertainty=False,
+                enable_text_postprocess=False,
+            )
+            engine._load_audio = lambda _: (np.zeros(12 * 16000, dtype=np.float32), 16000)
+            engine._create_asr = lambda: _CumulativeStreamingAsr()
+
+            # This models the old behavior: an isolated quiet VAD region decodes empty.
+            engine._process_speech_segment = lambda audio, sr, start, end: (
+                None
+                if start == 5.0
+                else ASRResult(
+                    text="第一句。" if start == 0.0 else "第三句。",
+                    raw_text="第一句。" if start == 0.0 else "第三句。",
+                    is_final=True,
+                    start_sec=start,
+                    end_sec=end,
+                )
+            )
+
+            results = engine.process_file("meeting.wav")
+
+        transcript = "".join(item.raw_text for item in results)
+        self.assertIn("被吞掉的短句", transcript)
+        self.assertEqual(results[0].start_sec, 0.0)
+        self.assertEqual(results[-1].end_sec, 11.0)
 
     def test_meeting_profile_selects_960ms_model_files(self):
         with tempfile.TemporaryDirectory() as model_dir:

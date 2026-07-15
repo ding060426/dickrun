@@ -50,6 +50,7 @@ from xasr.hotword_config import HotwordConfigStore
 from xasr.runtime_config import RuntimeConfigStore
 from diarization import OfflineMeetingPipeline, SherpaDiarizationBackend
 from diarization.registry import MeetingRegistry
+from build_info import API_REVISION
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -300,6 +301,7 @@ async def health():
     return {
         "status": "ok",
         "service": "DiTing v2.0",
+        "api_revision": API_REVISION,
         "xasr_available": HAS_XASR and xasr_engine is not None and xasr_engine.is_model_available,
         "xasr_loading": xasr_loading,
         "live_vad_available": vad_model is not None,

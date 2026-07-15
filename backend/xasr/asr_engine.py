@@ -15,6 +15,7 @@ import os
 import sys
 import time
 import logging
+from difflib import SequenceMatcher
 from typing import Optional, List, Dict, Callable
 import numpy as np
 
@@ -296,10 +297,10 @@ class XASREngine:
 
         File recognition pipeline:
         1. Load audio
-        2. Local Silero VAD finds speech segments
-        3. For each speech segment: create a fresh ASR stream, process,
-           get final result
-        4. Return list of per-utterance results
+        2. Local Silero VAD finds speech time anchors
+        3. Keep one ASR stream across the timeline and capture cumulative text
+           at the VAD boundaries
+        4. Map the final transcript back to sentence-like time ranges
 
         This fixes the previous bug where process_chunk() always returned
         is_final=False and no results were ever captured.
@@ -346,35 +347,43 @@ class XASREngine:
             total_segments,
         )
 
-        # 3. Process each speech segment
-        # File mode creates an isolated recognizer for every VAD slice below;
-        # do not also allocate a full live recognizer for the outer session.
+        # 3. Decode one continuous stream and use VAD boundaries as anchors.
+        # The outer session owns only shared cognitive state; the timeline path
+        # creates its own short-lived recognizer stream.
         self.start_session(create_recognizer=False)
-        results = []
+        results = self._process_speech_timeline(
+            data,
+            sr,
+            segments,
+            on_progress=on_progress,
+            on_segment=on_segment,
+        )
 
-        for seg_idx, (start_s, end_s) in enumerate(segments):
-            progress = 0.1 + 0.85 * (seg_idx / max(1, total_segments))
-            if on_progress:
-                on_progress("processing", progress)
+        # Keep the isolated decoder as a compatibility fallback for tests,
+        # missing runtimes, and providers that cannot expose cumulative text.
+        if results is None:
+            results = []
+            for seg_idx, (start_s, end_s) in enumerate(segments):
+                progress = 0.1 + 0.85 * (seg_idx / max(1, total_segments))
+                if on_progress:
+                    on_progress("processing", progress)
 
-            start_sample = max(0, int(start_s * sr))
-            end_sample = min(len(data), int(end_s * sr))
-            seg_audio = data[start_sample:end_sample]
+                start_sample = max(0, int(start_s * sr))
+                end_sample = min(len(data), int(end_s * sr))
+                seg_audio = data[start_sample:end_sample]
 
-            seg_dur = (end_sample - start_sample) / sr
-            if seg_dur < 0.1:
-                logger.debug(f"  Segment {seg_idx}: too short ({seg_dur:.2f}s), skipping")
-                continue
+                seg_dur = (end_sample - start_sample) / sr
+                if seg_dur < 0.1:
+                    logger.debug(f"  Segment {seg_idx}: too short ({seg_dur:.2f}s), skipping")
+                    continue
 
-            logger.debug(f"  Segment {seg_idx}: {start_s:.1f}s - {end_s:.1f}s ({seg_dur:.1f}s)")
+                logger.debug(f"  Segment {seg_idx}: {start_s:.1f}s - {end_s:.1f}s ({seg_dur:.1f}s)")
+                result = self._process_speech_segment(seg_audio, sr, start_s, end_s)
 
-            # Process this segment with a fresh ASR stream
-            result = self._process_speech_segment(seg_audio, sr, start_s, end_s)
-
-            if result and result.text.strip():
-                results.append(result)
-                if on_segment:
-                    on_segment(result, len(results), total_segments)
+                if result and result.text.strip():
+                    results.append(result)
+                    if on_segment:
+                        on_segment(result, len(results), total_segments)
 
         # 4. Done
         self.end_session()
@@ -389,6 +398,195 @@ class XASREngine:
             on_progress("done", 1.0)
 
         return results
+
+    def _process_speech_timeline(
+        self,
+        audio: np.ndarray,
+        sr: int,
+        segments: list[tuple[float, float]],
+        *,
+        on_progress: Callable[[str, float], None] | None = None,
+        on_segment: Callable[[ASRResult, int, int], None] | None = None,
+    ) -> Optional[List[ASRResult]]:
+        """Decode once across the full timeline and use VAD only as time anchors.
+
+        A streaming transducer needs acoustic history for quiet, short phrases.
+        Resetting it for every VAD region discarded that history and made valid
+        speech decode as an empty string.  This path keeps one recognizer stream
+        alive, captures cumulative transcript snapshots at VAD boundaries, and
+        maps the final transcript back to sentence-like time ranges.
+        """
+
+        if not segments or not self.model_available:
+            return None
+        asr = self._create_asr()
+        if asr is None:
+            return None
+
+        snapshots: list[str] = []
+        segment_index = 0
+        chunk_size = max(1, int(0.2 * sr))
+        try:
+            for offset in range(0, len(audio), chunk_size):
+                chunk = audio[offset:offset + chunk_size]
+                asr.accept_waveform(chunk, sr)
+                asr.decode()
+                processed_sec = min(len(audio), offset + len(chunk)) / sr
+
+                while (
+                    segment_index < len(segments)
+                    and processed_sec >= segments[segment_index][1]
+                ):
+                    snapshots.append(asr.get_partial_result() or "")
+                    segment_index += 1
+                    if on_progress:
+                        fraction = segment_index / max(1, len(segments))
+                        on_progress("processing", 0.1 + 0.8 * fraction)
+
+            last_partial = asr.get_partial_result() or ""
+            while segment_index < len(segments):
+                snapshots.append(last_partial)
+                segment_index += 1
+
+            tail_silence = np.zeros(int(1.0 * sr), dtype=np.float32)
+            asr.accept_waveform(tail_silence, sr)
+            asr.decode()
+            asr.input_finished()
+            final_text = (asr.get_final_result() or "").strip()
+        finally:
+            del asr
+
+        if not final_text:
+            logger.warning(
+                "Continuous file decode returned empty; retrying isolated VAD regions"
+            )
+            return None
+
+        results = self._timeline_results_from_transcript(
+            audio,
+            sr,
+            segments,
+            snapshots,
+            final_text,
+        )
+        if on_segment:
+            for index, result in enumerate(results, 1):
+                on_segment(result, index, len(results))
+        return results
+
+    def _timeline_results_from_transcript(
+        self,
+        audio: np.ndarray,
+        sr: int,
+        segments: list[tuple[float, float]],
+        snapshots: list[str],
+        final_text: str,
+    ) -> List[ASRResult]:
+        positions: list[int] = []
+        cursor = 0
+        for snapshot in snapshots[:len(segments)]:
+            cursor = self._snapshot_position(snapshot, final_text, cursor)
+            positions.append(cursor)
+        while len(positions) < len(segments):
+            positions.append(cursor)
+        positions[-1] = len(final_text)
+
+        pieces: list[str] = []
+        cursor = 0
+        for position in positions:
+            pieces.append(final_text[cursor:position])
+            cursor = position
+
+        # Streaming punctuation often arrives one boundary late. Attach leading
+        # punctuation to the preceding phrase before deciding which VAD ranges
+        # form a complete sentence.
+        leading_punctuation = set("，。！？!?；;、,.：:")
+        for index in range(1, len(pieces)):
+            while pieces[index] and pieces[index][0] in leading_punctuation:
+                pieces[index - 1] += pieces[index][0]
+                pieces[index] = pieces[index][1:]
+
+        timed_text: list[dict] = []
+        for (start_s, end_s), text in zip(segments, pieces):
+            text = text.strip()
+            if not text:
+                continue
+            item = {"start": start_s, "end": end_s, "text": text}
+            if (
+                timed_text
+                and not timed_text[-1]["text"].rstrip().endswith(("。", "！", "？", "!", "?", "."))
+                and start_s - timed_text[-1]["end"] <= 5.0
+            ):
+                timed_text[-1]["end"] = end_s
+                timed_text[-1]["text"] += text
+            else:
+                timed_text.append(item)
+
+        if not timed_text:
+            timed_text = [{
+                "start": segments[0][0],
+                "end": segments[-1][1],
+                "text": final_text,
+            }]
+
+        results: list[ASRResult] = []
+        for item in timed_text:
+            start_sample = max(0, int(item["start"] * sr))
+            end_sample = min(len(audio), int(item["end"] * sr))
+            result_audio = audio[start_sample:end_sample]
+            self._current_snr = estimate_snr(result_audio, sr)
+            self._current_rt60 = estimate_rt60(result_audio, sr)
+            result = self._build_result(
+                raw_text=item["text"],
+                is_partial=False,
+                is_final=True,
+                start_sec=item["start"],
+                end_sec=item["end"],
+            )
+            result.audio_data = result_audio
+            results.append(result)
+        return results
+
+    @staticmethod
+    def _snapshot_position(snapshot: str, final_text: str, minimum: int) -> int:
+        """Map a cumulative partial transcript to a monotonic final-text offset."""
+
+        snapshot = (snapshot or "").strip()
+        if not snapshot:
+            return minimum
+        if final_text.startswith(snapshot):
+            return max(minimum, len(snapshot))
+
+        # Partial transcripts can revise an earlier character. Match only a
+        # bounded tail around the expected offset so long meetings do not turn
+        # this alignment into quadratic work over the entire transcript.
+        tail = snapshot[-160:]
+        exact_tail = final_text.find(tail, max(0, minimum - len(tail)))
+        if exact_tail >= 0:
+            return min(len(final_text), max(minimum, exact_tail + len(tail)))
+
+        expected = min(len(final_text), max(minimum, len(snapshot)))
+        final_start = max(0, min(minimum, expected) - 256)
+        final_end = min(len(final_text), expected + 512)
+        snapshot_start = max(0, len(snapshot) - 256)
+        snapshot_tail = snapshot[snapshot_start:]
+        final_window = final_text[final_start:final_end]
+        matcher = SequenceMatcher(None, snapshot_tail, final_window, autojunk=False)
+        tail_tolerance = max(3, len(snapshot_tail) // 10)
+        candidates = [
+            final_start + match_final_start + size
+            for match_snapshot_start, match_final_start, size in matcher.get_matching_blocks()
+            if size and match_snapshot_start + size >= len(snapshot_tail) - tail_tolerance
+        ]
+        if candidates:
+            return min(len(final_text), max(minimum, max(candidates)))
+
+        common = 0
+        for left, right in zip(snapshot, final_text):
+            if left != right:
+                break
+            common += 1
+        return max(minimum, common)
 
     def _process_speech_segment(
         self, audio: np.ndarray, sr: int, start_s: float, end_s: float

@@ -42,4 +42,9 @@ xasr_source/
 # ── Temp files ──
 *.tmp
 *.temp
+*.part
+*.wrong_backup
 _test_*
+
+# ── Model downloads (incomplete/partial) ──
+backend/xasr/model_downloads/

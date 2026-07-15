@@ -453,35 +453,30 @@ class XASREngine:
             )
 
         try:
-            # Split into chunks and feed to the stream
+            # Feed non-overlapping chunks to the streaming recognizer.
+            # Re-sending overlapped audio makes transducer states see duplicate speech
+            # and can severely corrupt recognition on uploaded files.
             chunk_size = int(0.2 * sr)  # 200ms chunks
-            overlap = int(0.05 * sr)     # 50ms overlap
-            hop = chunk_size - overlap
-
             final_texts = []
 
-            for i in range(0, len(audio), hop):
-                chunk = audio[i:i + chunk_size]
-                if len(chunk) < hop // 2:
+            # A short trailing silence helps streaming models flush the final tokens.
+            tail_silence = np.zeros(int(0.5 * sr), dtype=np.float32)
+            audio_for_asr = np.concatenate([audio.astype(np.float32, copy=False), tail_silence])
+
+            for i in range(0, len(audio_for_asr), chunk_size):
+                chunk = audio_for_asr[i:i + chunk_size]
+                if len(chunk) == 0:
                     break
 
                 asr.accept_waveform(chunk, sr)
                 asr.decode()
 
-                # Check for endpoint (natural pause detected)
-                if asr.is_endpoint():
-                    text = asr.get_partial_result().strip()
-                    if text:
-                        final_texts.append(text)
-                    asr.reset()  # Start new utterance
-
-            # Get any remaining text
+            # The file-upload path is already segmented by VAD. Do not reset on
+            # internal endpoint detection here; keep each VAD segment as one stream.
             asr.input_finished()
             remaining = asr.get_final_result()
             if remaining and remaining.strip():
-                # Only add if not already captured via endpoint
-                if not final_texts or remaining != final_texts[-1]:
-                    final_texts.append(remaining.strip())
+                final_texts.append(remaining.strip())
 
             # Combine all utterances
             if not final_texts:

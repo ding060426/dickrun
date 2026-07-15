@@ -59,6 +59,15 @@ except ImportError as e:
     logger.warning(f"Eval_Ali integration not available: {e}")
     HAS_EVAL = False
 
+# ── Text Post-Processor ───────────────────────────────────────
+try:
+    from modules.text_postprocessor import postprocess_text
+    HAS_POSTPROCESSOR = True
+    logger.info("Text post-processor loaded")
+except ImportError as e:
+    logger.warning(f"Text post-processor not available: {e}")
+    HAS_POSTPROCESSOR = False
+
 # ===========================================================================
 # Lifespan: Load X-ASR in background
 # ===========================================================================
@@ -689,6 +698,10 @@ async def ws_live(websocket: WebSocket):
 
         if engine and engine.is_model_available:
             engine.start_session()
+            logger.info("Live session started, waiting for audio chunks...")
+            chunk_count = 0
+            send_count = 0
+            fail_count = 0
             while True:
                 data = await websocket.receive_text()
                 msg = json.loads(data)
@@ -698,42 +711,55 @@ async def ws_live(websocket: WebSocket):
                     if audio_b64:
                         audio_bytes = base64.b64decode(audio_b64)
                         audio_chunk = np.frombuffer(audio_bytes, dtype=np.float32)
-                        result = engine.process_chunk(audio_chunk)
+                        chunk_count += 1
 
-                        await manager.send_json(websocket, {
-                            "type": "live_result",
-                            "data": {
-                                "timestamp": result.timestamp,
-                                "text": result.text,
-                                "raw_text": result.raw_text,
-                                "is_partial": result.is_partial,
-                                "is_final": result.is_final,
-                                "snr_db": result.snr_db,
-                                "quality_label": result.quality_label,
-                                "asr_confidence": result.asr_confidence,
-                                "corrections": result.corrections,
-                                "logic_flags": result.logic_flags,
-                                "terms": result.terms,
-                                "uncertain_spans": result.uncertain_spans,
-                            }
-                        })
-                elif msg.get("action") == "finalize":
-                    result = engine._finalize_results()
-                    if result:
-                        await manager.send_json(websocket, {
-                            "type": "live_result",
-                            "data": {
-                                "timestamp": result.timestamp,
-                                "text": result.text,
-                                "is_partial": False, "is_final": True,
-                                "snr_db": result.snr_db,
-                                "quality_label": result.quality_label,
-                                "asr_confidence": result.asr_confidence,
-                                "logic_flags": result.logic_flags,
-                                "terms": result.terms,
-                            }
-                        })
+                        # Run CPU-intensive ASR in thread pool to avoid blocking event loop
+                        result = await asyncio.to_thread(engine.process_chunk, audio_chunk)
+
+                        # Only send response if there's text or endpoint detected
+                        if result.text or result.is_final:
+                            # For final segments, apply text post-processing
+                            postproc_info = None
+                            display_text = str(result.text)
+                            if result.is_final and result.text and HAS_POSTPROCESSOR:
+                                try:
+                                    display_text, postproc_info = await asyncio.to_thread(
+                                        postprocess_text, str(result.text)
+                                    )
+                                    if postproc_info and postproc_info.get('corrections'):
+                                        logger.info(f"Live postproc: '{result.text[:30]}' → '{display_text[:30]}'")
+                                except Exception as pe:
+                                    logger.warning(f"Post-processing failed: {pe}")
+
+                            if result.text:
+                                logger.info(f"Live chunk #{chunk_count}: text='{result.text[:50]}', final={result.is_final}")
+                            try:
+                                resp_data = {
+                                    "timestamp": float(result.timestamp),
+                                    "text": str(display_text),
+                                    "raw_text": str(result.raw_text),
+                                    "is_partial": bool(result.is_partial),
+                                    "is_final": bool(result.is_final),
+                                    "snr_db": float(result.snr_db) if result.snr_db else 25.0,
+                                    "quality_label": str(result.quality_label),
+                                    "asr_confidence": float(result.asr_confidence) if result.asr_confidence else 0.8,
+                                }
+                                # Include post-processing info for final segments
+                                if postproc_info:
+                                    resp_data["postprocessed"] = True
+                                    resp_data["original_text"] = postproc_info.get('original_text', '')
+                                    resp_data["fillers_removed"] = postproc_info.get('fillers_removed', [])
+                                    resp_data["corrections"] = postproc_info.get('corrections', [])
+                                await websocket.send_json({
+                                    "type": "live_result",
+                                    "data": resp_data
+                                })
+                                send_count += 1
+                            except Exception as send_err:
+                                fail_count += 1
+                                logger.error(f"Live send failed #{chunk_count}: {send_err} (fails={fail_count})")
                 elif msg.get("action") == "stop":
+                    logger.info(f"Live session stopped: chunks={chunk_count}, sent={send_count}, failed={fail_count}")
                     engine.end_session()
                     break
         else:
@@ -747,9 +773,12 @@ async def ws_live(websocket: WebSocket):
                     "type": "live_result",
                     "data": {
                         "timestamp": time.time(),
-                        "snr_estimate": 22,
-                        "partial_text": "[Demo] X-ASR model not loaded",
-                        "confidence": 0.75,
+                        "text": "[Demo] X-ASR model not loaded",
+                        "is_partial": True,
+                        "is_final": False,
+                        "snr_db": 22,
+                        "quality_label": "medium",
+                        "asr_confidence": 0.75,
                     }
                 })
     except WebSocketDisconnect:

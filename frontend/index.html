@@ -340,6 +340,101 @@ body {
 }
 .upload-status-card .stage { color: var(--accent-blue); }
 .upload-status-card .done { color: var(--accent-green); }
+
+/* ── Live Mic Voice Orb ── */
+.mic-orb-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%) translateY(18px) scale(0.96);
+  width: 240px;
+  min-height: 150px;
+  padding: 18px 18px 14px;
+  border: 1px solid rgba(74,144,217,0.18);
+  border-radius: 24px;
+  background: rgba(15,17,23,0.72);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 450;
+  transition: opacity 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+}
+.mic-orb-panel.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.mic-orb-panel.listening {
+  border-color: rgba(139,108,232,0.42);
+}
+.mic-orb-wrap {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mic-orb-ring,
+.mic-orb-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transform: scale(var(--orb-scale, 1));
+  transition: transform 0.08s linear, opacity 0.08s linear;
+}
+.mic-orb-ring {
+  border: 1px solid rgba(139,108,232,0.48);
+  opacity: var(--orb-ring-opacity, 0.35);
+  box-shadow: 0 0 var(--orb-shadow, 18px) rgba(139,108,232,0.42);
+}
+.mic-orb-glow {
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.98), rgba(112,190,255,0.95) 18%, rgba(139,108,232,0.74) 48%, rgba(74,144,217,0.18) 72%, rgba(74,144,217,0) 100%);
+  filter: blur(var(--orb-blur, 0.5px));
+  opacity: var(--orb-glow-opacity, 0.82);
+}
+.mic-orb-core {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 28%, #ffffff 0%, #bfe8ff 22%, #7a8cff 52%, #6b46e8 100%);
+  box-shadow: inset -10px -12px 24px rgba(28,18,86,0.38), inset 8px 8px 16px rgba(255,255,255,0.28), 0 0 var(--orb-core-shadow, 20px) rgba(74,144,217,0.58);
+  transform: scale(var(--orb-core-scale, 1));
+  transition: transform 0.08s linear, box-shadow 0.08s linear;
+}
+.mic-orb-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 28px;
+  margin: 0 auto 8px;
+}
+.mic-orb-wave span {
+  width: 3px;
+  height: var(--bar-height, 7px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #bfe8ff, #8b6ce8);
+  opacity: 0.42;
+  transform: scaleY(var(--bar-scale, 0.53));
+  transition: height 0.08s linear, transform 0.08s linear, opacity 0.08s linear;
+}
+.mic-orb-panel.listening .mic-orb-wave span { opacity: 0.82; }
+.mic-orb-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+.mic-orb-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
 </style>
 </head>
 <body>
@@ -464,6 +559,24 @@ body {
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Live Mic Voice Orb                                          -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true">
+  <div class="mic-orb-wrap" id="micOrbWrap">
+    <div class="mic-orb-ring"></div>
+    <div class="mic-orb-glow"></div>
+    <div class="mic-orb-core"></div>
+  </div>
+  <div class="mic-orb-wave" id="micOrbWave">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <div class="mic-orb-title" id="micOrbTitle">正在听你说话</div>
+  <div class="mic-orb-subtitle" id="micOrbSubtitle">音量越大，语音球越活跃</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Debug Log Panel                                             -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="log-panel" id="logPanel">
@@ -533,6 +646,11 @@ const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
 const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
+const micOrbPanel = $('micOrbPanel');
+const micOrbWrap = $('micOrbWrap');
+const micOrbWave = $('micOrbWave');
+const micOrbTitle = $('micOrbTitle');
+const micOrbSubtitle = $('micOrbSubtitle');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -550,6 +668,10 @@ let uploadWsDelivered = false; // whether WS delivered any segments
 // Live mic
 let micStream = null;
 let micWs = null;
+let micAudioContext = null;
+let micAnalyser = null;
+let micVisualizerRAF = null;
+let micLevelSmoothed = 0;
 let isRecording = false;
 
 // Log stream
@@ -1436,6 +1558,72 @@ function finishUploadUI(status) {
 // Live Mic Recording
 // ═══════════════════════════════════════════════════════════
 
+function setMicOrbVisible(visible, subtitle = '') {
+  if (!micOrbPanel) return;
+  micOrbPanel.classList.toggle('visible', visible);
+  micOrbPanel.classList.toggle('listening', visible && isRecording);
+  micOrbPanel.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  if (micOrbTitle) micOrbTitle.textContent = visible ? '正在听你说话' : '麦克风已停止';
+  if (micOrbSubtitle) micOrbSubtitle.textContent = subtitle || (visible ? '音量越大，语音球越活跃' : '');
+  if (!visible) updateMicOrbLevel(0);
+}
+
+function updateMicOrbLevel(level) {
+  const safeLevel = Math.max(0, Math.min(1, level || 0));
+  const scale = 1 + safeLevel * 0.42;
+  if (micOrbWrap) {
+    micOrbWrap.style.setProperty('--orb-level', safeLevel.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-scale', scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-ring-opacity', (0.25 + safeLevel * 0.65).toFixed(3));
+    micOrbWrap.style.setProperty('--orb-shadow', (18 + safeLevel * 34).toFixed(1) + 'px');
+    micOrbWrap.style.setProperty('--orb-blur', (0.5 + safeLevel * 3).toFixed(1) + 'px');
+    micOrbWrap.style.setProperty('--orb-glow-opacity', (0.82 + safeLevel * 0.18).toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', (1 + safeLevel * 0.22).toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-shadow', (20 + safeLevel * 50).toFixed(1) + 'px');
+  }
+  if (micOrbWave) {
+    const bars = micOrbWave.querySelectorAll('span');
+    bars.forEach((bar, i) => {
+      const phase = Math.sin(performance.now() / 120 + i * 0.72) * 0.5 + 0.5;
+      const barLevel = Math.max(0.06, safeLevel * (0.42 + phase * 0.88));
+      bar.style.setProperty('--bar-level', barLevel.toFixed(3));
+      bar.style.setProperty('--bar-height', (5 + barLevel * 24).toFixed(1) + 'px');
+      bar.style.setProperty('--bar-scale', (0.45 + barLevel).toFixed(3));
+    });
+  }
+}
+
+function startMicVisualizer() {
+  stopMicVisualizer();
+  if (!micAnalyser) return;
+
+  const data = new Float32Array(micAnalyser.fftSize);
+  const tick = () => {
+    if (!isRecording || !micAnalyser) {
+      stopMicVisualizer();
+      return;
+    }
+    micAnalyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / data.length);
+    const level = Math.min(1, rms * 9);
+    micLevelSmoothed = micLevelSmoothed * 0.72 + level * 0.28;
+    updateMicOrbLevel(micLevelSmoothed);
+    micVisualizerRAF = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function stopMicVisualizer() {
+  if (micVisualizerRAF !== null) {
+    cancelAnimationFrame(micVisualizerRAF);
+    micVisualizerRAF = null;
+  }
+  micLevelSmoothed = 0;
+  updateMicOrbLevel(0);
+}
+
 async function toggleMic() {
   const btnMic = $('btnMic');
   const micStatusEl = micStatus;
@@ -1452,49 +1640,108 @@ async function toggleMic() {
       audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true }
     });
     const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    // Resume AudioContext (browsers start it suspended)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    micAudioContext = audioContext;
     const source = audioContext.createMediaStreamSource(micStream);
+    micAnalyser = audioContext.createAnalyser();
+    micAnalyser.fftSize = 1024;
+    micAnalyser.smoothingTimeConstant = 0.78;
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
     try {
       micWs = new WebSocket('ws://localhost:8765/ws/live');
       micWs.onopen = () => {
+        console.log('[Mic] WebSocket connected to /ws/live');
         if (micStatusEl) { micStatusEl.textContent = 'X-ASR Live'; micStatusEl.style.color = 'var(--accent-green)'; }
+        setMicOrbVisible(true, '已连接实时识别，开始说话');
       };
       micWs.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+        console.log('[Mic] WS message:', msg.type, msg.data?.text?.slice(0, 40) || '');
         if (msg.type === 'live_result' && msg.data.text) {
+          if (msg.data.is_partial) {
+            setMicOrbVisible(true, '正在实时转写...');
+          } else if (msg.data.is_final) {
+            setMicOrbVisible(true, '已收到一句完整识别结果');
+          }
           updateMicResult(msg.data);
         }
       };
-      micWs.onerror = () => {
-        if (micStatusEl) { micStatusEl.textContent = 'Local'; micStatusEl.style.color = 'var(--accent-yellow)'; }
+      micWs.onerror = (e) => {
+        console.error('[Mic] WebSocket error:', e);
+        if (micStatusEl) { micStatusEl.textContent = 'WS Error'; micStatusEl.style.color = 'var(--accent-red)'; }
+        setMicOrbVisible(true, '实时识别连接失败，但仍在显示麦克风输入');
+        showToast('WebSocket connection failed - is backend running?');
+      };
+      micWs.onclose = () => {
+        console.log('[Mic] WebSocket closed');
       };
     } catch (e) {
-      if (micStatusEl) { micStatusEl.textContent = 'Local'; micStatusEl.style.color = 'var(--accent-yellow)'; }
+      console.error('[Mic] WebSocket creation failed:', e);
+      if (micStatusEl) { micStatusEl.textContent = 'No WS'; micStatusEl.style.color = 'var(--accent-yellow)'; }
+      setMicOrbVisible(true, '未连接后端，仅显示麦克风音量');
     }
 
     let chunkCount = 0;
+    const actualSampleRate = audioContext.sampleRate;
+    console.log('[Mic] AudioContext sampleRate:', actualSampleRate, '(requested 16000)');
+
     processor.onaudioprocess = (e) => {
       if (!isRecording) return;
       const inputData = e.inputBuffer.getChannelData(0);
       chunkCount++;
-      if (micWs && micWs.readyState === WebSocket.OPEN && chunkCount % 4 === 0) {
-        const float32 = new Float32Array(inputData);
-        const bytes = new Uint8Array(float32.buffer);
+
+      // Log audio level every 10 chunks
+      if (chunkCount % 10 === 0) {
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
+        const rms = Math.sqrt(sum / inputData.length);
+        console.log(`[Mic] chunk #${chunkCount}, samples=${inputData.length}, RMS=${rms.toFixed(4)}, sr=${actualSampleRate}`);
+      }
+
+      if (micWs && micWs.readyState === WebSocket.OPEN) {
+        // Resample to 16kHz if AudioContext is running at a different rate
+        let audio16k = inputData;
+        if (actualSampleRate !== 16000) {
+          const ratio = 16000 / actualSampleRate;
+          const newLen = Math.round(inputData.length * ratio);
+          audio16k = new Float32Array(newLen);
+          for (let i = 0; i < newLen; i++) {
+            const srcIdx = i / ratio;
+            const idx0 = Math.floor(srcIdx);
+            const idx1 = Math.min(idx0 + 1, inputData.length - 1);
+            const frac = srcIdx - idx0;
+            audio16k[i] = inputData[idx0] * (1 - frac) + inputData[idx1] * frac;
+          }
+        }
+
+        const bytes = new Uint8Array(audio16k.buffer);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
         micWs.send(JSON.stringify({ action: 'process_chunk', audio: btoa(binary) }));
       }
     };
 
+    // Connect through zero-gain node to prevent audio feedback to speakers
+    const silentGain = audioContext.createGain();
+    silentGain.gain.value = 0;
+    source.connect(micAnalyser);
     source.connect(processor);
-    processor.connect(audioContext.destination);
+    processor.connect(silentGain);
+    silentGain.connect(audioContext.destination);
     isRecording = true;
+    setMicOrbVisible(true);
+    startMicVisualizer();
     if (btnMic) { btnMic.textContent = 'Stop'; btnMic.classList.add('active'); }
     if (micStatusEl) { micStatusEl.textContent = 'Recording...'; micStatusEl.style.color = 'var(--accent-red)'; }
     showToast('Recording started');
   } catch (err) {
     console.error('Mic error:', err);
+    stopMicVisualizer();
+    setMicOrbVisible(false);
     if (micStatusEl) { micStatusEl.textContent = 'Mic denied'; micStatusEl.style.color = 'var(--accent-red)'; }
     showToast('Cannot access microphone');
   }
@@ -1502,8 +1749,26 @@ async function toggleMic() {
 
 function stopMicRecording() {
   isRecording = false;
+  stopMicVisualizer();
+  setMicOrbVisible(false);
+  micAnalyser = null;
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-  if (micWs) { micWs.send(JSON.stringify({ action: 'stop' })); micWs.close(); micWs = null; }
+  if (micWs) {
+    if (micWs.readyState === WebSocket.OPEN) {
+      micWs.send(JSON.stringify({ action: 'stop' }));
+      // Give backend 500ms to process queued chunks and send final results
+      setTimeout(() => {
+        if (micWs) { micWs.close(); micWs = null; }
+      }, 500);
+    } else {
+      micWs.close();
+      micWs = null;
+    }
+  }
+  if (micAudioContext) {
+    micAudioContext.close().catch(() => {});
+    micAudioContext = null;
+  }
 }
 
 function updateMicResult(data) {
@@ -1531,6 +1796,23 @@ function updateMicResult(data) {
     const idx = allSegments.length;
     allSegments.push(data);
     renderSegment(data, idx, false);
+
+    // Show post-processing corrections if available
+    if (data.postprocessed && (data.corrections?.length || data.fillers_removed?.length)) {
+      const corrParts = [];
+      if (data.fillers_removed?.length) corrParts.push(`停顿词: ${data.fillers_removed.join(', ')}`);
+      if (data.corrections?.length) {
+        const corrText = data.corrections.map(c => `${c.original}→${c.corrected}`).join(', ');
+        corrParts.push(`纠错: ${corrText}`);
+      }
+      if (corrParts.length) {
+        const corrHtml = `<div style="margin-top:4px;padding:4px 10px;font-size:11px;color:var(--text-muted);background:rgba(88,166,255,0.08);border-radius:4px;border-left:2px solid var(--accent-blue);">
+          ${escapeHTML(corrParts.join(' | '))}
+        </div>`;
+        const segs = transcriptBody.querySelectorAll('.segment');
+        if (segs.length > 0) segs[segs.length - 1].insertAdjacentHTML('beforeend', corrHtml);
+      }
+    }
   }
   transcriptBody.scrollTop = transcriptBody.scrollHeight;
 }
@@ -1610,6 +1892,11 @@ function resetAll() {
   if (overallConfText) overallConfText.textContent = '--';
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = 'No meeting loaded';
   if (connectionStatus) connectionStatus.textContent = 'Offline';
+  if (isRecording) stopMicRecording();
+  else {
+    stopMicVisualizer();
+    setMicOrbVisible(false);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════

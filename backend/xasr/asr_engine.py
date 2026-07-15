@@ -562,7 +562,12 @@ class XASREngine:
 
     def start_session(self):
         """Start a new recognition session (for streaming mode)."""
-        if self.asr:
+        # Create ASR instance for this session (thread-safe, one per stream)
+        if self.model_available and self.asr is None:
+            self.asr = self._create_asr()
+            if self.asr:
+                logger.info("Streaming ASR instance created for live session")
+        elif self.asr:
             self.asr.reset()
         self._session_active = True
         self._total_segments_processed = 0
@@ -590,9 +595,10 @@ class XASREngine:
 
         self._total_segments_processed += 1
 
-        # Acoustic estimation
-        self._current_snr = estimate_snr(audio_chunk, sr)
-        self._current_rt60 = estimate_rt60(audio_chunk, sr)
+        # Acoustic estimation (every 5 chunks to reduce CPU load)
+        if self._total_segments_processed % 5 == 0:
+            self._current_snr = estimate_snr(audio_chunk, sr)
+            self._current_rt60 = estimate_rt60(audio_chunk, sr)
 
         # X-ASR inference
         if self.asr:
@@ -603,6 +609,14 @@ class XASREngine:
         else:
             raw_text = ""
             is_endpoint = False
+
+        # Skip expensive _build_result if no text and no endpoint
+        if not raw_text and not is_endpoint:
+            return ASRResult(
+                text="", raw_text="",
+                is_partial=True, is_final=False,
+                snr_db=self._current_snr, quality_label="medium",
+            )
 
         result = self._build_result(
             raw_text=raw_text,
@@ -627,6 +641,7 @@ class XASREngine:
         if self._session_active:
             if self.asr:
                 self.asr.input_finished()
+                self.asr = None  # Free resources
             self._session_active = False
             logger.debug("Session ended")
 

@@ -1,0 +1,45 @@
+# ── Large datasets ──
+Eval_Ali/
+
+# ── ONNX model files (>100MB each) ──
+backend/xasr/models/*.onnx
+
+# ── Audio/video files (large) ──
+*.mp3
+*.mp4
+*.wav
+
+# ── Python caches ──
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ── Logs ──
+backend/logs/
+*.log
+
+# ── Demo output ──
+backend/demo_output/
+asr_output.txt
+
+# ── Environment ──
+venv/
+.venv/
+env/
+
+# ── IDE ──
+.vscode/
+.idea/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── X-ASR source (third-party, cloned separately) ──
+xasr_source/
+
+# ── Temp files ──
+*.tmp
+*.temp
+_test_*

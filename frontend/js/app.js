@@ -45,24 +45,24 @@ const meetingTitleDisplay = $('meetingTitleDisplay');
 const connectionStatus = $('connectionStatus');
 const xasrStatus = $('xasrStatus');
 const statSegments = $('statSegments');
-const statLogicFlags = $('statLogicFlags');
-const statLowConf = $('statLowConf');
 const statCorrections = $('statCorrections');
-const overallConfBar = $('overallConfBar');
-const overallConfText = $('overallConfText');
 const processingPanel = $('processingPanel');
-const logicPanel = $('logicPanel');
-const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
 const micOrbPanel = $('micOrbPanel');
 const micOrbWrap = $('micOrbWrap');
 const micOrbWave = $('micOrbWave');
 const micOrbTitle = $('micOrbTitle');
 const micOrbSubtitle = $('micOrbSubtitle');
-const domainCard = $('domainCard');
+const micOrbDragHandle = $('micOrbDragHandle');
+const micOrbCloseBtn = $('micOrbClose');
+const micOrbDockTab = $('micOrbDockTab');
 const hotwordCard = $('hotwordCard');
 const speakerCard = $('speakerCard');
 const summaryCard = $('summaryCard');
+const actionCard = $('actionCard');
+const progressRingFg = $('progressRingFg');
+const progressRingPct = $('progressRingPct');
+const progressRingStage = $('progressRingStage');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -421,7 +421,7 @@ class AudioPlaybackManager {
       if (on) el.classList.add('playing');
       else el.classList.remove('playing');
     }
-    const btn = document.querySelector(`.segment-play-btn[data-seg-index="${segIndex}"]`);
+    const btn = document.querySelector(`.seg-play-icon[data-seg-index="${segIndex}"]`);
     if (btn) {
       if (on) btn.classList.add('playing');
       else btn.classList.remove('playing');
@@ -570,22 +570,52 @@ function renderSegment(seg, index, autoPlay = false) {
     <div class="segment-top">
       <span class="segment-index">#${index + 1}</span>
       <span class="segment-dur">时长 ${durationText}</span>
-      <span class="segment-confidence" style="color:${confColor};font-weight:600;">置信度 ${confidenceText}${confLabel ? ' (' + confLabel + ')' : ''}</span>
-      ${hasAudio ? `<button class="segment-play-btn" data-seg-index="${index}" type="button" title="播放/暂停">播放</button>` : ''}
+      ${hasAudio ? `<button class="seg-play-icon" data-seg-index="${index}" type="button" title="播放/暂停"><img src="./assets/play-btn.jpg" alt="播放" width="24" height="24"></button>` : ''}
+      ${hasAudio ? `<span class="seg-expand-toggle" data-seg-index="${index}" title="展开/收起波形">▾</span>` : ''}
     </div>
     <div class="segment-text">${textHtml}</div>
+    ${hasAudio ? `<div class="seg-waveform-expand" id="segWaveform_${index}" style="display:none;"><div class="seg-waveform-container" id="segWaveContainer_${index}"></div></div>` : ''}
   `;
 
   transcriptBody.appendChild(card);
 
   if (hasAudio) {
     audioManager.createAudio(index, audioBase64);
-    const playBtn = card.querySelector(`.segment-play-btn[data-seg-index="${index}"]`);
+
+    // Play icon button
+    const playBtn = card.querySelector(`.seg-play-icon[data-seg-index="${index}"]`);
     if (playBtn) {
       playBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (audioManager.activeIndex === index) audioManager.pause();
         else audioManager.play(index);
+      });
+    }
+
+    // Expand toggle for waveform
+    const expandToggle = card.querySelector(`.seg-expand-toggle[data-seg-index="${index}"]`);
+    const waveformExpand = card.querySelector(`#segWaveform_${index}`);
+    const waveContainer = card.querySelector(`#segWaveContainer_${index}`);
+
+    if (expandToggle && waveformExpand) {
+      let waveCreated = false;
+      expandToggle.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const isHidden = waveformExpand.style.display === 'none';
+        if (isHidden) {
+          waveformExpand.style.display = 'block';
+          expandToggle.classList.add('expanded');
+          // Lazy-load waveform on first expand
+          if (!waveCreated && waveContainer && typeof WaveSurfer !== 'undefined') {
+            waveCreated = true;
+            // Clean up existing audio-only instance, replace with WaveSurfer
+            audioManager.destroy(index);
+            await audioManager.create(index, audioBase64, waveContainer);
+          }
+        } else {
+          waveformExpand.style.display = 'none';
+          expandToggle.classList.remove('expanded');
+        }
       });
     }
   }
@@ -616,38 +646,29 @@ function updateStats(segmentsProcessed = null) {
   }, 0);
   const corrCount = segments.reduce((sum, s) => sum + (Array.isArray(s.corrections) ? s.corrections.length : 0), 0);
 
-  if (statLogicFlags) statLogicFlags.textContent = logicCount;
-  if (statLowConf) statLowConf.textContent = lowConfCount;
   if (statCorrections) statCorrections.textContent = corrCount;
-
-  const avgConf = segments.length
-    ? segments.reduce((sum, s) => sum + Number(s.asr_confidence || 0), 0) / segments.length
-    : 0;
-  const pct = avgConf > 0 ? Math.round(avgConf * 100) : Math.min(90, 50 + realCount * 3);
-  if (overallConfBar) overallConfBar.style.width = pct + '%';
-  if (overallConfText) overallConfText.textContent = pct ? pct + '%' : '--';
 }
 
-function updateLogicPanel() {
-  if (!logicPanel) return;
-  const flags = [];
-  for (const seg of allSegments) {
-    for (const f of (seg.logic_flags || [])) {
-      flags.push(f);
-    }
+// ── Progress Ring (v4.5) ──
+const RING_CIRCUMFERENCE = 2 * Math.PI * 34;
+
+function updateProgressRing(fraction, stageLabel) {
+  if (!progressRingFg) return;
+  const pct = Math.max(0, Math.min(1, fraction));
+  progressRingFg.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - pct));
+  if (pct >= 1) {
+    progressRingFg.style.stroke = 'var(--accent-green)';
+  } else if (pct > 0.5) {
+    progressRingFg.style.stroke = 'var(--accent-blue)';
+  } else {
+    progressRingFg.style.stroke = 'var(--accent-orange)';
   }
-  if (flags.length === 0) {
-    logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无逻辑提示</div>';
-    return;
-  }
-  logicPanel.innerHTML = flags.map(f => {
-    const icon = f.severity === 'resolved' ? 'OK' : '!';
-    return `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span style="color:${f.severity === 'resolved' ? 'var(--accent-green)' : 'var(--accent-yellow)'};">${icon}</span>
-      ${f.message || ''}
-    </div>`;
-  }).join('');
+  if (progressRingPct) progressRingPct.textContent = Math.round(pct * 100) + '%';
+  if (progressRingStage && stageLabel) progressRingStage.textContent = stageLabel;
 }
+
+// updateLogicPanel removed in v4.5 (logic panel deleted from UI)
+function updateLogicPanel() { /* no-op: logic panel removed */ }
 
 // ═══════════════════════════════════════════════════════════
 // 分析结果面板渲染 (v4.5)
@@ -656,31 +677,28 @@ function updateLogicPanel() {
 const SPEAKER_COLORS = ['#4A90D9', '#E8743C', '#50B86C', '#e8b83c', '#8b6ce8', '#e0556a'];
 
 function resetResultsPanel() {
-  if (domainCard) domainCard.innerHTML = '<div class="summary-empty">分析中…</div>';
   if (hotwordCard) hotwordCard.innerHTML = '<div class="summary-empty">提取中…</div>';
   if (speakerCard) speakerCard.innerHTML = '<div class="summary-empty">识别中…</div>';
   if (summaryCard) summaryCard.innerHTML = '<div class="summary-empty">会议处理完成后将自动生成摘要…</div>';
+  if (actionCard) actionCard.innerHTML = '<div class="summary-empty">暂无行动项</div>';
 }
 
 function renderResultsPanel(data) {
   if (!data) return;
 
-  // 1. 领域
-  if (data.domain) {
-    renderDomainCard(data.domain);
-  } else {
-    if (domainCard) domainCard.innerHTML = '<div class="summary-empty">尚未识别</div>';
-  }
-
-  // 2. 热词
+  // 1. 热词
   renderHotwordCard(data.hotwords || []);
 
-  // 3. 说话人分布
+  // 2. 说话人分布
   renderSpeakerCard(data.speaker_stats || {});
 
-  // 4. 摘要
+  // 3. 摘要
   if (data.summary) {
     renderSummaryCard(data.summary);
+    // 4. 演示模式 action_items → actionCard
+    if (data.summary.action_items && data.summary.action_items.length > 0) {
+      renderActionCard(data.summary.action_items);
+    }
   }
 
   // 5. 自动提取行动项（如果有 segments）
@@ -691,41 +709,8 @@ function renderResultsPanel(data) {
   }
 }
 
-function renderDomainCard(domain) {
-  const card = document.getElementById('domainCard');
-  if (!card) return;
-
-  if (!domain || !domain.domain) {
-    card.innerHTML = '<div class="summary-empty">未检测到领域</div>';
-    return;
-  }
-
-  const pct = domain.confidence ? Math.round(domain.confidence * 100) : '--';
-  const methodLabel = domain.method === 'llm' ? 'LLM 推理' : (domain.method === 'demo' ? '演示' : '规则匹配');
-
-  let h = `<div class="domain-badge">${escapeHTML(domain.domain)}</div>`;
-  h += `<div class="domain-meta">`;
-  h += `<span>置信度 ${pct}%</span>`;
-  h += `<span class="dot"></span>`;
-  h += `<span>${methodLabel}</span>`;
-  h += `</div>`;
-
-  if (domain.sub_domains && domain.sub_domains.length > 0) {
-    h += '<div class="domain-sub">';
-    domain.sub_domains.forEach(sd => { h += `<span class="domain-sub-tag">${escapeHTML(sd)}</span>`; });
-    h += '</div>';
-  }
-
-  if (domain.matched_terms && domain.matched_terms.length > 0) {
-    h += '<div class="domain-matched">匹配词：' + domain.matched_terms.slice(0, 6).map(t => escapeHTML(t)).join(' · ') + '</div>';
-  }
-
-  if (domain.reason) {
-    h += `<div class="domain-matched" style="margin-top:2px;">${escapeHTML(domain.reason)}</div>`;
-  }
-
-  card.innerHTML = h;
-}
+// renderDomainCard removed in v4.5 (domain card deleted from UI)
+function renderDomainCard(domain) { /* no-op */ }
 
 function renderHotwordCard(hotwords) {
   const card = document.getElementById('hotwordCard');
@@ -814,44 +799,42 @@ function renderSummaryCard(summary) {
     h += '</div>';
   }
 
-  if (summary.action_items && summary.action_items.length > 0) {
-    h += '<div class="summary-section"><div class="summary-section-title">行动项 / TODO</div>';
-    summary.action_items.forEach((a, i) => {
-      const item = typeof a === 'string' ? { task: a } : a;
-      const task = item.task || '';
-      const assignee = item.assignee || '';
-      const deadline = item.deadline || '';
-      const priority = item.priority || 'medium';
-      const source = item.source_text || '';
-      const speaker = item.speaker || '';
+  // action_items rendered separately in actionCard (v4.5)
+  card.innerHTML = h;
+}
 
-      // Priority color
-      const pColor = priority === 'high' ? '#f85149' : priority === 'low' ? '#8b949e' : '#58a6ff';
-      const pLabel = priority === 'high' ? '高' : priority === 'low' ? '低' : '中';
-
-      h += `<div style="margin:6px 0;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid ${pColor};">`;
-      // Row 1: task + priority badge
-      h += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
-      h += `<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${pColor}33;color:${pColor};font-weight:600;">${pLabel}</span>`;
-      h += `<span style="font-size:13px;color:#e6edf3;font-weight:500;">${escapeHTML(task)}</span>`;
-      h += `</div>`;
-      // Row 2: meta (assignee / deadline / speaker)
-      const metaParts = [];
-      if (assignee) metaParts.push(`👤 ${escapeHTML(assignee)}`);
-      if (deadline) metaParts.push(`⏰ ${escapeHTML(deadline)}`);
-      if (speaker) metaParts.push(`🎙 ${escapeHTML(speaker)}`);
-      if (metaParts.length) {
-        h += `<div style="margin-top:4px;font-size:11px;color:#8b949e;display:flex;gap:12px;flex-wrap:wrap;">${metaParts.join('')}</div>`;
-      }
-      // Row 3: source text
-      if (source) {
-        h += `<div style="margin-top:6px;font-size:11px;color:#6e7681;border-top:1px solid #21262d;padding-top:4px;font-style:italic;">"${escapeHTML(source)}"</div>`;
-      }
-      h += `</div>`;
-    });
-    h += '</div>';
+// ── Render action items to actionCard (v4.5) ──
+function renderActionCard(actionItems) {
+  const card = $('actionCard');
+  if (!card) return;
+  if (!actionItems || actionItems.length === 0) {
+    card.innerHTML = '<div class="summary-empty">暂无行动项</div>';
+    return;
   }
-
+  let h = '';
+  actionItems.forEach((a) => {
+    const item = typeof a === 'string' ? { task: a } : a;
+    const task = item.task || '';
+    const assignee = item.assignee || '';
+    const deadline = item.deadline || '';
+    const priority = item.priority || 'medium';
+    const source = item.source_text || '';
+    const speaker = item.speaker || '';
+    const pColor = priority === 'high' ? '#f85149' : priority === 'low' ? '#8b949e' : '#58a6ff';
+    const pLabel = priority === 'high' ? '高' : priority === 'low' ? '低' : '中';
+    h += `<div style="margin:6px 0;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid ${pColor};">`;
+    h += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
+    h += `<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${pColor}33;color:${pColor};font-weight:600;">${pLabel}</span>`;
+    h += `<span style="font-size:13px;color:#e6edf3;font-weight:500;">${escapeHTML(task)}</span>`;
+    h += `</div>`;
+    const metaParts = [];
+    if (assignee) metaParts.push(`👤 ${escapeHTML(assignee)}`);
+    if (deadline) metaParts.push(`⏰ ${escapeHTML(deadline)}`);
+    if (speaker) metaParts.push(`🎙 ${escapeHTML(speaker)}`);
+    if (metaParts.length) h += `<div style="margin-top:4px;font-size:11px;color:#8b949e;display:flex;gap:12px;flex-wrap:wrap;">${metaParts.join('')}</div>`;
+    if (source) h += `<div style="margin-top:6px;font-size:11px;color:#6e7681;border-top:1px solid #21262d;padding-top:4px;font-style:italic;">"${escapeHTML(source)}"</div>`;
+    h += `</div>`;
+  });
   card.innerHTML = h;
 }
 
@@ -861,7 +844,7 @@ function renderSummaryCard(summary) {
 
 async function fetchAndRenderActionItems(segments) {
   if (!segments || segments.length === 0) return;
-  const card = document.getElementById('summaryCard');
+  const card = $('actionCard');
   if (!card) return;
 
   try {
@@ -877,27 +860,9 @@ async function fetchAndRenderActionItems(segments) {
     });
     const data = await resp.json();
     if (data.action_items && data.action_items.length > 0) {
-      // Append action items to summary card
-      let h = card.innerHTML;
-      h += '<div class="summary-section"><div class="summary-section-title">行动项 / TODO (自动提取)</div>';
-      data.action_items.forEach((a, i) => {
-        const pColor = a.priority === 'high' ? '#f85149' : a.priority === 'low' ? '#8b949e' : '#58a6ff';
-        const pLabel = a.priority === 'high' ? '高' : a.priority === 'low' ? '低' : '中';
-        h += `<div style="margin:6px 0;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid ${pColor};">`;
-        h += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
-        h += `<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${pColor}33;color:${pColor};font-weight:600;">${pLabel}</span>`;
-        h += `<span style="font-size:13px;color:#e6edf3;font-weight:500;">${escapeHTML(a.task || '')}</span>`;
-        h += `</div>`;
-        const meta = [];
-        if (a.assignee) meta.push(`👤 ${escapeHTML(a.assignee)}`);
-        if (a.deadline) meta.push(`⏰ ${escapeHTML(a.deadline)}`);
-        if (a.speaker) meta.push(`🎙 ${escapeHTML(a.speaker)}`);
-        if (meta.length) h += `<div style="margin-top:4px;font-size:11px;color:#8b949e;display:flex;gap:12px;flex-wrap:wrap;">${meta.join('')}</div>`;
-        if (a.source_text) h += `<div style="margin-top:6px;font-size:11px;color:#6e7681;border-top:1px solid #21262d;padding-top:4px;font-style:italic;">"${escapeHTML(a.source_text)}"</div>`;
-        h += `</div>`;
-      });
-      h += '</div>';
-      card.innerHTML = h;
+      renderActionCard(data.action_items);
+    } else {
+      card.innerHTML = '<div class="summary-empty">暂无行动项</div>';
     }
   } catch (e) {
     console.error('[DiTing] Action items fetch failed:', e);
@@ -926,8 +891,6 @@ async function startDemo() {
   allSegments = demoData.segments || [];
 
   isPlaying = true;
-  const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = '演示中...'; btnStart.disabled = true; }
   updateConnectionStatus('connected');
 
   currentSegmentIndex = -1;
@@ -959,8 +922,6 @@ function playNextDemoSegment() {
 
 function finishDemo() {
   isPlaying = false;
-  const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
   updateConnectionStatus('completed');
   showToast('演示完成');
 }
@@ -1025,10 +986,13 @@ function renderUploadSnapshot(task) {
   }
 
   if (processingPanel && task.status && !['completed', 'demo_mode'].includes(task.status)) {
+    const frac = task.progress_fraction || 0;
+    const stage = task.progress_stage || task.status;
     processingPanel.innerHTML = `<div class="upload-status-card">
-      <div class="stage">阶段：${escapeHTML(task.progress_stage || task.status)}</div>
-      <div style="color:var(--text-muted);">${Math.round((task.progress_fraction || 0) * 100)}% · ${escapeHTML(task.filename || '')}</div>
+      <div class="stage">阶段：${escapeHTML(stage)}</div>
+      <div style="color:var(--text-muted);">${Math.round(frac * 100)}% · ${escapeHTML(task.filename || '')}</div>
     </div>`;
+    updateProgressRing(frac, stage);
   }
 
   if (task.status === 'completed' || task.status === 'demo_mode') {
@@ -1137,6 +1101,7 @@ async function handleFileUpload(event) {
       <div class="stage">正在上传：${file.name}</div>
       <div style="color:var(--text-muted);">${(file.size/1024/1024).toFixed(1)} MB</div>
     </div>`;
+    updateProgressRing(0.05, '上传中');
   }
 
   // ── Fallback timer: if WS doesn't deliver within 30s, use HTTP result ──
@@ -1322,6 +1287,7 @@ function handleUploadWSMessage(msg, generation = resetGeneration) {
           <div style="color:var(--text-muted);">引擎：${escapeHTML(msg.data.engine || '')}</div>
         </div>`;
       }
+      updateProgressRing(0.1, '处理中');
       break;
 
     case 'progress':
@@ -1329,6 +1295,7 @@ function handleUploadWSMessage(msg, generation = resetGeneration) {
         const progEl = panel.querySelector('.stage');
         if (progEl) progEl.textContent = `阶段：${msg.data.stage} (${(msg.data.fraction*100).toFixed(0)}%)`;
       }
+      updateProgressRing(msg.data.fraction || 0, msg.data.stage || '处理中');
       break;
 
     case 'segment': {
@@ -1425,8 +1392,7 @@ function finishUploadUI(status, options = {}) {
   if (status === 'complete') {
     updateConnectionStatus('completed');
     if (progressFill) progressFill.style.width = '100%';
-    if (overallConfBar) { overallConfBar.style.width = '85%'; overallConfBar.style.background = 'var(--accent-green)'; }
-    if (overallConfText) overallConfText.textContent = '85%';
+    updateProgressRing(1, '完成');
   } else if (status === 'cancelled') {
     updateConnectionStatus('disconnected');
     clearUploadTaskRef();
@@ -1446,12 +1412,168 @@ function finishUploadUI(status, options = {}) {
 
 function setMicOrbVisible(visible, subtitle = '') {
   if (!micOrbPanel) return;
+  // If docked, don't show panel (only undock restores it)
+  if (visible && micOrbPanel.classList.contains('docked')) return;
   micOrbPanel.classList.toggle('visible', visible);
   micOrbPanel.classList.toggle('listening', visible && isRecording);
   micOrbPanel.setAttribute('aria-hidden', visible ? 'false' : 'true');
   if (micOrbTitle) micOrbTitle.textContent = visible ? '正在听你说话' : '麦克风已停止';
   if (micOrbSubtitle) micOrbSubtitle.textContent = subtitle || (visible ? '音量越大，语音球越活跃' : '');
   if (!visible) updateMicOrbLevel(0);
+}
+
+// ── Mic Orb Panel: Drag + Edge Dock (v4.5) ──
+const DOCK_THRESHOLD = 60; // px from edge to trigger docking
+
+let _orbDragState = null;
+let _orbDocked = false;
+let _orbDockSide = null; // 'left' | 'right' | 'top' | 'bottom'
+let _orbLastPos = null;  // {x, y} before docking
+
+function _getPanelRect() {
+  if (!micOrbPanel) return null;
+  const r = micOrbPanel.getBoundingClientRect();
+  return { x: r.left, y: r.top, w: r.width, h: r.height };
+}
+
+function _setPanelPos(x, y) {
+  if (!micOrbPanel) return;
+  // Clamp within viewport so the panel never goes off-screen
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const rect = micOrbPanel.getBoundingClientRect();
+  const w = rect.width || 240;
+  const h = rect.height || 150;
+  const clampedX = Math.max(0, Math.min(x, vw - w));
+  const clampedY = Math.max(0, Math.min(y, vh - h));
+  micOrbPanel.style.left = clampedX + 'px';
+  micOrbPanel.style.top = clampedY + 'px';
+  micOrbPanel.style.bottom = 'auto';
+  micOrbPanel.style.transform = 'none';
+}
+
+function _checkEdgeDock() {
+  const rect = _getPanelRect();
+  if (!rect) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tol = 2; // px tolerance for "touching edge"
+  // If panel was clamped to any edge → dock to that side
+  if (rect.x <= tol) _dockOrb('left');
+  else if (rect.x + rect.w >= vw - tol) _dockOrb('right');
+  else if (rect.y <= tol) _dockOrb('top');
+  else if (rect.y + rect.h >= vh - tol) _dockOrb('bottom');
+}
+
+function _dockOrb(side) {
+  if (!micOrbPanel || !micOrbDockTab) return;
+  _orbDocked = true;
+  _orbDockSide = side;
+  micOrbPanel.classList.add('docked');
+  micOrbPanel.classList.remove('visible');
+
+  // Position the dock tab at the edge
+  const tabSize = 40;
+  let tabX, tabY;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (side === 'left') { tabX = 0; tabY = vh / 2 - tabSize / 2; }
+  else if (side === 'right') { tabX = vw - tabSize; tabY = vh / 2 - tabSize / 2; }
+  else if (side === 'top') { tabX = vw / 2 - tabSize / 2; tabY = 0; }
+  else { tabX = vw / 2 - tabSize / 2; tabY = vh - tabSize; }
+
+  micOrbDockTab.style.left = tabX + 'px';
+  micOrbDockTab.style.top = tabY + 'px';
+  micOrbDockTab.classList.add('visible');
+}
+
+function _undockOrb() {
+  if (!micOrbPanel || !micOrbDockTab) return;
+  _orbDocked = false;
+  _orbDockSide = null;
+  micOrbPanel.classList.remove('docked');
+  micOrbDockTab.classList.remove('visible');
+
+  // Restore to last position or default center
+  if (_orbLastPos) {
+    _setPanelPos(_orbLastPos.x, _orbLastPos.y);
+  } else {
+    // Default: center bottom
+    micOrbPanel.style.left = '50%';
+    micOrbPanel.style.bottom = '64px';
+    micOrbPanel.style.top = 'auto';
+    micOrbPanel.style.transform = 'translateX(-50%)';
+  }
+  micOrbPanel.classList.add('visible');
+}
+
+function _initOrbDrag() {
+  if (!micOrbDragHandle || !micOrbPanel) return;
+
+  micOrbDragHandle.addEventListener('mousedown', (e) => {
+    if (micOrbPanel.classList.contains('docked')) return;
+    const rect = _getPanelRect();
+    if (!rect) return;
+    _orbDragState = {
+      offsetX: e.clientX - rect.x,
+      offsetY: e.clientY - rect.y,
+    };
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!_orbDragState) return;
+    const x = e.clientX - _orbDragState.offsetX;
+    const y = e.clientY - _orbDragState.offsetY;
+    _setPanelPos(x, y);
+    _orbLastPos = { x, y };
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!_orbDragState) return;
+    _orbDragState = null;
+    _checkEdgeDock();
+  });
+
+  // Touch support
+  micOrbDragHandle.addEventListener('touchstart', (e) => {
+    if (micOrbPanel.classList.contains('docked')) return;
+    const touch = e.touches[0];
+    const rect = _getPanelRect();
+    if (!rect) return;
+    _orbDragState = {
+      offsetX: touch.clientX - rect.x,
+      offsetY: touch.clientY - rect.y,
+    };
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!_orbDragState) return;
+    const touch = e.touches[0];
+    const x = touch.clientX - _orbDragState.offsetX;
+    const y = touch.clientY - _orbDragState.offsetY;
+    _setPanelPos(x, y);
+    _orbLastPos = { x, y };
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!_orbDragState) return;
+    _orbDragState = null;
+    _checkEdgeDock();
+  });
+
+  // Close button → hide panel (stop mic)
+  if (micOrbCloseBtn) {
+    micOrbCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isRecording) stopMicRecording();
+      setMicOrbVisible(false);
+    });
+  }
+
+  // Dock tab click → restore
+  if (micOrbDockTab) {
+    micOrbDockTab.addEventListener('click', () => {
+      _undockOrb();
+    });
+  }
 }
 
 function updateMicOrbLevel(level) {
@@ -1516,7 +1638,7 @@ async function toggleMic() {
 
   if (isRecording) {
     stopMicRecording();
-    if (btnMic) { btnMic.textContent = '麦克风'; btnMic.classList.remove('active'); }
+    if (btnMic) { btnMic.classList.remove('active'); }
     if (micStatusEl) micStatusEl.textContent = '';
     return;
   }
@@ -1621,7 +1743,7 @@ async function toggleMic() {
     isRecording = true;
     setMicOrbVisible(true);
     startMicVisualizer();
-    if (btnMic) { btnMic.textContent = '停止'; btnMic.classList.add('active'); }
+    if (btnMic) { btnMic.classList.add('active'); }
     if (micStatusEl) { micStatusEl.textContent = '录音中...'; micStatusEl.style.color = 'var(--accent-red)'; }
     showToast('录音已开始');
   } catch (err) {
@@ -1667,25 +1789,15 @@ function updateMicResult(data) {
 
   const liveEl = document.getElementById('live-result');
   if (data.is_partial) {
-    const confValue = data.asr_confidence ?? data.confidence;
-    const confidenceText = formatConfidence(confValue);
-    const confColor = confidenceColor(confValue);
     if (liveEl) {
       const textEl = liveEl.querySelector('.segment-text');
-      const confidenceEl = liveEl.querySelector('.segment-confidence');
       if (textEl) textEl.textContent = data.text || '...';
-      if (confidenceEl) {
-        confidenceEl.textContent = `置信度 ${confidenceText}`;
-        confidenceEl.style.color = confColor;
-        confidenceEl.style.fontWeight = '600';
-      }
       return;
     }
     const html = `<div class="segment" id="live-result" style="opacity:0.7;">
       <div class="segment-top">
         <span class="segment-index">实时</span>
         <span class="segment-dur">时长 ${formatDuration(data)}</span>
-        <span class="segment-confidence" style="color:${confColor};font-weight:600;">置信度 ${confidenceText}</span>
       </div>
       <div class="segment-text">${escapeHTML(data.text || '（监听中...）')}</div>
     </div>`;
@@ -1770,9 +1882,6 @@ function resetAll(options = {}) {
   audioManager.reset();
   resetResultsPanel();
 
-  const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
-
   if (transcriptBody) {
     transcriptBody.innerHTML = '';
   }
@@ -1782,19 +1891,14 @@ function resetAll(options = {}) {
     if (msgEl) msgEl.textContent = '等待会议输入...';
   }
 
-  if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>';
-  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>';
-  if (summaryPanel) summaryPanel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;">会议处理完成后将生成摘要...</div>';
+  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:6px 0;">等待输入...</div>';
+  updateProgressRing(0, '等待');
 
   if (progressFill) progressFill.style.width = '0%';
   if (timeDisplay) timeDisplay.textContent = '--:--';
   if (segmentCounter) segmentCounter.textContent = '0/0';
   if (statSegments) statSegments.textContent = '0';
-  if (statLogicFlags) statLogicFlags.textContent = '0';
-  if (statLowConf) statLowConf.textContent = '0';
   if (statCorrections) statCorrections.textContent = '0';
-  if (overallConfBar) overallConfBar.style.width = '0%';
-  if (overallConfText) overallConfText.textContent = '--';
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = '未加载会议';
   if (connectionStatus) connectionStatus.textContent = '离线';
   if (isRecording) stopMicRecording();
@@ -1802,6 +1906,11 @@ function resetAll(options = {}) {
     stopMicVisualizer();
     setMicOrbVisible(false);
   }
+  // Reset orb dock state
+  if (micOrbPanel) micOrbPanel.classList.remove('docked');
+  if (micOrbDockTab) micOrbDockTab.classList.remove('visible');
+  _orbDocked = false;
+  _orbLastPos = null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1845,9 +1954,9 @@ function initApp() {
   checkBackendStatus();
   connectLogStream();
   restoreUploadTaskOnLoad();
+  _initOrbDrag();
 
   // Button wiring
-  const btnStart = $('btnStart');
   const btnReset = $('btnReset');
   const btnMic = $('btnMic');
   const btnUpload = $('btnUpload');
@@ -1855,8 +1964,7 @@ function initApp() {
   const btnLog = $('btnLog');
   const logPanelHeader = $('logPanelHeader');
 
-  if (btnStart) btnStart.addEventListener('click', startDemo);
-  if (btnReset) btnReset.addEventListener('click', resetAll);
+  if (btnReset) btnReset.addEventListener('click', () => resetAll({ cancelTasks: true }));
   if (btnMic) btnMic.addEventListener('click', toggleMic);
   if (btnUpload) btnUpload.addEventListener('click', () => { if (fileUpload) fileUpload.click(); });
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
@@ -1873,7 +1981,7 @@ initApp();
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !e.target.closest('input,textarea')) {
     e.preventDefault();
-    if (!isPlaying) startDemo();
+    startDemo();
   }
   if (e.code === 'KeyR' && e.ctrlKey) {
     e.preventDefault();

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>谛听 v4.5 - 智能会议语音认知系统</title>
 <link rel="stylesheet" href="./css/styles.css">
+<script src="https://unpkg.com/wavesurfer.js@7"></script>
 </head>
 <body>
 
@@ -47,74 +48,47 @@
     </div>
   </div>
 
-  <!-- Right Sidebar -->
+  <!-- Right Sidebar (merged: processing status + stats) -->
   <div class="sidebar">
     <div class="sidebar-card">
-      <div class="sidebar-card-header">统计</div>
+      <div class="sidebar-card-header">处理状态 & 统计</div>
       <div class="sidebar-card-body">
+        <!-- 圆形进度环 -->
+        <div class="progress-ring-container">
+          <svg class="progress-ring" width="80" height="80">
+            <circle class="progress-ring-bg" cx="40" cy="40" r="34" />
+            <circle class="progress-ring-fg" cx="40" cy="40" r="34" id="progressRingFg" />
+          </svg>
+          <div class="progress-ring-text">
+            <span class="progress-ring-pct" id="progressRingPct">0%</span>
+            <span class="progress-ring-stage" id="progressRingStage">等待</span>
+          </div>
+        </div>
+        <!-- 处理阶段 -->
+        <div class="status-stage-row" id="processingPanel">
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:6px 0;">等待输入...</div>
+        </div>
+        <!-- 统计数据 -->
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-blue);" id="statSegments">0</div>
             <div class="stat-label">分段</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value" style="color:var(--accent-orange);" id="statLogicFlags">0</div>
-            <div class="stat-label">逻辑提示</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" style="color:var(--accent-red);" id="statLowConf">0</div>
-            <div class="stat-label">低置信</div>
-          </div>
-          <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-green);" id="statCorrections">0</div>
             <div class="stat-label">纠错</div>
           </div>
         </div>
-        <div style="margin-top:8px;">
-          <div style="height:3px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden;">
-            <div id="overallConfBar" style="height:100%;width:0%;background:var(--accent-green);border-radius:2px;transition:width 0.5s;"></div>
-          </div>
-          <div style="font-size:10px;text-align:right;color:var(--text-muted);margin-top:2px;" id="overallConfText">--</div>
-        </div>
       </div>
-    </div>
-
-    <div class="sidebar-card">
-      <div class="sidebar-card-header">处理状态</div>
-      <div class="sidebar-card-body" id="processingPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>
-      </div>
-    </div>
-
-    <div class="sidebar-card">
-      <div class="sidebar-card-header">逻辑校验</div>
-      <div class="sidebar-card-body" id="logicPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 摘要 Panel -->
-  <div class="summary-panel" id="summaryPanel">
-    <div style="font-size:12px;color:var(--text-muted);text-align:center;">
-      会议处理完成后将生成摘要...
     </div>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
-<!-- 分析结果面板 (v3.1)                                         -->
+<!-- 分析结果面板 (v4.5)                                         -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="results-panel" id="resultsPanel">
-  <!-- 领域卡片 -->
-  <div class="results-card">
-    <div class="results-card-header">会议领域</div>
-    <div class="results-card-body" id="domainCard">
-      <div class="summary-empty">分析中…</div>
-    </div>
-  </div>
-
-  <!-- 热词卡片 -->
+  <!-- 关键术语 -->
   <div class="results-card">
     <div class="results-card-header">关键术语</div>
     <div class="results-card-body" id="hotwordCard">
@@ -122,7 +96,7 @@
     </div>
   </div>
 
-  <!-- 说话人卡片 -->
+  <!-- 说话人分布 -->
   <div class="results-card">
     <div class="results-card-header">说话人分布</div>
     <div class="results-card-body" id="speakerCard">
@@ -130,11 +104,19 @@
     </div>
   </div>
 
-  <!-- 摘要卡片 -->
+  <!-- 会议摘要 -->
   <div class="results-card">
     <div class="results-card-header">会议摘要</div>
     <div class="results-card-body" id="summaryCard">
       <div class="summary-empty">会议处理完成后将自动生成摘要…</div>
+    </div>
+  </div>
+
+  <!-- 行动项 / TODO -->
+  <div class="results-card">
+    <div class="results-card-header">行动项 / TODO</div>
+    <div class="results-card-body" id="actionCard">
+      <div class="summary-empty">暂无行动项</div>
     </div>
   </div>
 </div>
@@ -143,12 +125,11 @@
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
-  <button class="btn btn-primary" id="btnStart">演示</button>
-  <button class="btn btn-secondary" id="btnReset">重置</button>
+  <button class="btn btn-primary" id="btnReset">重置</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
-  <button class="btn btn-secondary" id="btnMic">麦克风</button>
   <button class="btn btn-secondary" id="btnUpload">上传</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
+  <button class="btn-mic-circle" id="btnMic" title="麦克风"><img src="./assets/mic-icon.jpg" alt="麦克风" width="20" height="20"></button>
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
@@ -159,6 +140,8 @@
 <!-- Live Mic Voice Orb                                          -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true">
+  <div class="mic-orb-drag-handle" id="micOrbDragHandle"></div>
+  <button class="mic-orb-close" id="micOrbClose" type="button" title="关闭弹窗" aria-label="关闭">×</button>
   <div class="mic-orb-wrap" id="micOrbWrap">
     <div class="mic-orb-ring"></div>
     <div class="mic-orb-glow"></div>
@@ -172,6 +155,7 @@
   <div class="mic-orb-title" id="micOrbTitle">正在听你说话</div>
   <div class="mic-orb-subtitle" id="micOrbSubtitle">音量越大，语音球越活跃</div>
 </div>
+<div class="mic-orb-dock-tab" id="micOrbDockTab" title="点击恢复弹窗">🎙</div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Debug Log Panel                                             -->

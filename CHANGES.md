@@ -19,6 +19,7 @@
 - [11. 上传任务状态持久化/任务管理](#11-上传任务状态持久化任务管理)
 - [12. 前端拆分](#12-前端拆分)
 - [13. 版本号统一更新](#13-版本号统一更新)
+- [14. 前端布局重构](#14-前端布局重构-v45--frontend-update)
 
 ---
 
@@ -644,3 +645,115 @@ GET /api/audio/upload/{file_id}/status
 - Python `py_compile` 全部通过
 - `node --check frontend/js/app.js` 通过
 - 所有版本引用已统一为 v4.5
+
+---
+
+## 14. 前端布局重构 (v4.5 — frontend-update)
+
+> 本次改动涵盖前端布局精简、播放控件升级、麦克风弹窗拖拽吸附、页面视口适配，涉及 `frontend/index.html`、`frontend/css/styles.css`、`frontend/js/app.js` 三个文件。
+
+### 14.1 布局精简：删除三区域
+
+| 删除区域 | 原 HTML 位置 | 清理内容 |
+|---------|-------------|---------|
+| 会议领域卡片 | results-panel 首列 | 删除 `domainCard` DOM + `renderDomainCard()` 空操作化 |
+| 中下方摘要横栏 | main-container 下方 | 删除 `summaryPanel` DOM + CSS `.summary-panel` |
+| 右侧逻辑校验卡片 | sidebar 第三卡 | 删除 `logicPanel` DOM + `updateLogicPanel()` 空操作化 |
+
+### 14.2 合并处理状态 & 统计
+
+- 两张独立卡片合并为一张「处理状态 & 统计」卡片
+- 顶部新增 SVG 圆形进度环（80px 直径，`stroke-dashoffset` 动画）
+- 进度环颜色随进度变化：橙（<50%）→ 蓝（50%-99%）→ 绿（100%）
+- 新增 `updateProgressRing(fraction, stageLabel)` 函数，在 6 处调用
+- 删除统计数据中的引擎、逻辑提示、低置信三项，仅保留分段和纠错
+
+### 14.3 底部结果面板重分配
+
+- 从 `1fr 1fr 1fr 2fr` 改为 `1fr 1fr 1fr 1fr` 等宽 4 列
+- 内容：关键术语 + 说话人分布 + 会议摘要 + 行动项/TODO
+- 行动项从摘要卡片中独立为单独卡片
+- 新增 `renderActionCard(actionItems)` 函数
+- `fetchAndRenderActionItems()` 渲染目标从 `summaryCard` 改为 `actionCard`
+- 除关键术语外，其余三栏均支持内部滚动（`overflow-y: auto`）
+
+### 14.4 转写文本 seg 改进
+
+| 改动 | 详情 |
+|------|------|
+| 删除置信度显示 | 文件上传和实时麦克风两条路径的置信度 span 均移除 |
+| 播放按钮图标化 | 文本"播放"→ 橘色圆形底板 + 白色三角形 → 改为 `<img>` 图片按钮（`play-btn.jpg`） |
+| 播放按钮位置 | 从 seg 最右端移至时长右侧 |
+| 展开图标改大 | `font-size` 12px→16px，`min-width` 20px→28px，颜色提升至 `--text-secondary` |
+| 时长文字改亮 | `color` 从 `--text-muted` 提升到 `--text-secondary` |
+| 可展开波形图 | 原播放按钮位置替换为 `▾` 展开图标，展开后显示 WaveSurfer 波形图，支持 `dragToSeek` 拖动跳转 |
+| 波形图懒加载 | 首次展开时销毁 `createAudio` 轻量实例并创建 WaveSurfer 实例 |
+| WaveSurfer CDN | 修复前端拆分时丢失的 `<script src="https://unpkg.com/wavesurfer.js@7">` 引用 |
+
+### 14.5 麦克风弹窗拖拽 + 边缘吸附隐藏
+
+**新增 DOM 元素**：
+
+| 元素 | 作用 |
+|------|------|
+| `.mic-orb-drag-handle` | 弹窗顶部 28px 拖动条，`cursor: grab` |
+| `.mic-orb-close` | 右上角 22px 圆形关闭按钮 `×` |
+| `.mic-orb-dock-tab` | 吸附后边缘显示的 40px 圆形恢复按钮 `🎙` |
+
+**拖拽逻辑**：
+- mousedown 在拖动条上记录鼠标与弹窗左上角的偏移量
+- mousemove 实时更新 `left/top`，通过 `_setPanelPos()` clamp 在视口内（不超出边界）
+- mouseup 调用 `_checkEdgeDock()` 检测弹窗是否贴住视口任意一边（2px 容差）
+- 贴边 → 触发 `_dockOrb(side)` 吸附隐藏，弹窗淡出，在对应边缘显示 dock tab
+- 不贴边 → 停留在当前位置
+- 点击 dock tab → `_undockOrb()` 恢复弹窗到上次位置或默认居中
+
+**边界约束**：`_setPanelPos()` 使用 `Math.max(0, Math.min(x, vw - w))` 和 `Math.max(0, Math.min(y, vh - h))` 确保弹窗不超出视口。
+
+**Touch 支持**：touchstart/touchmove/touchend 复用同一逻辑。
+
+**关闭按钮**：点击 `×` → 停止录音 + 隐藏弹窗。
+
+### 14.6 麦克风按钮圆形化 + 位置对换
+
+- 麦克风按钮从文字"麦克风"改为圆形图标按钮（`mic-icon.jpg`）
+- 新增 `.btn-mic-circle` CSS：36px 圆形，`.active` 时红色边框
+- JS 中移除 `btnMic.textContent` 赋值，只保留 `classList.add/remove('active')`
+- controls-bar 中上传移到左侧，麦克风圆形按钮在右侧
+
+### 14.7 控制栏精简
+
+- 删除演示按钮（`btnStart`）
+- 重置按钮从 `btn-secondary` 改为 `btn-primary`（品牌渐变底色）
+- 重置按钮绑定改为 `resetAll({ cancelTasks: true })`，确保点击时停止所有任务：
+  - 停止演示播放（`isPlaying = false` + 清除定时器）
+  - 取消上传识别任务（后端 cancel API + abort + 关闭 WebSocket）
+  - 停止麦克风录音（`stopMicRecording()`）
+- `startDemo()` 函数保留（空格键快捷键仍可触发演示模式）
+
+### 14.8 页面视口适配（不滚动看全）
+
+| CSS 改动 | 效果 |
+|---------|------|
+| `body` → `height: 100vh; overflow: hidden; display: flex; flex-direction: column` | 页面整体不滚动 |
+| `.header` / `.controls-bar` / `.results-panel` → `flex-shrink: 0` | 固定高度区域不被压缩 |
+| `.main-container` → `flex: 1; min-height: 0` | 占据剩余空间 |
+| `.sidebar` / `.sidebar-card` → `flex: 1; flex-direction: column` | 侧栏与转写栏等高并列 |
+| `.sidebar-card-body` → `flex: 1; overflow-y: auto` | 侧栏内容超出时内部滚动 |
+| `.results-panel` → 固定 `height: 200px` | 底部结果面板高度固定 |
+
+### 14.9 文件变更清单
+
+| 文件 | 改动量 | 主要内容 |
+|------|--------|---------|
+| `frontend/index.html` | -15 行 / +40 行 | 删除3区域、合并侧栏、4列结果面板、麦克风弹窗新增3元素、删除演示按钮、添加WaveSurfer CDN |
+| `frontend/css/styles.css` | -25 行 / +120 行 | 进度环、图标按钮、展开波形、拖拽条、关闭按钮、dock tab、视口适配、圆形麦克风按钮 |
+| `frontend/js/app.js` | -80 行 / +180 行 | updateProgressRing、renderActionCard、图标按钮事件、波形懒加载、拖拽吸附逻辑、移除btnStart引用 |
+| `frontend/assets/play-btn.jpg` | 新增 | 播放按钮图标 |
+| `frontend/assets/mic-icon.jpg` | 新增 | 麦克风图标 |
+
+### 14.10 验证
+
+- `node --check frontend/js/app.js`：通过
+- `python -m py_compile backend/main.py`：通过
+- 全局搜索确认无残留的 `segment-play-btn`、`overallConfBar`、`logicPanel`、`summaryPanel`、`domainCard`、`statLogicFlags`、`statLowConf`、`btnStart` 引用

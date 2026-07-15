@@ -283,25 +283,22 @@ class LogicValidator:
     """
     会议场景逻辑校验引擎
     校验维度:
-      1. 跨发言数据矛盾
+      1. 结构化数据的跨发言矛盾
       2. 数学计算一致性
       3. 时序逻辑
       4. 术语一致性
+
+    不直接比较 ASR 文本中的裸数字。裸数字缺少指标、单位和时间范围，
+    仅凭数值差异无法可靠判断同一说话人是否自相矛盾。
     """
 
     def __init__(self):
         self.claimed_data: List[dict] = []  # 已声明数据点
-        self.speaker_statements: Dict[str, List[str]] = {}  # 各说话人发言
 
     def add_statement(self, speaker_id: str, text: str, data_points: List[dict],
                       timestamp: float) -> List[dict]:
         """添加一条发言，返回检测到的逻辑冲突"""
         flags = []
-
-        # 记录说话人发言
-        if speaker_id not in self.speaker_statements:
-            self.speaker_statements[speaker_id] = []
-        self.speaker_statements[speaker_id].append(text)
 
         # 校验1: 数据矛盾检测
         for dp in data_points:
@@ -360,24 +357,6 @@ class LogicValidator:
 
             self.claimed_data.append(dp)
 
-        # 校验2: 自相矛盾检测 (同一说话人)
-        if len(self.speaker_statements[speaker_id]) >= 2:
-            recent = self.speaker_statements[speaker_id][-2:]
-            # 简化: 检查最近两句是否包含互相矛盾的数值
-            nums1 = self._extract_numbers(recent[0])
-            nums2 = self._extract_numbers(recent[1])
-            for n1 in nums1:
-                for n2 in nums2:
-                    if n1 > 0 and n2 > 0:
-                        diff = abs(n2 - n1) / max(n1, 1)
-                        if diff > 0.5:  # 50% 差异
-                            flags.append({
-                                'type': 'self_contradiction',
-                                'severity': 'warning',
-                                'message': f'同一说话人数据可能存在矛盾 (数值差异 {diff*100:.0f}%)',
-                                'calculation': f'{n1} vs {n2}'
-                            })
-
         return flags
 
     def _parse_numeric(self, value_str: str) -> Optional[float]:
@@ -389,14 +368,8 @@ class LogicValidator:
             return float(match.group())
         return None
 
-    def _extract_numbers(self, text: str) -> List[float]:
-        """提取文本中的所有数值"""
-        numbers = re.findall(r'[\d.]+', text)
-        return [float(n) for n in numbers if float(n) > 0]
-
     def reset(self):
         self.claimed_data = []
-        self.speaker_statements = {}
 
 
 # ============================================================

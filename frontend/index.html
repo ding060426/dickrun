@@ -867,6 +867,7 @@ body {
 <script src="./live-protocol.js"></script>
 <script src="./hotword-settings.js"></script>
 <script src="./app-settings.js"></script>
+<script src="./logic-flags.js"></script>
 <script type="module">
 // ============================================================
 // DiTing v3.0 - Frontend with wavesurfer.js
@@ -1392,8 +1393,9 @@ function renderSegment(seg, index, autoPlay = false) {
 
   // Build logic flags HTML
   let flagsHTML = '';
-  if (seg.logic_flags && seg.logic_flags.length > 0) {
-    flagsHTML = seg.logic_flags.map(f =>
+  const visibleFlags = getVisibleLogicFlags(seg);
+  if (visibleFlags.length > 0) {
+    flagsHTML = visibleFlags.map(f =>
       `<div class="segment-logic-flag ${f.severity || 'warning'}">
         <span>${f.severity === 'resolved' ? 'OK' : '!'}</span>
         <span>${f.message || ''}</span>
@@ -1521,7 +1523,7 @@ function escapeHTML(str) {
 function updateStats(segmentsProcessed) {
   if (statSegments) statSegments.textContent = segmentsProcessed;
 
-  const logicCount = allSegments.reduce((sum, s) => sum + (s.logic_flags ? s.logic_flags.length : 0), 0);
+  const logicCount = allSegments.reduce((sum, s) => sum + getVisibleLogicFlags(s).length, 0);
   const lowConfCount = allSegments.reduce((sum, s) => sum + (s.uncertain_spans ? s.uncertain_spans.length : 0), 0);
   const corrCount = allSegments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
 
@@ -1538,7 +1540,7 @@ function updateLogicPanel() {
   if (!logicPanel) return;
   const flags = [];
   for (const seg of allSegments) {
-    for (const f of (seg.logic_flags || [])) {
+    for (const f of getVisibleLogicFlags(seg)) {
       flags.push(f);
     }
   }
@@ -1597,9 +1599,10 @@ function playNextDemoSegment() {
   renderSegment(seg, currentSegmentIndex, false);  // demo: no audio, no auto-play
   updateStats(currentSegmentIndex + 1);
   updateProgress(currentSegmentIndex);
-  if (seg.logic_flags && seg.logic_flags.length > 0) {
+  const visibleFlags = getVisibleLogicFlags(seg);
+  if (visibleFlags.length > 0) {
     updateLogicPanel();
-    for (const f of seg.logic_flags) {
+    for (const f of visibleFlags) {
       if (f.severity === 'warning') showToast('Logic: ' + (f.message || '').substring(0, 60));
     }
   }

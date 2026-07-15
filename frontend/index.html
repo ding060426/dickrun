@@ -699,6 +699,23 @@ body {
 .schedule-panel .sp-item .sp-name { font-weight: 600; }
 .schedule-panel .sp-item .sp-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 .schedule-panel .sp-empty { color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 11px; }
+.schedule-panel .sp-people { font-size: 10px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+.schedule-panel .sp-description { font-size: 10px; color: var(--text-muted); margin-top: 4px; white-space: pre-wrap; }
+.schedule-panel .sp-manage { margin-top: 7px; }
+.participant-picker {
+  max-height: 132px; overflow-y: auto; padding: 6px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary);
+}
+.participant-option {
+  display: flex; align-items: center; gap: 8px; padding: 6px;
+  border-radius: 6px; color: var(--text-primary); cursor: pointer;
+}
+.participant-option:hover { background: var(--bg-tertiary); }
+.participant-option input { width: auto; margin: 0; }
+.participant-option .participant-account { color: var(--text-muted); font-size: 10px; }
+.participant-empty { color: var(--text-muted); font-size: 10px; padding: 7px; line-height: 1.5; }
+.reservation-actions { display: flex; gap: 6px; }
+.reservation-actions .btn { flex: 1; }
 .calendar-day .dot {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   width: 6px; height: 6px;
@@ -1130,7 +1147,17 @@ body {
           <div class="form-row"><label>开始时间</label><input id="reservationStart" type="datetime-local"></div>
           <div class="form-row"><label>结束时间</label><input id="reservationEnd" type="datetime-local"></div>
           <div class="form-row"><label>地点</label><input id="reservationLocation" placeholder="会议室A / 线上"></div>
-          <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
+          <div class="form-row"><label>会议说明</label><textarea id="reservationDescription" rows="2" placeholder="议题或补充信息（可选）"></textarea></div>
+          <div class="form-row">
+            <label>参会同事</label>
+            <div class="participant-picker" id="reservationParticipants">
+              <div class="participant-empty">请先在“用户”中添加同事</div>
+            </div>
+          </div>
+          <div class="reservation-actions">
+            <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
+            <button class="btn btn-secondary" id="btnCancelReservationEdit" style="display:none">取消编辑</button>
+          </div>
           <div class="entity-list" id="reservationsList"></div>
         </div>
         <div class="reservation-calendar" id="reservationCalendar">
@@ -1566,6 +1593,11 @@ async function logout() {
   try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
   authToken = '';
   currentUser = null;
+  reservationFriends = [];
+  _lastReservationData = [];
+  _lastReservationMap = {};
+  resetReservationForm();
+  renderCalendar([]);
   localStorage.removeItem('diting_auth_token');
   showHome();
 }
@@ -1592,16 +1624,43 @@ async function loadUsers() {
   await loadFriendList();
 }
 
+let reservationFriends = [];
+let editingReservationId = null;
+
+function renderReservationParticipantPicker(selectedIds) {
+  const picker = $('reservationParticipants');
+  if (!picker) return;
+  let selected = selectedIds;
+  if (selected === undefined && editingReservationId) {
+    const editing = _lastReservationData.find(r => r.id === editingReservationId);
+    selected = editing?.participant_user_ids || [];
+  }
+  const selectedSet = new Set(selected || []);
+  if (reservationFriends.length === 0) {
+    picker.innerHTML = '<div class="participant-empty">暂无可选同事，请先在“用户”中添加同事</div>';
+    return;
+  }
+  picker.innerHTML = reservationFriends.map(friend => `
+    <label class="participant-option">
+      <input type="checkbox" name="reservationParticipant" value="${escapeHTML(friend.friend_id)}" ${selectedSet.has(friend.friend_id) ? 'checked' : ''}>
+      <span>${escapeHTML(friend.display_name || friend.username)} <span class="participant-account">@${escapeHTML(friend.username)}</span></span>
+    </label>`).join('');
+}
+
 async function loadFriendList() {
   const list = $('friendsList');
   if (!list) return;
+  reservationFriends = [];
+  renderReservationParticipantPicker();
   try {
     const data = await apiFetch('/api/friends');
-    if (!data.friends || data.friends.length === 0) {
+    reservationFriends = data.friends || [];
+    renderReservationParticipantPicker();
+    if (reservationFriends.length === 0) {
       list.innerHTML = '<div class="entity-card" style="text-align:center;color:var(--text-muted);">暂无同事</div>';
       return;
     }
-    list.innerHTML = data.friends.map(f => `<div class="friend-card">
+    list.innerHTML = reservationFriends.map(f => `<div class="friend-card">
       <div class="info">
         <div class="name">${escapeHTML(f.display_name || f.username)}</div>
         <div class="role">@${escapeHTML(f.username)} · ${escapeHTML(f.role)}</div>
@@ -1679,19 +1738,27 @@ async function loadReservations() {
   if (!list) return;
   try {
     const data = await apiFetch('/api/meetings/reservations');
-    list.innerHTML = data.reservations.map(r => {
+    const reservations = data.reservations || [];
+    list.innerHTML = reservations.map(r => {
       const ts = getMeetingTimeStatus(r.start_time, r.end_time);
       const statusBadge = `<span class="time-status ${ts.cls}">${ts.label}</span>`;
       const dbStatus = r.status && r.status !== 'scheduled' ? ` · ${r.status}` : '';
+      const organizerName = r.organizer?.display_name || r.organizer?.username || '未知用户';
+      const participantNames = (r.participants || []).map(p => p.display_name || p.username).join('、') || '无其他参会人';
       return `<div class="entity-card">
         <div class="title">${escapeHTML(r.title)} ${statusBadge}</div>
         <div class="meta">${formatDateTime(r.start_time)} - ${formatDateTime(r.end_time)}</div>
+        <div class="meta">创建者: ${escapeHTML(organizerName)}</div>
+        <div class="meta">参会人: ${escapeHTML(participantNames)}</div>
         <div class="meta">参会码: ${escapeHTML(r.join_code)}${dbStatus}</div>
+        ${r.can_manage ? `<button class="btn-sm btn-add" style="margin-top:5px" onclick="window.editReservation('${r.id}')">管理</button>` : ''}
       </div>`;
     }).join('') || '<div class="entity-card">暂无预约</div>';
-    renderCalendar(data.reservations || []);
+    renderCalendar(reservations);
+    renderReservationParticipantPicker();
   } catch (e) {
     list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+    renderCalendar([]);
   }
 }
 
@@ -1762,8 +1829,12 @@ function renderCalendar(reservations) {
         const start = m.start_time ? formatDateTime(m.start_time) : '';
         const end = m.end_time ? formatDateTime(m.end_time) : '';
         const loc = m.location || '';
+        const organizerName = m.organizer?.display_name || m.organizer?.username || '未知用户';
+        const participantNames = (m.participants || []).map(p => p.display_name || p.username).join('、') || '无其他参会人';
         return `<div class="tt-title">${escapeHTML(m.title)}</div>
           <div class="tt-meta">${start} - ${end}</div>
+          <div class="tt-meta">创建者: ${escapeHTML(organizerName)}</div>
+          <div class="tt-meta">参会人: ${escapeHTML(participantNames)}</div>
           ${loc ? `<div class="tt-meta">${escapeHTML(loc)}</div>` : ''}`;
       }).join('<div style="border-top:1px solid var(--border);margin:4px 0"></div>') + '</div>';
     }
@@ -1801,10 +1872,16 @@ function showDaySchedule(day, meetings) {
     const start = m.start_time ? formatDateTime(m.start_time) : '';
     const end = m.end_time ? formatDateTime(m.end_time) : '';
     const loc = m.location || '';
+    const organizerName = m.organizer?.display_name || m.organizer?.username || '未知用户';
+    const participantNames = (m.participants || []).map(p => p.display_name || p.username).join('、') || '无其他参会人';
     return `<div class="sp-item">
       <div class="sp-name">${escapeHTML(m.title)}</div>
       <div class="sp-time">${start} - ${end}</div>
       ${loc ? `<div class="sp-time">${escapeHTML(loc)}</div>` : ''}
+      <div class="sp-people">创建者: ${escapeHTML(organizerName)}</div>
+      <div class="sp-people">其他参会人: ${escapeHTML(participantNames)}</div>
+      ${m.description ? `<div class="sp-description">${escapeHTML(m.description)}</div>` : ''}
+      ${m.can_manage ? `<button class="btn-sm btn-add sp-manage" onclick="window.editReservation('${m.id}')">管理会议信息</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -1829,21 +1906,80 @@ function formatDateTime(isoStr) {
   }
 }
 
+function toDateTimeLocal(isoStr) {
+  if (!isoStr) return '';
+  const date = new Date(isoStr);
+  if (Number.isNaN(date.getTime())) return isoStr.substring(0, 16);
+  const pad = value => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function selectedReservationParticipantIds() {
+  return Array.from(document.querySelectorAll('input[name="reservationParticipant"]:checked')).map(input => input.value);
+}
+
+function resetReservationForm() {
+  editingReservationId = null;
+  ['reservationTitle', 'reservationStart', 'reservationEnd', 'reservationLocation', 'reservationDescription'].forEach(id => {
+    const input = $(id);
+    if (input) input.value = '';
+  });
+  renderReservationParticipantPicker([]);
+  if ($('btnCreateReservation')) $('btnCreateReservation').textContent = '创建预约';
+  if ($('btnCancelReservationEdit')) $('btnCancelReservationEdit').style.display = 'none';
+}
+
+function editReservation(reservationId) {
+  const reservation = _lastReservationData.find(item => item.id === reservationId);
+  if (!reservation || !reservation.can_manage) return;
+  editingReservationId = reservationId;
+  $('reservationTitle').value = reservation.title || '';
+  $('reservationStart').value = toDateTimeLocal(reservation.start_time);
+  $('reservationEnd').value = toDateTimeLocal(reservation.end_time);
+  $('reservationLocation').value = reservation.location || '';
+  $('reservationDescription').value = reservation.description || '';
+  renderReservationParticipantPicker(reservation.participant_user_ids || []);
+  $('btnCreateReservation').textContent = '保存修改';
+  $('btnCancelReservationEdit').style.display = '';
+  $('reservationTitle').focus();
+}
+
+window.editReservation = editReservation;
+
 async function createReservation() {
+  const title = $('reservationTitle').value.trim();
+  const startTime = $('reservationStart').value;
+  const endTime = $('reservationEnd').value;
+  if (!title || !startTime || !endTime) {
+    showToast('请填写标题、开始时间和结束时间');
+    return;
+  }
+  if (new Date(endTime) <= new Date(startTime)) {
+    showToast('结束时间必须晚于开始时间');
+    return;
+  }
   try {
-    await apiFetch('/api/meetings/reservations', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: $('reservationTitle').value.trim(),
-        start_time: $('reservationStart').value,
-        end_time: $('reservationEnd').value,
-        location: $('reservationLocation').value.trim(),
-      }),
+    const endpoint = editingReservationId
+      ? `/api/meetings/reservations/${editingReservationId}`
+      : '/api/meetings/reservations';
+    const body = JSON.stringify({
+      title,
+      start_time: new Date(startTime).toISOString(),
+      end_time: new Date(endTime).toISOString(),
+      location: $('reservationLocation').value.trim(),
+      description: $('reservationDescription').value.trim(),
+      participant_user_ids: selectedReservationParticipantIds(),
     });
-    showToast('会议已预约');
+    const options = editingReservationId
+      ? { method: 'PUT', body }
+      : { method: 'POST', body };
+    const wasEditing = Boolean(editingReservationId);
+    await apiFetch(endpoint, options);
+    showToast(wasEditing ? '会议信息已更新' : '会议已预约');
+    resetReservationForm();
     await loadReservations();
   } catch (e) {
-    showToast('预约失败: ' + e.message);
+    showToast((editingReservationId ? '更新失败: ' : '预约失败: ') + e.message);
   }
 }
 
@@ -3272,8 +3408,10 @@ function initApp() {
   const friendSearch = $('friendSearch');
   if (friendSearch) friendSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchFriends(); });
   const btnCreateReservation = $('btnCreateReservation');
+  const btnCancelReservationEdit = $('btnCancelReservationEdit');
   const btnJoinMeeting = $('btnJoinMeeting');
   if (btnCreateReservation) btnCreateReservation.addEventListener('click', createReservation);
+  if (btnCancelReservationEdit) btnCancelReservationEdit.addEventListener('click', resetReservationForm);
   if (btnJoinMeeting) btnJoinMeeting.addEventListener('click', joinMeeting);
 
   // Analysis buttons

@@ -57,7 +57,15 @@ else:
     print("admin user created: admin / value from DITING_ADMIN_PASSWORD")
 
 # Verify all tables
-for t in ["users", "auth_sessions", "meeting_reservations", "meeting_joins", "meeting_analyses", "friends"]:
+for t in [
+    "users",
+    "auth_sessions",
+    "meeting_reservations",
+    "meeting_participants",
+    "meeting_joins",
+    "meeting_analyses",
+    "friends",
+]:
     try:
         c.table(t).select("*").limit(1).execute()
         print(f"  {t}: OK")

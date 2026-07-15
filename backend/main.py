@@ -421,8 +421,11 @@ async def api_list_reservations(
     status: str | None = Query(None),
     authorization: str | None = Header(None),
 ):
-    _require_user(authorization)
-    reservations = db.list_reservations(user_id=user_id, status=status)
+    user = _require_user(authorization)
+    visible_user_id = (
+        user_id if user.get("role") == "admin" and user_id else user["id"]
+    )
+    reservations = db.list_reservations(user_id=visible_user_id, status=status)
     now = datetime.now().astimezone()
     for reservation in reservations:
         try:
@@ -444,6 +447,10 @@ async def api_list_reservations(
                 reservation["time_status"] = "进行中"
         except (AttributeError, KeyError, TypeError, ValueError):
             reservation["time_status"] = "未知"
+        reservation["can_manage"] = (
+            reservation.get("organizer_user_id") == user["id"]
+            or user.get("role") == "admin"
+        )
     return {"reservations": reservations}
 
 
@@ -453,7 +460,7 @@ async def api_create_reservation(
     authorization: str | None = Header(None),
 ):
     user = _require_user(authorization)
-    data.setdefault("organizer_user_id", user["id"])
+    data["organizer_user_id"] = user["id"]
     try:
         return {"reservation": db.create_reservation(data)}
     except ValueError as error:
@@ -466,8 +473,19 @@ async def api_update_reservation(
     data: dict,
     authorization: str | None = Header(None),
 ):
-    _require_user(authorization)
-    return {"reservation": db.update_reservation(reservation_id, data)}
+    user = _require_user(authorization)
+    reservation = db.get_reservation(reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Meeting reservation not found")
+    if (
+        reservation.get("organizer_user_id") != user["id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Only the organizer can manage this meeting")
+    try:
+        return {"reservation": db.update_reservation(reservation_id, data)}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.post("/api/meetings/join")

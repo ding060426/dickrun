@@ -35,6 +35,30 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _participant_ids_from_value(value):
+    if not isinstance(value, list):
+        try:
+            value = json.loads(value or "[]")
+        except (TypeError, json.JSONDecodeError):
+            value = []
+    return list(dict.fromkeys(str(item) for item in value if item))
+
+
+def _validate_reservation_times(start_time, end_time):
+    try:
+        start = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as error:
+        raise ValueError("start_time and end_time must be ISO datetimes") from error
+    local_timezone = datetime.now().astimezone().tzinfo
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=local_timezone)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=local_timezone)
+    if end <= start:
+        raise ValueError("end_time must be after start_time")
+
+
 def hash_password(password, salt=None):
     salt = salt or secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120000)
@@ -47,81 +71,11 @@ def verify_password(password, salt, expected_hash):
 
 
 def init_db():
-    """Ensure Supabase tables exist (run via Supabase SQL Editor)."""
-    sql = """
-    CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        display_name TEXT NOT NULL,
-        email TEXT DEFAULT '',
-        phone TEXT DEFAULT '',
-        role TEXT NOT NULL DEFAULT 'user',
-        status TEXT NOT NULL DEFAULT 'active',
-        password_salt TEXT NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS auth_sessions (
-        token TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id),
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        expires_at TIMESTAMPTZ
-    );
-
-    CREATE TABLE IF NOT EXISTS meeting_reservations (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        organizer_user_id TEXT NOT NULL REFERENCES users(id),
-        participant_user_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-        start_time TIMESTAMPTZ NOT NULL,
-        end_time TIMESTAMPTZ NOT NULL,
-        location TEXT DEFAULT '',
-        meeting_type TEXT NOT NULL DEFAULT 'offline',
-        status TEXT NOT NULL DEFAULT 'scheduled',
-        join_code TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS meeting_joins (
-        id TEXT PRIMARY KEY,
-        meeting_id TEXT NOT NULL REFERENCES meeting_reservations(id),
-        user_id TEXT REFERENCES users(id),
-        display_name TEXT NOT NULL,
-        joined_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS meeting_analyses (
-        id TEXT PRIMARY KEY,
-        meeting_id TEXT NOT NULL REFERENCES meeting_reservations(id),
-        title TEXT NOT NULL,
-        transcript_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-        segments_count INTEGER NOT NULL DEFAULT 0,
-        duration_sec REAL NOT NULL DEFAULT 0,
-        logic_flags_count INTEGER NOT NULL DEFAULT 0,
-        low_confidence_count INTEGER NOT NULL DEFAULT 0,
-        corrections_count INTEGER NOT NULL DEFAULT 0,
-        overall_confidence REAL DEFAULT 0,
-        hotwords JSONB NOT NULL DEFAULT '[]'::jsonb,
-        summary_json JSONB DEFAULT '{}'::jsonb,
-        created_by TEXT REFERENCES users(id),
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS friends (
-        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        user_id TEXT NOT NULL REFERENCES users(id),
-        friend_id TEXT NOT NULL REFERENCES users(id),
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        UNIQUE (user_id, friend_id),
-        CHECK (user_id <> friend_id)
-    );
-    """
-    print("[Supabase] Please run this SQL in your Supabase SQL Editor to create tables.")
-    print("[Supabase] Alternatively, tables will be auto-created on first insert.")
+    """Return the authoritative schema that must be run in Supabase SQL Editor."""
+    schema_path = os.path.join(os.path.dirname(__file__), "..", "supabase_init.sql")
+    with open(schema_path, "r", encoding="utf-8") as schema_file:
+        sql = schema_file.read()
+    print(f"[Supabase] Run the schema in SQL Editor before startup: {schema_path}")
     return sql
 
 
@@ -224,21 +178,63 @@ def logout(token):
 
 # ── Reservations ──────────────────────────────────────────────
 
+def _validate_colleague_participants(client, organizer_user_id, participant_ids):
+    normalized = [
+        user_id
+        for user_id in _participant_ids_from_value(participant_ids)
+        if user_id != organizer_user_id
+    ]
+    if not normalized:
+        return []
+    active = client.table("users").select("id").eq("status", "active").in_("id", normalized).execute()
+    colleagues = client.table("friends").select("friend_id").eq("user_id", organizer_user_id).in_("friend_id", normalized).execute()
+    active_ids = {row["id"] for row in (active.data or [])}
+    colleague_ids = {row["friend_id"] for row in (colleagues.data or [])}
+    if set(normalized) - active_ids.intersection(colleague_ids):
+        raise ValueError("participants must be active colleagues of the organizer")
+    return normalized
+
+
+def _with_reservation_people(client, reservation):
+    if not reservation:
+        return None
+    data = dict(reservation)
+    organizer = client.table("users").select("id,username,display_name,role,status").eq("id", data["organizer_user_id"]).execute()
+    membership = client.table("meeting_participants").select("user_id").eq("meeting_id", data["id"]).execute()
+    participant_ids = [row["user_id"] for row in (membership.data or [])]
+    participants = []
+    if participant_ids:
+        result = client.table("users").select("id,username,display_name,role,status").eq("status", "active").in_("id", participant_ids).execute()
+        by_id = {row["id"]: row for row in (result.data or [])}
+        participants = [by_id[user_id] for user_id in participant_ids if user_id in by_id]
+        participants.sort(key=lambda item: (item.get("display_name") or item.get("username") or ""))
+    data["organizer"] = organizer.data[0] if organizer.data else None
+    data["participants"] = participants
+    data["participant_user_ids"] = [item["id"] for item in participants]
+    return data
+
 def list_reservations(user_id=None, status=None):
     client = _get_client()
     query = client.table("meeting_reservations").select("*").order("start_time", desc=True)
     if status:
         query = query.eq("status", status)
     if user_id:
-        query = query.or_(f"organizer_user_id.eq.{user_id},participant_user_ids.cs.{{\"{user_id}\"}}")
+        memberships = client.table("meeting_participants").select("meeting_id").eq("user_id", user_id).execute()
+        meeting_ids = [row["meeting_id"] for row in (memberships.data or [])]
+        if meeting_ids:
+            query = query.or_(
+                f"organizer_user_id.eq.{user_id},id.in.({','.join(meeting_ids)})"
+            )
+        else:
+            query = query.eq("organizer_user_id", user_id)
     result = query.execute()
-    return result.data or []
+    return [_with_reservation_people(client, row) for row in (result.data or [])]
 
 
 def get_reservation(reservation_id):
     client = _get_client()
     result = client.table("meeting_reservations").select("*").eq("id", reservation_id).execute()
-    return result.data[0] if result.data else None
+    return _with_reservation_people(client, result.data[0]) if result.data else None
 
 
 def create_reservation(data):
@@ -248,6 +244,7 @@ def create_reservation(data):
     end_time = data.get("end_time")
     if not all([title, organizer_user_id, start_time, end_time]):
         raise ValueError("title, organizer_user_id, start_time and end_time are required")
+    _validate_reservation_times(start_time, end_time)
     participant_ids = data.get("participant_user_ids") or []
     if not isinstance(participant_ids, list):
         raise ValueError("participant_user_ids must be a list")
@@ -257,6 +254,12 @@ def create_reservation(data):
     join_code = secrets.token_urlsafe(8)
 
     client = _get_client()
+    organizer = get_user(organizer_user_id)
+    if not organizer or organizer.get("status") != "active":
+        raise ValueError("organizer_user_id is invalid")
+    participant_ids = _validate_colleague_participants(
+        client, organizer_user_id, participant_ids
+    )
     client.table("meeting_reservations").insert({
         "id": reservation_id, "title": title,
         "description": data.get("description") or "",
@@ -269,6 +272,8 @@ def create_reservation(data):
         "join_code": join_code,
         "created_at": timestamp, "updated_at": timestamp,
     }).execute()
+    # The PostgreSQL trigger in supabase_init.sql synchronizes the normalized
+    # membership table in the same transaction as this reservation insert.
     return get_reservation(reservation_id)
 
 
@@ -277,9 +282,27 @@ def update_reservation(reservation_id, data):
     fields = {field: data[field] for field in allowed if field in data}
     if not fields:
         return get_reservation(reservation_id)
-    fields["updated_at"] = now_iso()
     client = _get_client()
+    existing = get_reservation(reservation_id)
+    if not existing:
+        return None
+    _validate_reservation_times(
+        fields.get("start_time", existing["start_time"]),
+        fields.get("end_time", existing["end_time"]),
+    )
+    participant_ids = None
+    if "participant_user_ids" in fields:
+        if not isinstance(fields["participant_user_ids"], list):
+            raise ValueError("participant_user_ids must be a list")
+        participant_ids = _validate_colleague_participants(
+            client,
+            existing["organizer_user_id"],
+            fields["participant_user_ids"],
+        )
+        fields["participant_user_ids"] = participant_ids
+    fields["updated_at"] = now_iso()
     client.table("meeting_reservations").update(fields).eq("id", reservation_id).execute()
+    # Membership synchronization is atomic through the PostgreSQL trigger.
     return get_reservation(reservation_id)
 
 

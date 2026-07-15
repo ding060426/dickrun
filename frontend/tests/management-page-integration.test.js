@@ -19,6 +19,14 @@ assert.doesNotMatch(html, /function startDemo\(/);
 assert.doesNotMatch(html, /getEmbeddedDemoData/);
 assert.doesNotMatch(html, /\/api\/meeting\/demo/);
 assert.doesNotMatch(html, /demo_mode/);
+assert.match(html, /id="reservationParticipants"/);
+assert.match(html, /participant_user_ids:/);
+assert.match(html, /function editReservation\(/);
+assert.match(html, /method: 'PUT'/);
+assert.match(html, /organizer\?\.display_name/);
+assert.match(html, /participants \|\| \[\]/);
+assert.match(html, /can_manage/);
+assert.match(html, /new Date\(startTime\)\.toISOString\(\)/);
 
 const moduleScript = html.match(/<script type="module">([\s\S]*?)<\/script>/);
 assert.ok(moduleScript, 'inline module script should exist');

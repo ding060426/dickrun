@@ -24,8 +24,10 @@ def now_iso():
 @contextmanager
 def connect():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 30000")
     try:
         yield conn
         conn.commit()
@@ -50,6 +52,9 @@ def verify_password(password, salt, expected_hash):
 
 def init_db():
     with connect() as conn:
+        # WAL lets calendar reads continue while another local account writes.
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -101,6 +106,15 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
 
+            CREATE TABLE IF NOT EXISTS meeting_participants (
+                meeting_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                added_at TEXT NOT NULL,
+                PRIMARY KEY (meeting_id, user_id),
+                FOREIGN KEY (meeting_id) REFERENCES meeting_reservations(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
             CREATE TABLE IF NOT EXISTS meeting_analyses (
                 id TEXT PRIMARY KEY,
                 meeting_id TEXT NOT NULL,
@@ -129,8 +143,14 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (friend_id) REFERENCES users(id)
             );
+
+            CREATE INDEX IF NOT EXISTS idx_reservations_organizer_time
+            ON meeting_reservations(organizer_user_id, start_time);
+            CREATE INDEX IF NOT EXISTS idx_meeting_participants_user
+            ON meeting_participants(user_id, meeting_id);
             """
         )
+        _migrate_reservation_participants(conn)
         existing = conn.execute("SELECT id FROM users WHERE username = ?", ("admin",)).fetchone()
         if not existing:
             salt, password_hash = hash_password(os.environ.get("DITING_ADMIN_PASSWORD", "admin123"))
@@ -156,6 +176,109 @@ def public_user(row):
     data.pop("password_salt", None)
     data.pop("password_hash", None)
     return data
+
+
+def _participant_ids_from_value(value):
+    if isinstance(value, list):
+        values = value
+    else:
+        try:
+            values = json.loads(value or "[]")
+        except (TypeError, json.JSONDecodeError):
+            values = []
+    return list(dict.fromkeys(str(item) for item in values if item))
+
+
+def _validate_reservation_times(start_time, end_time):
+    try:
+        start = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as error:
+        raise ValueError("start_time and end_time must be ISO datetimes") from error
+    local_timezone = datetime.now().astimezone().tzinfo
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=local_timezone)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=local_timezone)
+    if end <= start:
+        raise ValueError("end_time must be after start_time")
+
+
+def _migrate_reservation_participants(conn):
+    rows = conn.execute(
+        "SELECT id, organizer_user_id, participant_user_ids, created_at FROM meeting_reservations"
+    ).fetchall()
+    for row in rows:
+        for user_id in _participant_ids_from_value(row["participant_user_ids"]):
+            if user_id == row["organizer_user_id"]:
+                continue
+            user = conn.execute(
+                "SELECT id FROM users WHERE id = ? AND status = 'active'",
+                (user_id,),
+            ).fetchone()
+            if user:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO meeting_participants (meeting_id, user_id, added_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (row["id"], user_id, row["created_at"]),
+                )
+
+
+def _validate_colleague_participants(conn, organizer_user_id, participant_ids):
+    normalized = [
+        user_id
+        for user_id in _participant_ids_from_value(participant_ids)
+        if user_id != organizer_user_id
+    ]
+    if not normalized:
+        return []
+    placeholders = ",".join("?" for _ in normalized)
+    active_rows = conn.execute(
+        f"SELECT id FROM users WHERE status = 'active' AND id IN ({placeholders})",
+        normalized,
+    ).fetchall()
+    active_ids = {row["id"] for row in active_rows}
+    colleague_rows = conn.execute(
+        f"""
+        SELECT friend_id FROM friends
+        WHERE user_id = ? AND friend_id IN ({placeholders})
+        """,
+        [organizer_user_id, *normalized],
+    ).fetchall()
+    colleague_ids = {row["friend_id"] for row in colleague_rows}
+    invalid_ids = set(normalized) - active_ids.intersection(colleague_ids)
+    if invalid_ids:
+        raise ValueError("participants must be active colleagues of the organizer")
+    return normalized
+
+
+def _reservation_to_dict(conn, row):
+    reservation = row_to_dict(row)
+    if not reservation:
+        return None
+    organizer = conn.execute(
+        """
+        SELECT id, username, display_name, role, status
+        FROM users WHERE id = ?
+        """,
+        (reservation["organizer_user_id"],),
+    ).fetchone()
+    participants = conn.execute(
+        """
+        SELECT users.id, users.username, users.display_name, users.role, users.status
+        FROM meeting_participants
+        JOIN users ON users.id = meeting_participants.user_id
+        WHERE meeting_participants.meeting_id = ? AND users.status = 'active'
+        ORDER BY users.display_name, users.username
+        """,
+        (reservation["id"],),
+    ).fetchall()
+    reservation["organizer"] = row_to_dict(organizer)
+    reservation["participants"] = [row_to_dict(item) for item in participants]
+    reservation["participant_user_ids"] = [item["id"] for item in reservation["participants"]]
+    return reservation
 
 
 def list_users():
@@ -315,12 +438,21 @@ def list_reservations(user_id=None, status=None):
         query += " AND status = ?"
         params.append(status)
     if user_id:
-        query += " AND (organizer_user_id = ? OR participant_user_ids LIKE ?)"
-        params.extend([user_id, f'%"{user_id}"%'])
+        query += """
+            AND (
+                organizer_user_id = ?
+                OR EXISTS (
+                    SELECT 1 FROM meeting_participants
+                    WHERE meeting_participants.meeting_id = meeting_reservations.id
+                      AND meeting_participants.user_id = ?
+                )
+            )
+        """
+        params.extend([user_id, user_id])
     query += " ORDER BY start_time DESC"
     with connect() as conn:
         rows = conn.execute(query, params).fetchall()
-        return [row_to_dict(row) for row in rows]
+        return [_reservation_to_dict(conn, row) for row in rows]
 
 
 def create_reservation(data):
@@ -330,6 +462,7 @@ def create_reservation(data):
     end_time = data.get("end_time")
     if not all([title, organizer_user_id, start_time, end_time]):
         raise ValueError("title, organizer_user_id, start_time and end_time are required")
+    _validate_reservation_times(start_time, end_time)
     participant_ids = data.get("participant_user_ids") or []
     if not isinstance(participant_ids, list):
         raise ValueError("participant_user_ids must be a list")
@@ -340,6 +473,9 @@ def create_reservation(data):
         user = conn.execute("SELECT id FROM users WHERE id = ? AND status = 'active'", (organizer_user_id,)).fetchone()
         if not user:
             raise ValueError("organizer_user_id is invalid")
+        participant_ids = _validate_colleague_participants(
+            conn, organizer_user_id, participant_ids
+        )
         conn.execute(
             """
             INSERT INTO meeting_reservations (
@@ -354,12 +490,22 @@ def create_reservation(data):
                 data.get("status") or "scheduled", join_code, timestamp, timestamp,
             ),
         )
+        conn.executemany(
+            """
+            INSERT INTO meeting_participants (meeting_id, user_id, added_at)
+            VALUES (?, ?, ?)
+            """,
+            [(reservation_id, user_id, timestamp) for user_id in participant_ids],
+        )
     return get_reservation(reservation_id)
 
 
 def get_reservation(reservation_id):
     with connect() as conn:
-        return row_to_dict(conn.execute("SELECT * FROM meeting_reservations WHERE id = ?", (reservation_id,)).fetchone())
+        row = conn.execute(
+            "SELECT * FROM meeting_reservations WHERE id = ?", (reservation_id,)
+        ).fetchone()
+        return _reservation_to_dict(conn, row)
 
 
 def update_reservation(reservation_id, data):
@@ -367,17 +513,47 @@ def update_reservation(reservation_id, data):
     fields = [field for field in allowed if field in data]
     if not fields:
         return get_reservation(reservation_id)
-    values = []
-    assignments = []
-    for field in fields:
-        assignments.append(f"{field} = ?")
-        value = data[field]
-        if field == "participant_user_ids" and isinstance(value, list):
-            value = __import__("json").dumps(value)
-        values.append(value)
-    values.extend([now_iso(), reservation_id])
     with connect() as conn:
+        existing = conn.execute(
+            "SELECT * FROM meeting_reservations WHERE id = ?", (reservation_id,)
+        ).fetchone()
+        if not existing:
+            return None
+        _validate_reservation_times(
+            data.get("start_time", existing["start_time"]),
+            data.get("end_time", existing["end_time"]),
+        )
+        values = []
+        assignments = []
+        participant_ids = None
+        for field in fields:
+            assignments.append(f"{field} = ?")
+            value = data[field]
+            if field == "participant_user_ids":
+                if not isinstance(value, list):
+                    raise ValueError("participant_user_ids must be a list")
+                participant_ids = _validate_colleague_participants(
+                    conn, existing["organizer_user_id"], value
+                )
+                value = json.dumps(participant_ids)
+            values.append(value)
+        values.extend([now_iso(), reservation_id])
         conn.execute(f"UPDATE meeting_reservations SET {', '.join(assignments)}, updated_at = ? WHERE id = ?", values)
+        if participant_ids is not None:
+            conn.execute(
+                "DELETE FROM meeting_participants WHERE meeting_id = ?",
+                (reservation_id,),
+            )
+            conn.executemany(
+                """
+                INSERT INTO meeting_participants (meeting_id, user_id, added_at)
+                VALUES (?, ?, ?)
+                """,
+                [
+                    (reservation_id, user_id, now_iso())
+                    for user_id in participant_ids
+                ],
+            )
     return get_reservation(reservation_id)
 
 

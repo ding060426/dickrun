@@ -104,7 +104,28 @@ python start.py
 启动器会校验后端 API revision；如果 `8765` 被旧版 DiTing 占用，会明确报错并要求先关闭旧进程，
 不会再把旧服务误判为本次启动成功。
 
-### 5. 离线多说话人会议
+### 5. 会议管理与转写结果
+
+首页现已整合 `supabase-hero` 的会议管理系统，登录后可进入会议转写、会议预约、会议分析和用户管理。
+“会议转写”直接使用当前分支的 X-ASR、Silero VAD、长音频分块、说话人分离和实时 DTP2 麦克风链路；
+转写完成后可在“会议分析”中关联预约会议并保存分段、说话人、时长和质量统计。
+
+管理数据默认保存在本地 `backend/data/diting.db`，无需联网即可使用。首次启动会创建管理员账号 `admin`，
+密码读取 `DITING_ADMIN_PASSWORD`，未配置时仅为本地开发保留默认值 `admin123`。
+
+如需使用 Supabase，在 Supabase SQL Editor 中执行 `backend/supabase_init.sql`，复制并填写配置：
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+# 编辑 backend/.env 中的 SUPABASE_URL、SUPABASE_KEY 和管理员密码
+python backend/setup_supabase.py
+python start.py
+```
+
+只有 `SUPABASE_URL` 与 `SUPABASE_KEY` 同时存在时才启用 Supabase；否则自动回退到本地 SQLite，
+不会影响本地转写服务启动。
+
+### 6. 离线多说话人会议
 
 上传前勾选底部“说话人”，人数已知时选择 `2～8 人`；已知人数会直接约束聚类，通常比自动估计稳定。
 后端会让 diarization 与 X-ASR 共享同一份标准音频并独立分析，在换人点对跨说话人的 ASR 长段做带边界留白的
@@ -141,7 +162,7 @@ DITING_SPEAKER_STITCH_THRESHOLD=0.75
 
 单块失败会使用全新 worker 重试；分块或跨块声纹统一仍失败时回退到整段说话人分析，整段也失败才降级为纯 ASR。
 
-### 6. 实时麦克风转写
+### 7. 实时麦克风转写
 
 打开前端后点击顶部 `Mic`，允许浏览器使用麦克风即可。浏览器通过
 `AudioWorklet` 连续采集音频，按实际设备采样率降采样为 16 kHz 单声道

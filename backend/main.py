@@ -22,6 +22,7 @@ import concurrent.futures
 import traceback
 from functools import partial
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +30,7 @@ import numpy as np
 from fastapi import (
     FastAPI,
     File,
+    Header,
     HTTPException,
     Query,
     UploadFile,
@@ -57,9 +59,11 @@ from diarization import (
 )
 from diarization.registry import MeetingRegistry
 from build_info import API_REVISION
+from modules.management_store import select_management_store
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
+db = select_management_store()
 
 # ── X-ASR ───────────────────────────────────────────────────────
 try:
@@ -240,6 +244,11 @@ def _schedule_xasr_reload() -> None:
 async def lifespan(app: FastAPI):
     """Startup: fire-and-forget model loading."""
     logger.info("Starting DiTing backend server...")
+    try:
+        db.init_db()
+        logger.info("Meeting management store ready: %s", db.__name__)
+    except Exception as error:
+        logger.error("Meeting management store initialization failed: %s", error)
     _schedule_xasr_reload()
     yield
     logger.info("Shutting down DiTing backend...")
@@ -354,9 +363,276 @@ async def health():
         "xasr_loading": xasr_loading,
         "live_vad_available": vad_model is not None,
         "diarization_available": diarization_status["available"],
+        "management_store": db.__name__.rsplit(".", 1)[-1],
         "eval_available": HAS_EVAL,
         "timestamp": time.time(),
     }
+
+
+def _token_from_header(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return authorization.strip()
+
+
+def _require_user(authorization: str | None):
+    user = db.get_user_by_token(_token_from_header(authorization))
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return user
+
+
+# ===========================================================================
+# Meeting management routes
+# ===========================================================================
+
+
+@app.post("/api/auth/login")
+async def auth_login(data: dict):
+    result = db.login(data.get("username", ""), data.get("password", ""))
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return result
+
+
+@app.post("/api/auth/register")
+async def auth_register(data: dict):
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username:
+        raise HTTPException(status_code=400, detail="用户名不能为空")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="密码至少6位")
+    try:
+        user = db.create_user(
+            {
+                "username": username,
+                "display_name": data.get("display_name") or username,
+                "password": password,
+                "role": "user",
+            }
+        )
+        return {"user": user, "message": "注册成功"}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/auth/me")
+async def auth_me(authorization: str | None = Header(None)):
+    return {"user": _require_user(authorization)}
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(authorization: str | None = Header(None)):
+    db.logout(_token_from_header(authorization))
+    return {"ok": True}
+
+
+@app.get("/api/users")
+async def api_list_users(authorization: str | None = Header(None)):
+    _require_user(authorization)
+    return {"users": db.list_users()}
+
+
+@app.post("/api/users")
+async def api_create_user(data: dict, authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    try:
+        return {"user": db.create_user(data)}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.put("/api/users/{user_id}")
+async def api_update_user(
+    user_id: str,
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    if user.get("role") != "admin" and user.get("id") != user_id:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return {"user": db.update_user(user_id, data)}
+
+
+@app.get("/api/meetings/reservations")
+async def api_list_reservations(
+    user_id: str | None = Query(None),
+    status: str | None = Query(None),
+    authorization: str | None = Header(None),
+):
+    _require_user(authorization)
+    reservations = db.list_reservations(user_id=user_id, status=status)
+    now = datetime.now().astimezone()
+    for reservation in reservations:
+        try:
+            start = datetime.fromisoformat(
+                reservation["start_time"].replace("Z", "+00:00")
+            )
+            end = datetime.fromisoformat(
+                reservation["end_time"].replace("Z", "+00:00")
+            )
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=now.tzinfo)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=now.tzinfo)
+            if now < start:
+                reservation["time_status"] = "未开始"
+            elif now > end:
+                reservation["time_status"] = "已结束"
+            else:
+                reservation["time_status"] = "进行中"
+        except (AttributeError, KeyError, TypeError, ValueError):
+            reservation["time_status"] = "未知"
+    return {"reservations": reservations}
+
+
+@app.post("/api/meetings/reservations")
+async def api_create_reservation(
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    data.setdefault("organizer_user_id", user["id"])
+    try:
+        return {"reservation": db.create_reservation(data)}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.put("/api/meetings/reservations/{reservation_id}")
+async def api_update_reservation(
+    reservation_id: str,
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    _require_user(authorization)
+    return {"reservation": db.update_reservation(reservation_id, data)}
+
+
+@app.post("/api/meetings/join")
+async def api_join_meeting(
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = db.get_user_by_token(_token_from_header(authorization))
+    if user:
+        data.setdefault("user_id", user["id"])
+        data.setdefault("display_name", user["display_name"])
+    try:
+        return db.join_meeting(data)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/friends/search")
+async def api_search_users(
+    q: str = Query(...),
+    authorization: str | None = Header(None),
+):
+    user = db.get_user_by_token(_token_from_header(authorization))
+    exclude = user["id"] if user else None
+    return {"users": db.search_users(q, exclude_user_id=exclude)}
+
+
+@app.get("/api/friends")
+async def api_list_friends(authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    return {"friends": db.list_friends(user["id"])}
+
+
+@app.post("/api/friends")
+async def api_add_friend(data: dict, authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    friend_id = data.get("friend_id")
+    if not friend_id:
+        raise HTTPException(status_code=400, detail="friend_id required")
+    result = db.add_friend(user["id"], friend_id)
+    if not result:
+        raise HTTPException(status_code=409, detail="已经是好友或添加失败")
+    return {"friend": result}
+
+
+@app.delete("/api/friends/{friend_id}")
+async def api_remove_friend(
+    friend_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    db.remove_friend(user["id"], friend_id)
+    return {"ok": True}
+
+
+@app.post("/api/meetings/analysis")
+async def api_save_analysis(
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    data.setdefault("created_by", user["id"])
+    try:
+        return {"analysis": db.save_analysis(data)}
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/meetings/analysis")
+async def api_list_analyses(
+    meeting_id: str | None = Query(None),
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    return {
+        "analyses": db.list_analyses(
+            user_id=user["id"],
+            meeting_id=meeting_id,
+        )
+    }
+
+
+@app.get("/api/meetings/analysis/{analysis_id}")
+async def api_get_analysis(
+    analysis_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    analysis = db.get_analysis(analysis_id)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if (
+        analysis.get("created_by")
+        and analysis["created_by"] != user["id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return {"analysis": analysis}
+
+
+@app.delete("/api/meetings/analysis/{analysis_id}")
+async def api_delete_analysis(
+    analysis_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    analysis = db.get_analysis(analysis_id)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if (
+        analysis.get("created_by")
+        and analysis["created_by"] != user["id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    db.delete_analysis(analysis_id)
+    return {"ok": True}
 
 
 @app.get("/api/xasr/status")

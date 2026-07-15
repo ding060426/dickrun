@@ -22,6 +22,7 @@ __pycache__/
 backend/logs/
 backend/data/hotwords.json
 backend/data/settings.json
+backend/data/diting.db
 *.log
 
 # ── Demo output ──
@@ -32,6 +33,8 @@ asr_output.txt
 venv/
 .venv/
 env/
+.env
+backend/.env
 
 # ── IDE ──
 .vscode/

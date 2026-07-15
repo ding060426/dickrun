@@ -3,29 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DiTing v4.5 - Smart Meeting Speech Cognitive System</title>
+<title>DiTing v3.0 - Smart Meeting Speech Cognitive System</title>
 <style>
 /* ============================================================
    DiTing v3.0 - Global Styles (with wavesurfer.js integration)
    ============================================================ */
 :root {
-  --bg-primary: #0f1117;
-  --bg-secondary: #181b24;
-  --bg-tertiary: #1e2130;
-  --bg-card: #1a1d28;
-  --border: #2a2d3a;
-  --border-active: #3a3f55;
-  --text-primary: #e8eaed;
-  --text-secondary: #9aa0b0;
-  --text-muted: #5f6577;
-  --accent-blue: #4A90D9;
-  --accent-orange: #E8743C;
-  --accent-green: #50B86C;
-  --accent-red: #e0556a;
-  --accent-yellow: #e8b83c;
-  --accent-purple: #8b6ce8;
-  --gradient-brand: linear-gradient(135deg, #4A90D9 0%, #8b6ce8 100%);
-  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --bg-primary: #f0f4fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8edf5;
+  --bg-card: #ffffff;
+  --border: #d8dfe8;
+  --border-active: #b0bdd0;
+  --text-primary: #1a1f36;
+  --text-secondary: #4a5578;
+  --text-muted: #8b96b0;
+  --accent-blue: #3b82f6;
+  --accent-orange: #f59e0b;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-yellow: #eab308;
+  --accent-purple: #8b5cf6;
+  --gradient-brand: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -72,22 +72,127 @@ body {
   display: flex; align-items: center; gap: 8px;
   font-size: 12px;
 }
-.language-control {
+
+/* ── Global Home Header ── */
+.topbar {
+  height: 56px;
+  padding: 0 22px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 10px;
+  justify-content: space-between;
+  background: rgba(240,244,250,0.92);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  backdrop-filter: blur(12px);
 }
-.language-control select {
-  padding: 4px 7px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font: inherit;
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-brand {
+  display: flex; align-items: center; gap: 10px;
+  margin-right: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.topbar-brand-mark {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-brand);
+  color: white;
+  font-size: 14px;
+}
+.topbar-nav { display: flex; align-items: center; gap: 4px; }
+.topbar-nav-item {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 16px 12px 14px;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: color 0.2s, border-color 0.2s;
 }
+.topbar-nav-item:hover { color: var(--text-primary); }
+.topbar-nav-item.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+.topbar-user { color: var(--text-secondary); font-size: 12px; }
+.topbar-action {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+.topbar-action:hover { border-color: var(--accent-blue); }
+.topbar-action.danger:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+.home-hero {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-image:
+    radial-gradient(circle at 50% 35%, rgba(59,130,246,0.06), transparent 36%),
+    radial-gradient(circle at 70% 70%, rgba(139,92,246,0.04), transparent 35%);
+}
+.home-hero.hidden { display: none; }
+.hero-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.volume-orb {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.95) 0%, rgba(245,248,255,0.9) 50%, rgba(220,230,250,0.7) 100%);
+  opacity: 1;
+  box-shadow:
+    0 0 40px rgba(59,130,246,0.15),
+    0 0 80px rgba(139,92,246,0.10);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.freq-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 520px; height: 520px;
+  z-index: 0;
+  pointer-events: none;
+}
+.home-hero h1 {
+  font-size: clamp(64px, 12vw, 140px);
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  padding-bottom: 0.08em;
+  background: linear-gradient(135deg, #2a3f8f 0%, #6b3fa0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  position: relative;
+  z-index: 2;
+}
+.home-hero p {
+  margin-top: 20px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+.legacy-meeting-header { display: none !important; }
 
 /* ── Main Layout ── */
 .main-container {
@@ -96,7 +201,7 @@ body {
   grid-template-rows: 1fr auto;
   gap: 10px;
   padding: 10px 20px;
-  height: calc(100vh - 180px);
+  height: calc(100vh - 130px);
 }
 
 /* ── Transcript Panel ── */
@@ -138,15 +243,6 @@ body {
 .segment.has-audio { cursor: pointer; }
 .segment.has-audio:hover { border-left-color: var(--accent-blue); }
 .segment.no-audio { cursor: default; }
-.segment.overlap {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(224, 85, 106, 0.04) 0,
-    rgba(224, 85, 106, 0.04) 7px,
-    transparent 7px,
-    transparent 14px
-  );
-}
 
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-10px); }
@@ -158,18 +254,7 @@ body {
   padding: 6px 10px 2px 10px;
 }
 .segment-index { font-size: 10px; color: var(--text-muted); font-weight: 600; min-width: 28px; }
-.segment-speaker {
-  padding: 2px 7px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--accent-blue);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.segment-speaker:hover { background: rgba(88,166,255,0.12); }
+.segment-speaker { font-size: 11px; font-weight: 600; }
 .segment-time { font-size: 10px; color: var(--text-muted); font-family: 'SF Mono', 'Cascadia Code', monospace; }
 .segment-dur { font-size: 10px; color: var(--text-muted); }
 .segment-snr {
@@ -179,6 +264,7 @@ body {
 .segment-snr.high { background: rgba(80,184,108,0.15); color: var(--accent-green); }
 .segment-snr.medium { background: rgba(232,184,60,0.15); color: var(--accent-yellow); }
 .segment-snr.low { background: rgba(224,85,106,0.15); color: var(--accent-red); }
+
 .segment-play-btn {
   background: none; border: 1px solid var(--border-active); border-radius: 50%;
   width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
@@ -194,7 +280,7 @@ body {
   height: 44px;
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(0,0,0,0.25);
+  background: rgba(0,0,0,0.04);
   position: relative;
 }
 .segment-waveform canvas { display: block; }
@@ -281,7 +367,7 @@ body {
   font-size: 12px; font-weight: 600;
 }
 .sidebar-card-body { padding: 10px 12px; }
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .stat-item { text-align: center; padding: 6px; background: var(--bg-card); border-radius: 6px; }
 .stat-value { font-size: 18px; font-weight: 700; }
 .stat-label { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
@@ -311,96 +397,6 @@ body {
 .btn-secondary:hover { border-color: var(--border-active); }
 .btn-secondary.active { border-color: var(--accent-blue); background: rgba(74,144,217,0.1); }
 .btn-danger { background: rgba(224,85,106,0.15); color: var(--accent-red); border: 1px solid rgba(224,85,106,0.3); }
-.mic-orb-panel {
-  position: fixed;
-  left: 50%;
-  bottom: 64px;
-  width: 240px;
-  min-height: 150px;
-  padding: 18px 18px 14px;
-  border: 1px solid rgba(74, 144, 217, 0.18);
-  border-radius: 24px;
-  background: rgba(15, 17, 23, 0.74);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 450;
-  transform: translateX(-50%) translateY(18px) scale(0.96);
-  transition: opacity 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
-}
-.mic-orb-panel.visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
-}
-.mic-orb-panel.listening { border-color: rgba(139, 108, 232, 0.42); }
-.mic-orb-panel.finalizing { border-color: rgba(224, 185, 85, 0.42); }
-.mic-orb-wrap {
-  position: relative;
-  width: 92px;
-  height: 92px;
-  margin: 0 auto 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.mic-orb-ring,
-.mic-orb-glow {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  transform: scale(var(--orb-scale, 1));
-  transition: transform 0.08s linear, opacity 0.08s linear;
-}
-.mic-orb-ring {
-  border: 1px solid rgba(139, 108, 232, 0.48);
-  opacity: var(--orb-ring-opacity, 0.35);
-  box-shadow: 0 0 var(--orb-shadow, 18px) rgba(139, 108, 232, 0.42);
-}
-.mic-orb-glow {
-  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.98), rgba(112,190,255,0.95) 18%, rgba(139,108,232,0.74) 48%, rgba(74,144,217,0.18) 72%, transparent 100%);
-  filter: blur(var(--orb-blur, 0.5px));
-  opacity: var(--orb-glow-opacity, 0.82);
-}
-.mic-orb-core {
-  position: relative;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 28%, #fff 0%, #bfe8ff 22%, #7a8cff 52%, #6b46e8 100%);
-  box-shadow: inset -10px -12px 24px rgba(28,18,86,0.38), inset 8px 8px 16px rgba(255,255,255,0.28), 0 0 var(--orb-core-shadow, 20px) rgba(74,144,217,0.58);
-  transform: scale(var(--orb-core-scale, 1));
-  transition: transform 0.08s linear, box-shadow 0.08s linear;
-}
-.mic-orb-wave {
-  height: 28px;
-  margin: 0 auto 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-.mic-orb-wave span {
-  width: 3px;
-  height: 22px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #bfe8ff, #8b6ce8);
-  opacity: 0.42;
-  transform: scaleY(0.12);
-  transition: transform 0.08s linear, opacity 0.08s linear;
-}
-.mic-orb-panel.listening .mic-orb-wave span { opacity: 0.82; }
-.mic-orb-panel.finalizing .mic-orb-wave span { opacity: 0.34; }
-.mic-orb-title { font-size: 13px; font-weight: 700; text-align: center; }
-.mic-orb-subtitle { margin-top: 2px; font-size: 11px; color: var(--text-muted); text-align: center; }
-@media (prefers-reduced-motion: reduce) {
-  .mic-orb-panel,
-  .mic-orb-ring,
-  .mic-orb-glow,
-  .mic-orb-core,
-  .mic-orb-wave span { transition: none; }
-}
 .progress-bar {
   flex: 1; height: 4px;
   background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;
@@ -466,329 +462,452 @@ body {
 .upload-status-card .stage { color: var(--accent-blue); }
 .upload-status-card .done { color: var(--accent-green); }
 
-/* ── Settings Workspace ── */
-.hotword-modal {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(5, 7, 12, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 1200;
+/* Login modal */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(15,17,23,0.35);
+  backdrop-filter: blur(6px);
 }
-.hotword-modal.visible { display: flex; }
-.hotword-dialog {
-  width: min(1180px, calc(100vw - 48px));
-  height: min(820px, calc(100vh - 48px));
+.login-overlay.visible { display: flex; }
+.login-card {
+  width: min(400px, calc(100vw - 32px)); padding: 32px 28px;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.12);
+}
+.login-card h2 { font-size: 20px; margin-bottom: 6px; }
+.login-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+.login-card .switch-link {
+  text-align: center; margin-top: 12px; font-size: 12px; color: var(--text-muted);
+}
+.login-card .switch-link a {
+  color: var(--accent-blue); cursor: pointer; text-decoration: none;
+}
+.login-card .switch-link a:hover { text-decoration: underline; }
+#registerForm { display: none; }
+#registerForm.active { display: block; }
+#loginFormWrap.hidden { display: none; }
+.form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.form-row label { font-size: 11px; color: var(--text-secondary); }
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-primary); color: var(--text-primary); padding: 8px 10px; font-size: 12px; outline: none;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent-blue); }
+.login-error { min-height: 5px; color: var(--accent-red); font-size: 11px; margin-top: 8px; }
+.user-pill { font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; }
+.management-panel {
+  position: fixed; right: 5px; bottom: 58px; z-index: 200;
+  width: min(1680px, calc(100vw - 24px)); max-height: min(800px, calc(100vh - 90px));
+  display: none; flex-direction: column; background: var(--bg-secondary);
+  border: 1px solid var(--border-active); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.management-panel.visible { display: flex; }
+.management-header { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); }
+.management-header strong { font-size: 13px; }
+.management-body { padding: 12px; overflow-y: auto; }
+.management-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.management-tab { flex: 1; }
+.management-section { display: none; }
+.management-section.active { display: block; }
+.entity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.entity-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 5px 8px; font-size: 10px; }
+.entity-card .title { font-weight: 600; color: var(--text-primary); font-size: 11px; }
+.entity-card .meta { color: var(--text-muted); margin-top: 1px; font-size: 10px; word-break: break-all; }
+
+.users-layout {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
-  overflow: hidden;
-  border: 1px solid var(--border-active);
-  border-radius: 16px;
-  background: rgba(24, 27, 36, 0.98);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  height: 100%;
 }
-.settings-sidebar {
-  min-width: 0;
-  padding: 18px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border-right: 1px solid var(--border);
-  background: rgba(20, 24, 31, 0.98);
+.users-left, .users-right {
+  display: flex; flex-direction: column;
+  overflow-y: auto;
 }
-.settings-sidebar-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 2px 6px 8px;
-}
-.settings-sidebar-mark {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border-active);
-  border-radius: 9px;
-  color: var(--accent-blue);
-  background: rgba(65, 137, 230, 0.1);
-  font-size: 12px;
-  font-weight: 800;
-}
-.settings-sidebar-title strong { display: block; font-size: 14px; color: var(--text-primary); }
-.settings-sidebar-title small { display: block; margin-top: 2px; font-size: 9px; color: var(--text-muted); }
-.settings-search {
-  width: 100%;
-  padding: 9px 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  outline: none;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font: inherit;
-}
-.settings-search:focus { border-color: var(--accent-blue); }
-.settings-nav-label {
-  padding: 0 8px;
-  color: var(--text-dim);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.settings-nav { display: flex; flex-direction: column; gap: 5px; }
-.settings-nav-button {
-  width: 100%;
-  padding: 9px 10px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid transparent;
-  border-radius: 9px;
+.users-section-title {
+  font-size: 13px; font-weight: 700; margin-bottom: 10px;
   color: var(--text-secondary);
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  transition: 140ms ease;
 }
-.settings-nav-button:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.035); }
-.settings-nav-button.active {
-  border-color: rgba(65, 137, 230, 0.25);
-  color: var(--text-primary);
-  background: rgba(65, 137, 230, 0.12);
+.search-box {
+  display: flex; gap: 8px; margin-bottom: 12px;
 }
-.settings-nav-icon {
-  width: 30px;
-  height: 24px;
+.search-box input {
+  flex: 1;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-primary); color: var(--text-primary);
+  padding: 8px 10px; font-size: 12px; outline: none;
+}
+.search-box input:focus { border-color: var(--accent-blue); }
+.friend-card {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-card); padding: 8px 10px; font-size: 12px;
+  margin-bottom: 6px;
+}
+.friend-card .info { display: flex; flex-direction: column; gap: 2px; }
+.friend-card .name { font-weight: 600; }
+.friend-card .role { font-size: 10px; color: var(--text-muted); }
+.friend-card .btn-sm {
+  font-size: 10px; padding: 3px 10px;
+  border-radius: 6px; border: none; cursor: pointer;
+  font-family: inherit;
+}
+.btn-add { background: var(--accent-blue); color: white; }
+.btn-remove { background: rgba(239,68,68,0.12); color: var(--accent-red); }
+.reserve-layout {
   display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 800;
-}
-.settings-nav-button.active .settings-nav-icon { color: var(--accent-blue); background: rgba(65, 137, 230, 0.16); }
-.settings-workspace { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.hotword-dialog-header,
-.hotword-dialog-footer {
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.hotword-dialog-footer { border-top: 1px solid var(--border); border-bottom: 0; }
-.hotword-dialog-body { flex: 1; min-height: 0; padding: 24px 28px; overflow-y: auto; }
-.settings-page-heading { margin-bottom: 20px; }
-.settings-page-heading h2 { margin: 0; color: var(--text-primary); font-size: 22px; }
-.settings-page-heading p { margin: 6px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
-.settings-panel { display: none; }
-.settings-panel.active { display: block; }
-.settings-section {
-  max-width: 840px;
-}
-.settings-section-title { margin-bottom: 9px; font-size: 12px; font-weight: 700; color: var(--text-primary); }
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-}
-.settings-field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.settings-field.wide { grid-column: 1 / -1; }
-.settings-inline { display: flex; align-items: center; gap: 8px; }
-.settings-inline > *:first-child { flex: 1; }
-.settings-model-status {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  background: rgba(65, 137, 230, 0.08);
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1.5;
-}
-.mic-test-meter { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-primary); }
-.mic-test-meter > span { display: block; width: 0; height: 100%; background: var(--accent-green); transition: width 80ms linear; }
-.hotword-setting-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 240px minmax(0, 1100px) 300px;
   gap: 10px;
-  margin-bottom: 14px;
+  align-items: start;
 }
-.hotword-setting-card {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-card);
+.reservation-calendar {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: rgba(59,130,246,0.07); padding: 8px 10px; font-size: 10px; user-select: none;
 }
-.hotword-setting-card label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
-.hotword-score-controls { display: grid; grid-template-columns: 1fr 70px; gap: 8px; margin-top: 9px; }
-.hotword-input {
-  width: 100%;
-  min-width: 0;
-  padding: 7px 9px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  outline: none;
+.calendar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.calendar-header .month-label { font-weight: 700; font-size: 12px; color: var(--accent-blue); }
+.calendar-header button {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-secondary); cursor: pointer; padding: 1px 7px; font-size: 11px;
+  font-family: inherit; line-height: 1.2;
+}
+.calendar-header button:hover { background: var(--bg-tertiary); }
+.calendar-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; color: var(--text-muted); margin-bottom: 3px; font-size: 10px;
+}
+.calendar-days {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+}
+.calendar-day {
+  padding: 40px 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; border-radius: 5px;
+  cursor: pointer; position: relative; font-size: 13px; color: var(--text-primary);
+  line-height: 1;
+}
+.calendar-day:hover { background: var(--bg-tertiary); }
+.calendar-day.other-month { color: var(--text-muted); }
+.calendar-day.today { background: var(--accent-blue); color: white; font-weight: 700; }
+.calendar-day { color: var(--text-muted); }
+.calendar-day.has-meeting { color: var(--text-primary); font-weight: 600; }
+.calendar-day.has-meeting { color: var(--text-primary); font-weight: 600; cursor: pointer; background: rgba(59,130,246,0.14); }
+.schedule-panel {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-card); padding: 10px; font-size: 11px;
+  min-height: 120px;
+}
+.schedule-panel .sp-title { font-weight: 700; font-size: 12px; margin-bottom: 8px; color: var(--text-primary); }
+.schedule-panel .sp-item {
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+  margin-bottom: 6px; cursor: pointer; transition: background 0.15s;
+}
+.schedule-panel .sp-item:hover { background: var(--bg-tertiary); }
+.schedule-panel .sp-item .sp-name { font-weight: 600; }
+.schedule-panel .sp-item .sp-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.schedule-panel .sp-empty { color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 11px; }
+.calendar-day .dot {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  width: 6px; height: 6px;
+  border-radius: 2px; background: var(--accent-blue);
+}
+.calendar-day .tooltip {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); z-index: 300; white-space: nowrap;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 8px; padding: 8px 10px; font-size: 11px; color: var(--text-primary);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15); pointer-events: none; text-align: left;
+}
+.calendar-day .tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
+.calendar-day .tooltip .tt-meta { font-size: 10px; color: var(--text-muted); }
+.calendar-day:hover .tooltip { display: block; }
+.time-status {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.time-status.upcoming { background: rgba(74,144,217,0.15); color: var(--accent-blue); }
+.time-status.active { background: rgba(80,184,108,0.15); color: var(--accent-green); }
+.time-status.ended { background: rgba(95,101,119,0.15); color: var(--text-muted); }
+.time-status.unknown { background: rgba(232,184,60,0.15); color: var(--accent-yellow); }
+
+/* Module selector - Codex style */
+.module-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  display: none; align-items: center; justify-content: center;
   background: var(--bg-primary);
-  color: var(--text-primary);
-  font: inherit;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(59,130,246,0.04) 0%, transparent 60%),
+    radial-gradient(circle at 80% 100%, rgba(139,92,246,0.03) 0%, transparent 50%);
 }
-.hotword-input:focus { border-color: var(--accent-blue); }
-.hotword-list-header,
-.hotword-row {
-  display: grid;
-  grid-template-columns: 34px minmax(160px, 1fr) 88px 38px;
-  gap: 8px;
-  align-items: center;
+.module-overlay.visible { display: flex; }
+.module-container {
+  width: min(800px, calc(100vw - 64px));
+  padding: 0 24px;
+  text-align: center;
 }
-.hotword-list-header { padding: 0 4px 5px; font-size: 10px; color: var(--text-muted); }
-.hotword-list { display: flex; flex-direction: column; gap: 6px; max-height: 310px; overflow-y: auto; }
-.hotword-row {
-  padding: 7px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(15, 17, 23, 0.48);
+.module-hero {
+  margin-bottom: 48px;
 }
-.hotword-row.disabled { opacity: 0.55; }
-.hotword-remove { padding: 5px 0; color: var(--accent-red); }
-.hotword-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
-.hotword-note { margin-top: 10px; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
-.hotword-save-status { min-height: 16px; font-size: 10px; color: var(--text-muted); }
-.domain-preset-section {
-  margin-bottom: 18px;
-  padding: 14px;
-  border: 1px solid var(--border);
+.module-hero .brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.module-hero .brand-icon {
+  width: 42px; height: 42px;
+  background: var(--gradient-brand);
   border-radius: 12px;
-  background: rgba(65, 137, 230, 0.045);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: white;
 }
-.domain-preset-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.domain-preset-heading strong { display: block; color: var(--text-primary); font-size: 12px; }
-.domain-preset-heading span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 9px; }
-.domain-preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.domain-preset-card {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  transition: 140ms ease;
+.module-hero h2 {
+  font-size: 32px; font-weight: 800; margin: 0;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.domain-preset-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
-.domain-preset-card.selected {
-  border-color: var(--accent-blue);
-  background: rgba(65, 137, 230, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(65, 137, 230, 0.18);
+.module-hero .sub {
+  font-size: 14px; color: var(--text-muted);
+  margin-top: 8px; line-height: 1.6;
 }
-.domain-preset-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.domain-preset-card strong { display: block; color: var(--text-primary); font-size: 11px; }
-.domain-preset-card span { display: block; min-height: 28px; margin-top: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
-.domain-preset-card em { display: block; margin-top: 7px; color: var(--accent-blue); font-size: 9px; font-style: normal; }
-.domain-preset-check {
+.module-grid {
   display: grid;
-  width: 17px;
-  height: 17px;
-  flex: 0 0 17px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  color: transparent;
-  font-size: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 32px;
 }
-.domain-preset-card.selected .domain-preset-check { border-color: var(--accent-blue); background: var(--accent-blue); color: white; }
-.domain-selection-notice {
-  margin-top: 10px;
-  padding: 9px 10px;
-  border: 1px solid rgba(65, 137, 230, 0.35);
-  border-radius: 8px;
-  background: rgba(65, 137, 230, 0.09);
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1.5;
-}
-.domain-selection-notice[hidden] { display: none; }
-.domain-selection-notice strong { color: var(--accent-blue); }
-.domain-selection-notice small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 9px; }
-.diarization-upload-options {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.diarization-upload-options select {
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+.module-card {
   background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 24px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  position: relative; overflow: hidden;
 }
-@media (max-width: 820px) {
-  .hotword-dialog {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .settings-sidebar { padding: 10px; gap: 9px; border-right: 0; border-bottom: 1px solid var(--border); }
-  .settings-sidebar-title, .settings-nav-label { display: none; }
-  .settings-nav { flex-direction: row; }
-  .settings-nav-button { justify-content: center; padding: 7px; }
-  .settings-nav-icon { display: none; }
-  .hotword-dialog-body { padding: 18px; }
+.module-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 14px;
+  background: var(--gradient-brand);
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 0;
 }
-@media (max-width: 620px) {
-  .hotword-setting-grid, .settings-grid { grid-template-columns: 1fr; }
-  .domain-preset-grid { grid-template-columns: 1fr 1fr; }
-  .hotword-list-header,
-  .hotword-row { grid-template-columns: 30px minmax(120px, 1fr) 72px 34px; }
+.module-card:hover::before { opacity: 0.04; }
+.module-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.08), 0 0 0 1px rgba(59,130,246,0.15);
+}
+.module-card:hover .card-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+.module-card > * { position: relative; z-index: 1; }
+.module-card .icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: rgba(74,144,217,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; margin-bottom: 16px;
+}
+.module-card:nth-child(2) .icon { background: rgba(232,116,60,0.1); }
+.module-card:nth-child(3) .icon { background: rgba(80,184,108,0.1); }
+.module-card:nth-child(4) .icon { background: rgba(139,108,232,0.1); }
+.module-card .name {
+  font-size: 16px; font-weight: 700; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.module-card .card-arrow {
+  font-size: 14px; opacity: 0; transform: translateX(-8px);
+  transition: all 0.3s;
+  color: var(--accent-blue);
+}
+.module-card .desc { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+
+/* Main app wrapper: hidden until a module is selected */
+#mainApp { display: none; }
+#mainApp.active { display: block; }
+
+.back-btn {
+  position: fixed; top: 12px; left: 12px; z-index: 999;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 8px; padding: 8px 16px; font-size: 13px;
+  color: var(--text-primary); cursor: pointer;
+  display: none; align-items: center; gap: 6px;
+  box-shadow: var(--shadow);
+}
+.back-btn.visible { display: flex; }
+.back-btn:hover { background: var(--bg-tertiary); border-color: var(--accent-blue); }
+
+.module-nav {
+  position: fixed; top: 12px; right: 20px; z-index: 999;
+  display: none; gap: 6px;
+}
+.module-nav.visible { display: flex; }
+.module-nav-item {
+  padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg-secondary);
+  color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.module-nav-item:hover { border-color: var(--border-active); color: var(--text-primary); }
+.module-nav-item.active {
+  border-color: var(--accent-blue); color: var(--accent-blue);
+  background: rgba(74,144,217,0.1);
 }
 </style>
 </head>
 <body>
 
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-brand">
+      <div class="topbar-brand-mark">D</div>
+      <span>DiTing</span>
+    </div>
+    <nav class="topbar-nav" aria-label="模块导航">
+      <button class="topbar-nav-item" data-module="meeting">会议转写</button>
+      <button class="topbar-nav-item" data-module="reservation">会议预约</button>
+      <button class="topbar-nav-item" data-module="analysis">会议分析</button>
+      <button class="topbar-nav-item" data-module="users">用户管理</button>
+    </nav>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbarUser">未登录</span>
+    <button class="topbar-action" id="topbarLogin">登录</button>
+    <button class="topbar-action danger" id="topbarLogout" style="display:none;">退出</button>
+  </div>
+</header>
+
+<section class="home-hero" id="homeHero">
+  <div class="hero-visual">
+    <canvas class="freq-ring" id="freqRing" width="520" height="520"></canvas>
+    <div class="volume-orb" id="volumeOrb"></div>
+    <h1>DiTing</h1>
+  </div>
+  <p>智能会议语音认知系统 · 转写 · 分析 · 协作</p>
+</section>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h2 id="loginTitle">会议控制台登录</h2>
+    <p>支持本地 SQLite 与 Supabase 的会议管理账号</p>
+    <div id="loginFormWrap">
+      <form id="loginForm">
+        <div class="form-row">
+          <label for="loginUsername">用户名</label>
+          <input id="loginUsername" autocomplete="username" placeholder="用户名">
+        </div>
+        <div class="form-row">
+          <label for="loginPassword">密码</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="密码">
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%;">登录</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+      <div class="switch-link">还没有账号？<a id="showRegister">立即注册</a></div>
+    </div>
+
+    <form id="registerForm">
+      <div class="form-row">
+        <label for="regUsername">用户名</label>
+        <input id="regUsername" autocomplete="off" placeholder="请输入用户名">
+      </div>
+      <div class="form-row">
+        <label for="regPassword">密码</label>
+        <input id="regPassword" type="password" autocomplete="new-password" placeholder="至少6位">
+      </div>
+      <div class="form-row">
+        <label for="regPassword2">确认密码</label>
+        <input id="regPassword2" type="password" autocomplete="new-password" placeholder="再次输入密码">
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">注册</button>
+      <div class="login-error" id="registerError"></div>
+      <div class="switch-link">已有账号？<a id="showLogin">返回登录</a></div>
+    </form>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Module Selector                                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="module-overlay" id="moduleOverlay">
+  <div class="module-container">
+    <div class="module-hero">
+      <div class="brand">
+        <div class="brand-icon">D</div>
+        <h2>DiTing</h2>
+      </div>
+      <div class="sub">智能会议语音认知系统 — 转写 · 分析 · 协作</div>
+    </div>
+    <div class="module-grid">
+      <div class="module-card" data-module="meeting">
+        <div class="icon">转</div>
+        <div class="name">会议转写 <span class="card-arrow">→</span></div>
+        <div class="desc">实时语音转写、波形可视化、ASR 声学分析</div>
+      </div>
+      <div class="module-card" data-module="reservation">
+        <div class="icon">预</div>
+        <div class="name">会议预约 <span class="card-arrow">→</span></div>
+        <div class="desc">创建与管理会议预约，生成参会码，一键加入</div>
+      </div>
+      <div class="module-card" data-module="analysis">
+        <div class="icon">析</div>
+        <div class="name">会议分析 <span class="card-arrow">→</span></div>
+        <div class="desc">历史会议分析结果、转写记录与统计报表</div>
+      </div>
+      <div class="module-card" data-module="users">
+        <div class="icon">管</div>
+        <div class="name">用户管理 <span class="card-arrow">→</span></div>
+        <div class="desc">用户账号管理、角色权限分配与安全审计</div>
+      </div>
+    </div>
+    <div style="color:var(--text-muted);font-size:12px;">
+      <span id="moduleUserDisplay"></span>
+      <button class="btn btn-secondary" id="btnModuleLogout" style="font-size:11px;margin-left:12px;">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Main App (hidden until module selected)                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<button class="back-btn" id="btnBack" title="返回模块选择"> 返回</button>
+<nav class="module-nav" id="moduleNav">
+  <button class="module-nav-item" data-module="meeting">会议转写</button>
+  <button class="module-nav-item" data-module="reservation">会议预约</button>
+  <button class="module-nav-item" data-module="analysis">会议分析</button>
+  <button class="module-nav-item" data-module="users">用户管理</button>
+</nav>
+<div id="mainApp"><!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Header                                                      -->
 <!-- ═══════════════════════════════════════════════════════════ -->
-<div class="header">
+<div class="header legacy-meeting-header">
   <div class="header-brand">
     <div class="header-logo">E</div>
     <div>
-      <div class="header-title" data-i18n="app.name">DiTing v4.5</div>
-      <div class="header-subtitle" data-i18n="app.subtitle">智能会议语音认知系统</div>
+      <div class="header-title">DiTing v3.0</div>
+      <div class="header-subtitle">智能会议语音认知系统</div>
     </div>
   </div>
   <div class="header-info">
     <span class="header-meeting-title" id="meetingTitleDisplay">未加载会议</span>
+    <span class="user-pill" id="currentUserDisplay">未登录</span>
   </div>
   <div class="header-status">
-    <label class="language-control">
-      <span data-i18n="language.label">语言</span>
-      <select id="languageSelect" data-i18n-aria-label="language.label" aria-label="语言">
-        <option value="zh-CN">中文</option>
-        <option value="en-US">English</option>
-      </select>
-    </label>
-    <span id="xasrStatus" style="font-size:11px;color:var(--text-muted);" data-i18n="status.checking">检查中...</span>
-    <span id="connectionStatus" style="font-size:11px;">⚪ <span data-i18n="status.offline">离线</span></span>
+    <span id="xasrStatus" style="font-size:11px;color:var(--text-muted);">检测中...</span>
+    <span id="connectionStatus" style="font-size:11px;">⚪ 离线</span>
   </div>
 </div>
 
@@ -799,14 +918,14 @@ body {
   <!-- Transcript Panel -->
   <div class="transcript-panel">
     <div class="transcript-header">
-      <h3 data-i18n="transcript.title">转写文本与波形</h3>
+      <h3>转写 &amp; 波形</h3>
       <span style="font-size:11px;color:var(--text-muted);" id="segmentCounter">0/0</span>
     </div>
     <!-- Global Audio Status -->
     <div class="global-audio-bar" id="globalAudioBar">
       <span class="audio-status">
         <span class="pulse inactive" id="audioPulse"></span>
-        <span id="audioStatusText" data-i18n="transcript.no_audio">无音频</span>
+        <span id="audioStatusText">无音频</span>
       </span>
       <span style="flex:1;"></span>
       <span style="font-size:10px;color:var(--text-muted);" id="audioTimeDisplay">--:-- / --:--</span>
@@ -814,8 +933,8 @@ body {
     <div class="transcript-body" id="transcriptBody">
       <div class="empty-state" id="emptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:150px;color:var(--text-muted);gap:8px;">
         <div style="font-size:40px;opacity:0.3;">Mic</div>
-        <div data-i18n="transcript.waiting">等待会议输入...</div>
-        <div style="font-size:11px;" data-i18n="transcript.hint">点击“演示”或上传音频文件</div>
+        <div>等待会议开始...</div>
+        <div style="font-size:11px;">点击 [演示] 或上传音频文件</div>
       </div>
     </div>
   </div>
@@ -823,36 +942,36 @@ body {
   <!-- Right Sidebar -->
   <div class="sidebar">
     <div class="sidebar-card">
-      <div class="sidebar-card-header" data-i18n="stats.title">统计</div>
+      <div class="sidebar-card-header">统计</div>
       <div class="sidebar-card-body">
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-blue);" id="statSegments">0</div>
-            <div class="stat-label" data-i18n="stats.segments">片段</div>
+            <div class="stat-label">分段数</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-orange);" id="statLogicFlags">0</div>
-            <div class="stat-label" data-i18n="stats.logic_flags">逻辑提示</div>
+            <div class="stat-label">逻辑标记</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-green);" id="statCorrections">0</div>
-            <div class="stat-label" data-i18n="stats.corrections">纠错</div>
+            <div class="stat-label">修正</div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="sidebar-card">
-      <div class="sidebar-card-header" data-i18n="processing.title">处理进度</div>
+      <div class="sidebar-card-header">处理</div>
       <div class="sidebar-card-body" id="processingPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;" data-i18n="processing.waiting">等待输入...</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>
       </div>
     </div>
 
     <div class="sidebar-card">
-      <div class="sidebar-card-header" data-i18n="logic.title">逻辑验证</div>
+      <div class="sidebar-card-header">逻辑校验</div>
       <div class="sidebar-card-body" id="logicPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;" data-i18n="logic.no_data">暂无数据</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>
       </div>
     </div>
   </div>
@@ -860,7 +979,7 @@ body {
   <!-- Summary Panel -->
   <div class="summary-panel" id="summaryPanel">
     <div style="font-size:12px;color:var(--text-muted);text-align:center;">
-      <span data-i18n="summary.waiting">会议处理完成后将生成摘要...</span>
+      会议处理完成后将生成摘要...
     </div>
   </div>
 </div>
@@ -869,225 +988,127 @@ body {
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
-  <button class="btn btn-primary" id="btnStart" data-i18n="controls.demo">演示</button>
-  <button class="btn btn-secondary" id="btnReset" data-i18n="controls.reset">重置</button>
+  <button class="btn btn-primary" id="btnStart">演示</button>
+  <button class="btn btn-secondary" id="btnReset">重置</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
-  <button class="btn btn-secondary" id="btnMic" data-i18n="controls.mic">麦克风</button>
-  <button class="btn btn-secondary" id="btnUpload" data-i18n="controls.upload">上传</button>
-  <label class="diarization-upload-options" data-i18n-title="diarization.title" title="离线上传时自动区分说话人">
-    <input type="checkbox" id="enableDiarization" checked>
-    <span data-i18n="diarization.label">说话人</span>
-    <select id="knownSpeakerCount" data-i18n-title="diarization.count_title" title="已知人数通常更稳定">
-      <option value="" data-i18n="diarization.auto">人数自动</option>
-      <option value="2" data-i18n="diarization.people" data-i18n-count="2">2 人</option>
-      <option value="3" data-i18n="diarization.people" data-i18n-count="3">3 人</option>
-      <option value="4" data-i18n="diarization.people" data-i18n-count="4">4 人</option>
-      <option value="5" data-i18n="diarization.people" data-i18n-count="5">5 人</option>
-      <option value="6" data-i18n="diarization.people" data-i18n-count="6">6 人</option>
-      <option value="7" data-i18n="diarization.people" data-i18n-count="7">7 人</option>
-      <option value="8" data-i18n="diarization.people" data-i18n-count="8">8 人</option>
-    </select>
-  </label>
-  <button class="btn btn-secondary" id="btnHotwords" data-i18n="controls.settings">设置</button>
+  <button class="btn btn-secondary" id="btnMic">录音</button>
+  <button class="btn btn-secondary" id="btnUpload">上传</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
+  <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);" title="离线上传时自动区分说话人">
+    <input type="checkbox" id="enableDiarization" checked> 说话人分离
+  </label>
+  <select id="knownSpeakerCount" title="已知说话人数（可选）" style="font-size:10px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:4px;padding:3px;">
+    <option value="">人数自动</option>
+    <option value="2">2 人</option>
+    <option value="3">3 人</option>
+    <option value="4">4 人</option>
+    <option value="5">5 人</option>
+    <option value="6">6 人</option>
+  </select>
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
-  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;" data-i18n="controls.log">日志</button>
+  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">日志</button>
 </div>
 
-<div class="hotword-modal" id="hotwordModal" aria-hidden="true">
-  <section class="hotword-dialog" role="dialog" aria-modal="true" aria-labelledby="hotwordDialogTitle">
-    <aside class="settings-sidebar" data-i18n-aria-label="settings.search_aria" aria-label="设置分类">
-      <div class="settings-sidebar-title">
-        <span class="settings-sidebar-mark">DT</span>
-        <div><strong data-i18n="settings.sidebar_title">设置</strong><small data-i18n="settings.sidebar_subtitle">识别、设备与领域热词</small></div>
-      </div>
-      <input class="settings-search" id="settingsSearch" type="search" data-i18n-placeholder="settings.search_placeholder" placeholder="搜索设置..." data-i18n-aria-label="settings.search_aria" aria-label="搜索设置分类">
-      <div class="settings-nav-label" data-i18n="settings.category">语音识别</div>
-      <nav class="settings-nav" id="settingsNav" role="tablist" data-i18n-aria-label="settings.search_aria" aria-label="设置分类">
-        <button class="settings-nav-button active" id="settingsTabRecognition" type="button" role="tab" data-settings-tab="recognition" data-settings-search="识别 模型 文件 分段 VAD Silero" aria-controls="settingsPanelRecognition" aria-selected="true">
-          <span class="settings-nav-icon">ASR</span><span data-i18n="settings.recognition.tab">识别与分段</span>
-        </button>
-        <button class="settings-nav-button" id="settingsTabMicrophone" type="button" role="tab" data-settings-tab="microphone" data-settings-search="麦克风 设备 延迟 回声 噪声 增益 VAD" aria-controls="settingsPanelMicrophone" aria-selected="false" tabindex="-1">
-          <span class="settings-nav-icon">MIC</span><span data-i18n="settings.microphone.tab">麦克风</span>
-        </button>
-        <button class="settings-nav-button" id="settingsTabHotwords" type="button" role="tab" data-settings-tab="hotwords" data-settings-search="热词 领域 预设 拼音 权重 专业词" aria-controls="settingsPanelHotwords" aria-selected="false" tabindex="-1">
-          <span class="settings-nav-icon">Aa</span><span data-i18n="settings.hotwords.tab">热词与预设</span>
-        </button>
-      </nav>
-    </aside>
-    <div class="settings-workspace">
-    <div class="hotword-dialog-header">
-      <div>
-        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">识别与分段</div>
-        <div id="settingsPageDescription" style="font-size:10px;color:var(--text-muted);">配置实时与最终转写模型，以及文件语音切分参数</div>
-      </div>
-      <button class="btn btn-secondary" id="btnCloseHotwords" data-i18n-aria-label="controls.close" aria-label="关闭设置" data-i18n="controls.close">关闭</button>
-    </div>
-    <div class="hotword-dialog-body">
-      <div class="settings-panel settings-section active" id="settingsPanelRecognition" role="tabpanel" data-settings-panel="recognition" aria-labelledby="settingsTabRecognition" aria-hidden="false">
-        <div class="settings-page-heading">
-          <h2 data-i18n="settings.recognition.tab">识别与分段</h2>
-          <p data-i18n="settings.recognition.intro">选择适合实时预览和最终转写的本地模型，并调整长音频的 VAD 切分方式。</p>
-        </div>
-        <div class="settings-section-title" data-i18n="settings.recognition.section">识别模型与文件切分</div>
-        <div class="settings-grid">
-          <label class="settings-field"><span data-i18n="settings.recognition.live_model">实时预览模型</span>
-            <select class="hotword-input" id="liveAsrProfile">
-              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms · 最低延迟</option>
-              <option value="balanced" data-i18n="settings.profile.balanced">480 ms · 平衡</option>
-              <option value="meeting" data-i18n="settings.profile.meeting">960 ms · 会议默认</option>
-              <option value="quality" data-i18n="settings.profile.quality">1920 ms · 高精度</option>
-            </select>
-          </label>
-          <label class="settings-field"><span data-i18n="settings.recognition.final_model">最终转写模型</span>
-            <select class="hotword-input" id="finalAsrProfile">
-              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms · 最低延迟</option>
-              <option value="balanced" data-i18n="settings.profile.balanced">480 ms · 平衡</option>
-              <option value="meeting" data-i18n="settings.profile.meeting">960 ms · 会议默认</option>
-              <option value="quality" data-i18n="settings.profile.quality">1920 ms · 高精度</option>
-            </select>
-          </label>
-          <label class="settings-field wide"><span data-i18n="settings.recognition.final_pass">最终完整文件二次识别</span><input type="checkbox" id="finalTranscriptionEnabled"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.threshold">Silero 阈值</span><input class="hotword-input" id="fileVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_silence">最短静音（秒）</span><input class="hotword-input" id="fileVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_speech">最短语音（秒）</span><input class="hotword-input" id="fileVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.pre_padding">句首缓冲（ms）</span><input class="hotword-input" id="fileVadPrePadding" type="number" min="0" max="2000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.post_padding">句尾缓冲（ms）</span><input class="hotword-input" id="fileVadPostPadding" type="number" min="0" max="3000" step="50"></label>
-        </div>
-        <div class="settings-model-status" id="modelProfileStatus" data-i18n="settings.model_loading">正在读取本地模型...</div>
-      </div>
-
-      <div class="settings-panel settings-section" id="settingsPanelMicrophone" role="tabpanel" data-settings-panel="microphone" aria-labelledby="settingsTabMicrophone" aria-hidden="true">
-        <div class="settings-page-heading">
-          <h2 data-i18n="settings.microphone.tab">麦克风</h2>
-          <p data-i18n="settings.microphone.intro">管理输入设备、实时断句策略和浏览器侧音频增强选项。</p>
-        </div>
-        <div class="settings-section-title" data-i18n="settings.microphone.section">麦克风设备与延迟</div>
-        <div class="settings-grid">
-          <label class="settings-field wide"><span data-i18n="settings.microphone.input">输入设备</span>
-            <div class="settings-inline">
-              <select class="hotword-input" id="microphoneDevice"><option value="" data-i18n="settings.microphone.system_default">系统默认麦克风</option></select>
-              <button class="btn btn-secondary" type="button" id="btnRefreshMics" data-i18n="controls.refresh">刷新</button>
-              <button class="btn btn-secondary" type="button" id="btnTestMic" data-i18n="controls.test">测试</button>
-            </div>
-          </label>
-          <div class="settings-field wide">
-            <span id="micTestStatus" data-i18n="settings.microphone.not_tested">尚未测试麦克风</span>
-            <div class="mic-test-meter"><span id="micTestMeter"></span></div>
-          </div>
-          <label class="settings-field"><span data-i18n="settings.microphone.profile">实时切句档位</span>
-            <select class="hotword-input" id="microphoneLiveProfile">
-              <option value="meeting" data-i18n="settings.microphone.meeting">会议</option><option value="dictation" data-i18n="settings.microphone.dictation">听写</option><option value="oncall" data-i18n="settings.microphone.oncall">持续待机</option>
-            </select>
-          </label>
-          <label class="settings-field"><span data-i18n="settings.microphone.vad_gating">VAD 门控音频（小声环境建议关闭）</span><input type="checkbox" id="microphoneVadGating"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.pre_roll">句首预留（ms）</span><input class="hotword-input" id="microphonePreRoll" type="number" min="0" max="3000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.endpoint_grace">断句等待（ms）</span><input class="hotword-input" id="microphoneEndpointGrace" type="number" min="0" max="5000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.tail_pad">尾部静音（ms）</span><input class="hotword-input" id="microphoneTailPad" type="number" min="0" max="3000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.vad_threshold">实时 VAD 阈值</span><input class="hotword-input" id="microphoneVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_silence">最短静音（秒）</span><input class="hotword-input" id="microphoneVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_speech">最短语音（秒）</span><input class="hotword-input" id="microphoneVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.echo">回声消除</span><input type="checkbox" id="microphoneEchoCancellation"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.noise">噪声抑制</span><input type="checkbox" id="microphoneNoiseSuppression"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.gain">自动增益</span><input type="checkbox" id="microphoneAutoGain"></label>
-        </div>
-      </div>
-
-      <div class="settings-panel settings-section" id="settingsPanelHotwords" role="tabpanel" data-settings-panel="hotwords" aria-labelledby="settingsTabHotwords" aria-hidden="true">
-        <div class="settings-page-heading">
-          <h2 data-i18n="settings.hotwords.heading">热词与领域预设</h2>
-          <p data-i18n="settings.hotwords.intro">可同时选择多个领域或维护自定义词条。领域预设不会覆盖已有热词的权重。</p>
-        </div>
-        <div class="domain-preset-section">
-          <div class="domain-preset-heading">
-            <div><strong data-i18n="settings.hotwords.presets">领域预设（可多选）</strong><span data-i18n="settings.hotwords.preset_hint">点击选中，再次点击取消；建议只启用当前会议相关的 1–2 个领域</span></div>
-          </div>
-          <div class="domain-preset-grid" id="domainPresetGrid"></div>
-          <div class="domain-selection-notice" id="domainSelectionNotice" role="status" hidden>
-            <div><strong data-i18n="settings.hotwords.selected">已选领域：</strong><span id="domainSelectionNames"></span></div>
-            <small data-i18n="settings.hotwords.selected_hint">对应热词已在下方自动勾选；取消领域后，词条会保留但取消勾选。点击保存后应用到新识别会话。</small>
-          </div>
-        </div>
-        <div class="settings-section-title" data-i18n="settings.hotwords.section">热词与模糊拼音</div>
-      <div class="hotword-setting-grid">
-        <div class="hotword-setting-card">
-          <label><span data-i18n="settings.hotwords.enable">启用解码热词增强</span><input type="checkbox" id="hotwordsEnabled"></label>
-          <div class="hotword-note" data-i18n="settings.hotwords.enable_note">启用 modified beam search，并将每个热词的权重注入 X-ASR 解码器。</div>
-        </div>
-        <div class="hotword-setting-card">
-          <label><span data-i18n="settings.hotwords.fuzzy">启用模糊拼音纠错</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
-          <div class="hotword-note" data-i18n="settings.hotwords.fuzzy_note">支持平翘舌、n/l 和前后鼻音；只处理至少两个汉字的中文热词。</div>
-        </div>
-        <div class="hotword-setting-card" style="grid-column:1/-1;">
-          <label><span data-i18n="settings.hotwords.default_score">新热词默认权重</span><span id="defaultScoreLabel">5.0</span></label>
-          <div class="hotword-score-controls">
-            <input type="range" id="defaultHotwordScore" min="0.5" max="12" step="0.5" value="5">
-            <input class="hotword-input" type="number" id="defaultHotwordScoreNumber" min="0.1" max="20" step="0.5" value="5">
-          </div>
-        </div>
-      </div>
-      <div class="hotword-list-header"><span data-i18n="settings.hotwords.enabled">启用</span><span data-i18n="settings.hotwords.spelling">标准写法</span><span data-i18n="settings.hotwords.score">权重</span><span></span></div>
-      <div class="hotword-list" id="hotwordList"></div>
-      <div class="hotword-add">
-        <input class="hotword-input" id="newHotwordInput" data-i18n-placeholder="settings.hotwords.add_placeholder" placeholder="输入专业词、人名或缩写，例如 贾扬清 / OpenAI">
-        <button class="btn btn-secondary" id="btnAddHotword" data-i18n="controls.add">添加</button>
-      </div>
-      <div class="hotword-note" data-i18n="settings.hotwords.note">英文默认限制为 2.5，避免过度偏置；你仍可为单个词显式调整。中文同音替换采用最长词优先，单字不会参与模糊匹配。</div>
-      </div>
-    </div>
-    <div class="hotword-dialog-footer">
-      <div class="hotword-save-status" id="hotwordSaveStatus"></div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary" id="btnCancelHotwords" data-i18n="controls.cancel">取消</button>
-        <button class="btn btn-primary" id="btnSaveHotwords" data-i18n="controls.save_apply">保存并应用</button>
-      </div>
-    </div>
-    </div>
-  </section>
-</div>
-
-<div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true" role="status" aria-live="polite">
-  <div class="mic-orb-wrap" id="micOrbWrap">
-    <div class="mic-orb-ring"></div>
-    <div class="mic-orb-glow"></div>
-    <div class="mic-orb-core"></div>
+<div class="management-panel" id="managementPanel">
+  <div class="management-header">
+    <strong>用户 &amp; 会议管理</strong>
+    <button class="btn btn-secondary" id="btnCloseManagement">关闭</button>
   </div>
-  <div class="mic-orb-wave" id="micOrbWave">
-    <span></span><span></span><span></span><span></span><span></span>
-    <span></span><span></span><span></span><span></span><span></span>
-    <span></span><span></span><span></span><span></span><span></span>
+  <div class="management-body">
+
+    <div class="management-section active" id="usersSection">
+      <div class="users-layout">
+        <div class="users-left">
+          <div class="users-section-title">同事列表</div>
+          <div class="entity-list" id="friendsList"></div>
+        </div>
+        <div class="users-right">
+          <div class="search-box">
+            <input id="friendSearch" placeholder="搜索同事...">
+            <button class="btn btn-primary" id="btnSearchUsers">搜索</button>
+          </div>
+          <div class="entity-list" id="searchResults"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="management-section" id="reserveSection">
+      <div class="reserve-layout">
+        <div class="reserve-left">
+          <div class="form-row"><label>标题</label><input id="reservationTitle" placeholder="周例会"></div>
+          <div class="form-row"><label>开始时间</label><input id="reservationStart" type="datetime-local"></div>
+          <div class="form-row"><label>结束时间</label><input id="reservationEnd" type="datetime-local"></div>
+          <div class="form-row"><label>地点</label><input id="reservationLocation" placeholder="会议室A / 线上"></div>
+          <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
+          <div class="entity-list" id="reservationsList"></div>
+        </div>
+        <div class="reservation-calendar" id="reservationCalendar">
+          <div class="calendar-header">
+            <button id="calPrev">◀</button>
+            <span class="month-label" id="calMonthLabel"></span>
+            <button id="calNext">▶</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div class="calendar-days" id="calDays"></div>
+        </div>
+        <div class="schedule-panel" id="schedulePanel">
+          <div class="sp-title">会议安排</div>
+          <div class="sp-empty">点击日期查看详情</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="management-section" id="joinSection">
+      <div class="form-row"><label>参会码</label><input id="joinCode" placeholder="粘贴参会码"></div>
+      <div class="form-row"><label>显示名</label><input id="joinDisplayName" placeholder="嘉宾"></div>
+      <button class="btn btn-primary" id="btnJoinMeeting">加入会议</button>
+      <div class="entity-list" id="joinResult"></div>
+    </div>
+
+    <div class="management-section" id="analysisSection">
+      <div class="reserve-layout">
+        <div class="reserve-left">
+          <div class="form-row"><label>关联会议</label><select id="analysisMeetingId"><option value="">-- 选择 --</option></select></div>
+          <button class="btn btn-primary" id="btnSaveAnalysis">保存当前分析</button>
+          <button class="btn btn-secondary" id="btnRefreshAnalyses">刷新</button>
+        </div>
+        <div class="entity-list" id="analysesList"></div>
+      </div>
+    </div>
   </div>
-  <div class="mic-orb-title" id="micOrbTitle" data-i18n="mic.orb_listening">正在听你说话</div>
-  <div class="mic-orb-subtitle" id="micOrbSubtitle" data-i18n="mic.orb_hint">音量越大，语音球越活跃</div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Debug Log Panel                                             -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="log-panel" id="logPanel">
   <div class="log-panel-header" id="logPanelHeader">
-    <span data-i18n="logs.title">调试日志</span>
-    <span style="font-size:10px;color:var(--text-muted);" data-i18n="logs.close_hint">点击关闭</span>
+    <span>调试日志</span>
+    <span style="font-size:10px;color:var(--text-muted);">点击关闭</span>
   </div>
-  <div class="log-panel-body" id="logPanelBody"><div data-i18n="logs.connecting">连接中...</div></div>
+  <div class="log-panel-body" id="logPanelBody"><div>连接中...</div></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Scripts                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
-<script src="./mic-level.js"></script>
 <script src="./live-protocol.js"></script>
-<script src="./hotword-settings.js"></script>
-<script src="./app-settings.js"></script>
-<script src="./logic-flags.js"></script>
-<script src="./i18n.js"></script>
-<script src="./presentation.js"></script>
+<script src="./management-transcription.js"></script>
 <script type="module">
 // ============================================================
 // DiTing v3.0 - Frontend with wavesurfer.js
 // ============================================================
+
+const {
+  buildAnalysisPayload,
+  buildUploadUrl,
+  resolveBackend,
+} = globalThis.DiTingManagementTranscription;
 
 // ── Import wavesurfer.js (non-blocking — don't block UI init) ──
 let WaveSurfer = null;
@@ -1114,13 +1135,7 @@ let HAS_WAVESURFER = false;
 })();
 
 // ── Constants ────────────────────────────────────────────────
-const PAGE_PARAMS = new URLSearchParams(window.location.search);
-const API_HOST = PAGE_PARAMS.get('apiHost') || window.location.hostname || 'localhost';
-const API_PORT = PAGE_PARAMS.get('apiPort') || '8765';
-const API_PROTOCOL = window.location.protocol === 'https:' ? 'https:' : 'http:';
-const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const API_BASE = `${API_PROTOCOL}//${API_HOST}:${API_PORT}`;
-const WS_BASE = `${WS_PROTOCOL}//${API_HOST}:${API_PORT}`;
+const { apiBase: API_BASE, wsBase: WS_BASE } = resolveBackend(window.location);
 
 // ── DOM refs ─────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -1143,40 +1158,18 @@ const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
 const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
-const micOrbPanel = $('micOrbPanel');
-const micOrbWrap = $('micOrbWrap');
-const micOrbWave = $('micOrbWave');
-const micOrbTitle = $('micOrbTitle');
-const micOrbSubtitle = $('micOrbSubtitle');
-const micLevelBars = Array.from(micOrbWave?.querySelectorAll('span') || []);
-const hotwordModal = $('hotwordModal');
-const hotwordList = $('hotwordList');
-const hotwordsEnabled = $('hotwordsEnabled');
-const fuzzyPinyinEnabled = $('fuzzyPinyinEnabled');
-const defaultHotwordScore = $('defaultHotwordScore');
-const defaultHotwordScoreNumber = $('defaultHotwordScoreNumber');
-const defaultScoreLabel = $('defaultScoreLabel');
-const hotwordSaveStatus = $('hotwordSaveStatus');
-const modelProfileStatus = $('modelProfileStatus');
-const microphoneDevice = $('microphoneDevice');
-const micTestStatus = $('micTestStatus');
-const micTestMeter = $('micTestMeter');
-const settingsSearch = $('settingsSearch');
-const settingsPageDescription = $('settingsPageDescription');
-const settingsNavButtons = Array.from(document.querySelectorAll('[data-settings-tab]'));
-const settingsPanels = Array.from(document.querySelectorAll('[data-settings-panel]'));
-const domainPresetGrid = $('domainPresetGrid');
-const domainSelectionNotice = $('domainSelectionNotice');
-const domainSelectionNames = $('domainSelectionNames');
-const languageSelect = $('languageSelect');
-const i18n = window.DiTingI18n.createI18n({
-  storage: window.localStorage,
-  document,
-  navigatorLanguage: window.navigator.language,
-});
-const t = (key, values = {}, fallback = key) => i18n.t(key, values, fallback);
-i18n.apply();
-if (languageSelect) languageSelect.value = i18n.language;
+const loginOverlay = $('loginOverlay');
+const loginForm = $('loginForm');
+const loginError = $('loginError');
+const currentUserDisplay = $('currentUserDisplay');
+const managementPanel = $('managementPanel');
+const moduleOverlay = $('moduleOverlay');
+const mainApp = $('mainApp');
+const btnBack = $('btnBack');
+const homeHero = $('homeHero');
+const topbarUser = $('topbarUser');
+const topbarLogin = $('topbarLogin');
+const topbarLogout = $('topbarLogout');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1184,8 +1177,6 @@ let currentSegmentIndex = -1;
 let isPlaying = false;
 let playbackTimer = null;
 let demoData = null;
-let selectedDomainPresetIds = new Set();
-let currentConnectionState = 'disconnected';
 
 // Upload
 let uploadWs = null;
@@ -1197,26 +1188,666 @@ let currentMeetingId = null;
 // Live mic
 let micStream = null;
 let micWs = null;
+let isRecording = false;
 let micAudioContext = null;
 let micWorklet = null;
-let micStopTimer = null;
-let micDisplayLevel = 0;
-let micLevelLastUpdate = 0;
-let micLevelAnimationFrame = null;
-let isRecording = false;
 let micSequence = 0;
 let micStreamId = null;
+let micStopTimer = null;
 let micSegmentStartIndex = 0;
-let hotwordSettingsState = null;
-let appSettingsState = null;
-let micTestStream = null;
-let micTestAudioContext = null;
-let micTestAnimationFrame = null;
-let activeSettingsTab = 'recognition';
 
 // Log stream
 let logWs = null;
 let logVisible = false;
+
+// Auth and management
+let authToken = localStorage.getItem('diting_auth_token') || '';
+let currentUser = null;
+
+function authHeaders() {
+  return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, authHeaders(), options.headers || {});
+  const resp = await fetch(`${API_BASE}${path}`, Object.assign({}, options, { headers }));
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+  return data;
+}
+
+function setLoggedIn(user, token) {
+  const wasAlreadyLoggedIn = !!currentUser;
+  currentUser = user;
+  if (token) {
+    authToken = token;
+    localStorage.setItem('diting_auth_token', token);
+  }
+  if (loginOverlay) loginOverlay.classList.remove('visible');
+  if (currentUserDisplay) currentUserDisplay.textContent = `${user.display_name || user.username} · ${user.role}`;
+  const joinName = $('joinDisplayName');
+  if (joinName && user.display_name) joinName.value = user.display_name;
+  updateTopbar();
+  if (!wasAlreadyLoggedIn) {
+    if (pendingModule) {
+      switchModule(pendingModule);
+    } else {
+      showHome();
+    }
+    pendingModule = null;
+  }
+}
+
+function showLogin() {
+  if (loginOverlay) loginOverlay.classList.add('visible');
+  showLoginForm();
+  updateTopbar();
+}
+
+function showHome() {
+  if (loginOverlay) loginOverlay.classList.remove('visible');
+  if (moduleOverlay) moduleOverlay.classList.remove('visible');
+  if (mainApp) mainApp.classList.remove('active');
+  if (btnBack) btnBack.classList.remove('visible');
+  if (homeHero) homeHero.classList.remove('hidden');
+  const nav = $('moduleNav');
+  if (nav) nav.classList.remove('visible');
+  currentModule = null;
+  updateTopbar();
+  if (!volumeAnalyser) startVolumeMeter();
+}
+
+let currentModule = null;
+let pendingModule = null;
+
+function updateTopbar() {
+  document.querySelectorAll('.topbar-nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.module === currentModule);
+  });
+  if (currentUser) {
+    if (topbarUser) topbarUser.textContent = `${currentUser.display_name || currentUser.username} · ${currentUser.role}`;
+    if (topbarLogin) topbarLogin.style.display = 'none';
+    if (topbarLogout) topbarLogout.style.display = '';
+  } else {
+    if (topbarUser) topbarUser.textContent = '未登录';
+    if (topbarLogin) topbarLogin.style.display = '';
+    if (topbarLogout) topbarLogout.style.display = 'none';
+  }
+}
+
+function switchModule(name) {
+  if (!currentUser) {
+    pendingModule = name;
+    showLogin();
+    return;
+  }
+  currentModule = name;
+  if (moduleOverlay) moduleOverlay.classList.remove('visible');
+  if (btnBack) btnBack.classList.remove('visible');
+  if (homeHero) homeHero.classList.add('hidden');
+
+  const nav = $('moduleNav');
+  if (nav) {
+    nav.classList.remove('visible');
+    nav.querySelectorAll('.module-nav-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.module === name);
+    });
+  }
+
+  history.pushState({ module: name }, '', `#${name}`);
+
+  if (name === 'meeting') {
+    if (mainApp) mainApp.classList.add('active');
+    ensureMeetingViewVisible();
+  } else if (name === 'reservation') {
+    if (mainApp) mainApp.classList.add('active');
+    showReservationView();
+  } else if (name === 'analysis') {
+    if (mainApp) mainApp.classList.add('active');
+    showAnalysisView();
+  } else if (name === 'users') {
+    if (mainApp) mainApp.classList.add('active');
+    showUsersView();
+  }
+  updateTopbar();
+}
+
+function selectModule(name) {
+  switchModule(name);
+}
+
+function ensureMeetingViewVisible() {
+  if (managementPanel) {
+    managementPanel.classList.remove('visible');
+    managementPanel.removeAttribute('style');
+  }
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'grid';
+  if (controlsBar) controlsBar.style.display = 'flex';
+}
+
+function showReservationView() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'none';
+  if (controlsBar) controlsBar.style.display = 'none';
+  if (managementPanel) {
+    managementPanel.classList.add('visible');
+    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
+  }
+  switchManagementSection('reserveSection');
+  refreshManagementData();
+}
+
+function showAnalysisView() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'none';
+  if (controlsBar) controlsBar.style.display = 'none';
+  if (managementPanel) {
+    managementPanel.classList.add('visible');
+    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
+  }
+  switchManagementSection('analysisSection');
+  refreshManagementData();
+}
+
+function showUsersView() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'none';
+  if (controlsBar) controlsBar.style.display = 'none';
+  if (managementPanel) {
+    managementPanel.classList.add('visible');
+    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
+  }
+  switchManagementSection('usersSection');
+  refreshManagementData();
+}
+
+function showMeeting() {
+  switchModule('meeting');
+}
+
+async function restoreLogin() {
+  if (!authToken) {
+    showLogin();
+    return;
+  }
+  try {
+    const data = await apiFetch('/api/auth/me');
+    setLoggedIn(data.user);
+  } catch (e) {
+    localStorage.removeItem('diting_auth_token');
+    authToken = '';
+    showLogin();
+  }
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  if (loginError) loginError.textContent = '';
+  try {
+    const data = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: $('loginUsername').value.trim(),
+        password: $('loginPassword').value,
+      }),
+    });
+    setLoggedIn(data.user, data.token);
+    showToast('登录成功');
+    await refreshManagementData();
+  } catch (err) {
+    if (loginError) loginError.textContent = err.message;
+  }
+}
+
+async function handleRegisterSubmit(e) {
+  e.preventDefault();
+  const errEl = $('registerError');
+  if (errEl) errEl.textContent = '';
+  const username = $('regUsername').value.trim();
+  const password = $('regPassword').value;
+  const password2 = $('regPassword2').value;
+  if (!username) { if (errEl) errEl.textContent = '请输入用户名'; return; }
+  if (password.length < 6) { if (errEl) errEl.textContent = '密码至少6位'; return; }
+  if (password !== password2) { if (errEl) errEl.textContent = '两次密码不一致'; return; }
+  try {
+    const data = await apiFetch('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    showToast('注册成功，请登录');
+    showLoginForm();
+  } catch (err) {
+    if (errEl) errEl.textContent = err.message;
+  }
+}
+
+function showLoginForm() {
+  const wrap = $('loginFormWrap');
+  const reg = $('registerForm');
+  const title = $('loginTitle');
+  if (wrap) wrap.classList.remove('hidden');
+  if (reg) reg.classList.remove('active');
+  if (title) title.textContent = '会议控制台登录';
+  if ($('loginError')) $('loginError').textContent = '';
+  if ($('registerError')) $('registerError').textContent = '';
+  if ($('regPassword')) $('regPassword').value = '';
+  if ($('regPassword2')) $('regPassword2').value = '';
+}
+
+function showRegisterForm() {
+  const wrap = $('loginFormWrap');
+  const reg = $('registerForm');
+  const title = $('loginTitle');
+  if (wrap) wrap.classList.add('hidden');
+  if (reg) reg.classList.add('active');
+  if (title) title.textContent = '创建账号';
+}
+
+async function logout() {
+  try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+  authToken = '';
+  currentUser = null;
+  localStorage.removeItem('diting_auth_token');
+  showHome();
+}
+
+function toggleManagementPanel() {
+  if (!managementPanel) return;
+  managementPanel.classList.remove('visible');
+  managementPanel.removeAttribute('style');
+  showHome();
+}
+
+function switchManagementSection(sectionId) {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const section = $(sectionId);
+  if (section) section.classList.add('active');
+}
+
+async function refreshManagementData() {
+  if (!authToken) return;
+  await Promise.allSettled([loadFriendList(), loadReservations(), loadAnalyses(), loadReservationOptions()]);
+}
+
+async function loadUsers() {
+  await loadFriendList();
+}
+
+async function loadFriendList() {
+  const list = $('friendsList');
+  if (!list) return;
+  try {
+    const data = await apiFetch('/api/friends');
+    if (!data.friends || data.friends.length === 0) {
+      list.innerHTML = '<div class="entity-card" style="text-align:center;color:var(--text-muted);">暂无同事</div>';
+      return;
+    }
+    list.innerHTML = data.friends.map(f => `<div class="friend-card">
+      <div class="info">
+        <div class="name">${escapeHTML(f.display_name || f.username)}</div>
+        <div class="role">@${escapeHTML(f.username)} · ${escapeHTML(f.role)}</div>
+      </div>
+      <button class="btn-sm btn-remove" onclick="window.removeFriendById('${f.friend_id}')">移除</button>
+    </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function searchFriends() {
+  const q = $('friendSearch')?.value.trim();
+  if (!q) return;
+  const list = $('searchResults');
+  if (!list) return;
+  try {
+    const data = await apiFetch(`/api/friends/search?q=${encodeURIComponent(q)}`);
+    if (!data.users || data.users.length === 0) {
+      list.innerHTML = '<div class="entity-card" style="text-align:center;color:var(--text-muted);">未找到用户</div>';
+      return;
+    }
+    list.innerHTML = data.users.map(u => `<div class="friend-card">
+      <div class="info">
+        <div class="name">${escapeHTML(u.display_name || u.username)}</div>
+        <div class="role">@${escapeHTML(u.username)} · ${escapeHTML(u.role)}</div>
+      </div>
+      <button class="btn-sm btn-add" onclick="window.addFriendById('${u.id}')">添加</button>
+    </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+window.addFriendById = async function(friendId) {
+  try {
+    await apiFetch('/api/friends', { method: 'POST', body: JSON.stringify({ friend_id: friendId }) });
+    showToast('已添加为同事');
+    await loadFriendList();
+    await searchFriends();
+  } catch (e) {
+    showToast(e.message);
+  }
+};
+
+window.removeFriendById = async function(friendId) {
+  try {
+    await apiFetch(`/api/friends/${friendId}`, { method: 'DELETE' });
+    showToast('已移除');
+    await loadFriendList();
+  } catch (e) {
+    showToast(e.message);
+  }
+};
+
+async function createUser() {
+  try {
+    await apiFetch('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: $('newUsername').value.trim(),
+        display_name: $('newDisplayName').value.trim(),
+        password: $('newPassword').value,
+      }),
+    });
+    showToast('用户已创建');
+    await loadUsers();
+  } catch (e) {
+    showToast('创建用户失败: ' + e.message);
+  }
+}
+
+async function loadReservations() {
+  const list = $('reservationsList');
+  if (!list) return;
+  try {
+    const data = await apiFetch('/api/meetings/reservations');
+    list.innerHTML = data.reservations.map(r => {
+      const ts = getMeetingTimeStatus(r.start_time, r.end_time);
+      const statusBadge = `<span class="time-status ${ts.cls}">${ts.label}</span>`;
+      const dbStatus = r.status && r.status !== 'scheduled' ? ` · ${r.status}` : '';
+      return `<div class="entity-card">
+        <div class="title">${escapeHTML(r.title)} ${statusBadge}</div>
+        <div class="meta">${formatDateTime(r.start_time)} - ${formatDateTime(r.end_time)}</div>
+        <div class="meta">参会码: ${escapeHTML(r.join_code)}${dbStatus}</div>
+      </div>`;
+    }).join('') || '<div class="entity-card">暂无预约</div>';
+    renderCalendar(data.reservations || []);
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+// ── Reservation Calendar ────────────────────────────────────
+let calYear, calMonth;
+
+function initCalendar() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  if ($('calPrev')) $('calPrev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); });
+  if ($('calNext')) $('calNext').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); });
+}
+
+function getReservationMap(reservations) {
+  const map = {};
+  reservations.forEach(r => {
+    if (!r.start_time) return;
+    const d = new Date(r.start_time);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (!map[key]) map[key] = {};
+    const day = d.getDate();
+    if (!map[key][day]) map[key][day] = [];
+    map[key][day].push(r);
+  });
+  return map;
+}
+
+let _lastReservationData = [];
+let _lastReservationMap = {};
+
+function renderCalendar(reservations) {
+  if (reservations !== undefined) _lastReservationData = reservations;
+  const data = _lastReservationData;
+  const rmap = getReservationMap(data);
+  _lastReservationMap = rmap;
+  const key = `${calYear}-${calMonth}`;
+  const monthData = rmap[key] || {};
+
+  if ($('calMonthLabel')) $('calMonthLabel').textContent = `${calYear}年 ${calMonth + 1}月`;
+
+  const daysEl = $('calDays');
+  if (!daysEl) return;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const prevDays = new Date(calYear, calMonth, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  const isThisMonth = today.getFullYear() === calYear && today.getMonth() === calMonth;
+
+  let html = '';
+
+  for (let i = firstDay - 1; i >= 0; i--) {
+    html += `<div class="calendar-day other-month">${prevDays - i}</div>`;
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const hasMeeting = monthData[d] !== undefined;
+    const isToday = isThisMonth && d === today.getDate();
+    const baseCls = 'calendar-day';
+    const cls = [baseCls, isToday ? 'today' : '', hasMeeting ? 'has-meeting' : ''].filter(Boolean).join(' ');
+    let tooltip = '';
+    if (hasMeeting) {
+      const meetings = monthData[d];
+      tooltip = '<div class="tooltip">' + meetings.map(m => {
+        const start = m.start_time ? formatDateTime(m.start_time) : '';
+        const end = m.end_time ? formatDateTime(m.end_time) : '';
+        const loc = m.location || '';
+        return `<div class="tt-title">${escapeHTML(m.title)}</div>
+          <div class="tt-meta">${start} - ${end}</div>
+          ${loc ? `<div class="tt-meta">${escapeHTML(loc)}</div>` : ''}`;
+      }).join('<div style="border-top:1px solid var(--border);margin:4px 0"></div>') + '</div>';
+    }
+    html += `<div class="${cls}" data-day="${d}">${d}${hasMeeting ? '<span class="dot"></span>' + tooltip : ''}</div>`;
+  }
+
+  const remaining = 7 - ((firstDay + daysInMonth) % 7);
+  if (remaining < 7) {
+    for (let d = 1; d <= remaining; d++) {
+      html += `<div class="calendar-day other-month">${d}</div>`;
+    }
+  }
+
+  daysEl.innerHTML = html;
+  daysEl.onclick = (e) => {
+    const dayEl = e.target.closest('.calendar-day');
+    if (!dayEl) return;
+    const d = parseInt(dayEl.dataset.day);
+    if (!d) return;
+    const key = `${calYear}-${calMonth}`;
+    const monthData = (_lastReservationMap[key] || {});
+    showDaySchedule(d, monthData[d] || []);
+  };
+}
+
+function showDaySchedule(day, meetings) {
+  const panel = $('schedulePanel');
+  if (!panel) return;
+  const dateStr = `${calYear}年${calMonth + 1}月${day}日`;
+  if (meetings.length === 0) {
+    panel.innerHTML = `<div class="sp-title">${dateStr}</div><div class="sp-empty">当天无会议</div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="sp-title">${dateStr}</div>` + meetings.map(m => {
+    const start = m.start_time ? formatDateTime(m.start_time) : '';
+    const end = m.end_time ? formatDateTime(m.end_time) : '';
+    const loc = m.location || '';
+    return `<div class="sp-item">
+      <div class="sp-name">${escapeHTML(m.title)}</div>
+      <div class="sp-time">${start} - ${end}</div>
+      ${loc ? `<div class="sp-time">${escapeHTML(loc)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function getMeetingTimeStatus(startTime, endTime) {
+  if (!startTime || !endTime) return { label: '未知', cls: 'unknown' };
+  const now = new Date();
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (now < start) return { label: '未开始', cls: 'upcoming' };
+  if (now > end) return { label: '已结束', cls: 'ended' };
+  return { label: '进行中', cls: 'active' };
+}
+
+function formatDateTime(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return isoStr.substring(0, 16);
+  }
+}
+
+async function createReservation() {
+  try {
+    await apiFetch('/api/meetings/reservations', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: $('reservationTitle').value.trim(),
+        start_time: $('reservationStart').value,
+        end_time: $('reservationEnd').value,
+        location: $('reservationLocation').value.trim(),
+      }),
+    });
+    showToast('会议已预约');
+    await loadReservations();
+  } catch (e) {
+    showToast('预约失败: ' + e.message);
+  }
+}
+
+async function joinMeeting() {
+  const result = $('joinResult');
+  try {
+    const data = await apiFetch('/api/meetings/join', {
+      method: 'POST',
+      body: JSON.stringify({
+        join_code: $('joinCode').value.trim(),
+        display_name: $('joinDisplayName').value.trim(),
+      }),
+    });
+    if (result) result.innerHTML = `<div class="entity-card"><div class="title">已加入: ${escapeHTML(data.meeting.title)}</div><div class="meta">join_id: ${escapeHTML(data.join_id)}</div></div>`;
+    showToast('已加入会议');
+  } catch (e) {
+    if (result) result.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+// ── Meeting Analysis ──────────────────────────────────────────
+
+async function loadAnalyses() {
+  const list = $('analysesList');
+  if (!list) return;
+  try {
+    const data = await apiFetch('/api/meetings/analysis');
+    if (!data.analyses || data.analyses.length === 0) {
+      list.innerHTML = '<div class="entity-card">暂无分析记录</div>';
+      return;
+    }
+    list.innerHTML = data.analyses.map(a => `<div class="entity-card">
+      <div class="title">${escapeHTML(a.title)} <span style="color:var(--text-muted);">${(a.created_at||'').substring(0,10)}</span></div>
+      <div class="meta">分段: ${a.segments_count} · 时长: ${a.duration_sec?.toFixed(1) || 0}s</div>
+      <div class="meta">逻辑标记: ${a.logic_flags_count} · 修正: ${a.corrections_count}</div>
+      <div style="margin-top:4px;">
+        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="viewAnalysis('${a.id}')">View</button>
+        <button class="btn btn-danger" style="font-size:10px;padding:2px 8px;" onclick="deleteAnalysis('${a.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function saveAnalysis() {
+  if (allSegments.length === 0) {
+      showToast('没有可保存的分段，请先运行演示或上传文件。');
+    return;
+  }
+  try {
+    const payload = buildAnalysisPayload({
+      meetingId: $('analysisMeetingId').value || undefined,
+      title: meetingTitleDisplay?.textContent || 'Untitled',
+      segments: allSegments.filter(Boolean),
+    });
+    await apiFetch('/api/meetings/analysis', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    showToast('分析已保存');
+    await loadAnalyses();
+  } catch (e) {
+    showToast('保存失败: ' + e.message);
+  }
+}
+
+async function viewAnalysis(analysisId) {
+  try {
+    const data = await apiFetch(`/api/meetings/analysis/${analysisId}`);
+    const a = data.analysis;
+    if (transcriptBody) transcriptBody.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'none';
+    allSegments = (a.transcript_json || []).map((s, i) => ({
+      ...s,
+      display_text: s.text,
+      start_sec: s.start,
+      end_sec: s.end,
+      snr_db: s.snr_db || 25,
+      quality_label: 'high',
+      corrections: [],
+      logic_flags: [],
+      uncertain_spans: [],
+    }));
+    allSegments.forEach((seg, i) => renderSegment(seg, i, false));
+    updateStats(allSegments.length);
+    if (segmentCounter) segmentCounter.textContent = `${allSegments.length}/${allSegments.length}`;
+    if (progressFill) progressFill.style.width = '100%';
+    if (meetingTitleDisplay) meetingTitleDisplay.textContent = a.title || 'Analysis';
+    if (managementPanel) managementPanel.classList.remove('visible');
+    showToast(`已加载: ${a.title}`);
+  } catch (e) {
+    showToast('查看失败: ' + e.message);
+  }
+}
+
+async function deleteAnalysis(analysisId) {
+  try {
+    await apiFetch(`/api/meetings/analysis/${analysisId}`, { method: 'DELETE' });
+    showToast('已删除');
+    await loadAnalyses();
+  } catch (e) {
+    showToast('删除失败: ' + e.message);
+  }
+}
+
+async function loadReservationOptions() {
+  try {
+    const data = await apiFetch('/api/meetings/reservations');
+    const sel = $('analysisMeetingId');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select --</option>' +
+      (data.reservations || []).map(r => `<option value="${r.id}">${escapeHTML(r.title)} (${(r.start_time||'').substring(0,10)})</option>`).join('');
+  } catch (e) { /* ignore */ }
+}
 
 // ═══════════════════════════════════════════════════════════
 // AudioPlaybackManager (wavesurfer.js based)
@@ -1478,10 +2109,10 @@ class AudioPlaybackManager {
       audioPulse.className = 'pulse' + (active ? '' : ' inactive');
     }
     if (audioStatusText) {
-      audioStatusText.textContent = active ? t('transcript.playing') : t('transcript.no_audio');
+      audioStatusText.textContent = active ? '播放中...' : '无音频';
     }
     if (!active && audioTimeDisplay) {
-      audioTimeDisplay.textContent = '--:-- / --:--';
+          audioTimeDisplay.textContent = '--:-- / --:--';
     }
   }
 
@@ -1541,61 +2172,47 @@ function generateUUID() {
   });
 }
 
-function speakerColor(speakerId) {
-  if (!speakerId || speakerId === 'UNKNOWN') return 'var(--text-muted)';
-  let hash = 0;
-  for (const char of speakerId) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
-  return `hsl(${hash % 360} 68% 62%)`;
+function uploadApiUrl(fileId) {
+  return buildUploadUrl(API_BASE, fileId, {
+    enableDiarization: $('enableDiarization')?.checked !== false,
+    numSpeakers: $('knownSpeakerCount')?.value || undefined,
+  });
 }
 
-function uploadApiUrl(fileId) {
-  const params = new URLSearchParams({
-    file_id: fileId,
-    enable_diarization: $('enableDiarization')?.checked === false ? 'false' : 'true',
+function rerenderTranscript() {
+  audioManager.reset();
+  if (transcriptBody) transcriptBody.innerHTML = '';
+  allSegments.filter(Boolean).forEach((segment, index) => {
+    renderSegment(segment, index, false);
   });
-  const knownCount = $('knownSpeakerCount')?.value;
-  if (knownCount) params.set('num_speakers', knownCount);
-  return `${API_BASE}/api/audio/upload?${params.toString()}`;
 }
 
 async function renameSpeaker(speakerId) {
   if (!currentMeetingId || !speakerId || speakerId === 'UNKNOWN') return;
-  const existing = allSegments.find(seg => seg?.speaker_id === speakerId)?.speaker_name || '';
-  const name = window.prompt(t('segment.rename_prompt', { speaker: speakerId }), existing);
-  if (name === null || !name.trim()) return;
+  const segment = allSegments.find(item => item?.speaker_id === speakerId);
+  const name = window.prompt('输入说话人姓名', segment?.speaker_name || speakerId);
+  if (!name || !name.trim()) return;
   try {
-    const response = await fetch(
-      `${API_BASE}/api/meetings/${encodeURIComponent(currentMeetingId)}/speakers/${encodeURIComponent(speakerId)}`,
-      {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name.trim()}),
-      },
+    const meeting = await apiFetch(
+      `/api/meetings/${encodeURIComponent(currentMeetingId)}/speakers/${encodeURIComponent(speakerId)}`,
+      { method: 'PATCH', body: JSON.stringify({ name: name.trim() }) },
     );
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || 'rename failed');
-    allSegments.forEach(seg => {
-      if (seg?.speaker_id === speakerId) seg.speaker_name = name.trim();
-    });
-    document.querySelectorAll('.segment-speaker').forEach(label => {
-      if (label.dataset.speakerId === speakerId) label.textContent = name.trim();
-    });
-    showToast(`${speakerId} → ${name.trim()}`);
+    allSegments = meeting.segments || allSegments;
+    rerenderTranscript();
+    showToast(`已将 ${speakerId} 重命名为 ${name.trim()}`);
   } catch (error) {
-    showToast(t('segment.rename_failed', { message: error.message }));
+    showToast(`重命名失败: ${error.message}`);
   }
 }
 
 function updateConnectionStatus(status) {
   if (!connectionStatus) return;
-  currentConnectionState = status;
   const map = {
-    connected: 'status.connected',
-    completed: 'status.completed',
-    disconnected: 'status.offline',
+    'connected': '已连接',
+    'completed': '已完成',
+    'disconnected': '离线',
   };
-  const marker = status === 'disconnected' ? '⚪' : '●';
-  connectionStatus.textContent = `${marker} ${t(map[status] || status, {}, status)}`;
+  connectionStatus.textContent = map[status] || status;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1615,21 +2232,15 @@ function renderSegment(seg, index, autoPlay = false) {
   const snrDb = seg.snr_db != null ? seg.snr_db.toFixed(0) : '--';
   const startSec = seg.start_sec != null ? seg.start_sec : (seg.start || 0);
   const endSec = seg.end_sec != null ? seg.end_sec : (seg.end || 0);
-  const durationText = window.DiTingPresentation.formatDuration(seg);
+  const dur = (endSec - startSec) || 0;
   const hasAudio = !!(seg.audio_wav_base64);
   const speakerId = seg.speaker_id || seg.speaker || 'UNKNOWN';
-  const speakerLabel = seg.speaker_name || (
-    seg.overlap && seg.overlap_speakers?.length
-      ? seg.overlap_speakers.join(' / ')
-      : speakerId
-  );
-  const color = speakerColor(speakerId);
+  const speakerName = seg.speaker_name || speakerId || `Seg ${index + 1}`;
 
   // Build logic flags HTML
   let flagsHTML = '';
-  const visibleFlags = getVisibleLogicFlags(seg);
-  if (visibleFlags.length > 0) {
-    flagsHTML = visibleFlags.map(f =>
+  if (seg.logic_flags && seg.logic_flags.length > 0) {
+    flagsHTML = seg.logic_flags.map(f =>
       `<div class="segment-logic-flag ${f.severity || 'warning'}">
         <span>${f.severity === 'resolved' ? 'OK' : '!'}</span>
         <span>${f.message || ''}</span>
@@ -1637,35 +2248,20 @@ function renderSegment(seg, index, autoPlay = false) {
     ).join('');
   }
 
-  const cleanupParts = [];
-  if (seg.fillers_removed?.length) {
-    cleanupParts.push(`${t('segment.fillers_removed')}: ${seg.fillers_removed.join(', ')}`);
-  }
-  if (seg.repetitions_merged?.length) {
-    cleanupParts.push(`${t('segment.repetitions_merged')}: ${seg.repetitions_merged.join(', ')}`);
-  }
-  if (seg.corrections?.length) {
-    cleanupParts.push(`${t('segment.corrections')}: ${seg.corrections.map(c => `${c.original}→${c.corrected}`).join(', ')}`);
-  }
-  const postprocessHTML = cleanupParts.length
-    ? `<div style="margin-top:4px;padding:4px 10px;font-size:11px;color:var(--text-muted);background:rgba(88,166,255,0.08);border-radius:4px;border-left:2px solid var(--accent-blue);">${escapeHTML(cleanupParts.join(' | '))}</div>`
-    : '';
-
   // Build the card
   const card = document.createElement('div');
-  card.className = 'segment' + (hasAudio ? ' has-audio' : ' no-audio') + (seg.overlap ? ' overlap' : '');
+  card.className = 'segment' + (hasAudio ? ' has-audio' : ' no-audio');
   card.setAttribute('data-seg-index', index);
-  card.style.borderLeftColor = color;
 
   card.innerHTML = `
     <div class="segment-top">
       <span class="segment-index">#${index + 1}</span>
-      <button class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" data-i18n-title="segment.rename_title" style="color:${color};" title="${t('segment.rename_title')}">${escapeHTML(speakerLabel)}</button>
+      <span class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" role="button" title="点击重命名说话人" style="color:var(--accent-blue);cursor:pointer;">${escapeHTML(speakerName)}</span>
       <span class="segment-time">${formatTime(startSec)}</span>
-      <span class="segment-dur"><span data-i18n="segment.duration">${t('segment.duration')}</span> ${durationText}</span>
+      <span class="segment-dur">(${dur.toFixed(1)}s)</span>
       <span class="segment-snr ${qLabel}">SNR ${snrDb}dB</span>
       ${hasAudio
-        ? `<button class="segment-play-btn" data-seg-index="${index}" data-i18n-title="segment.play_pause" title="${t('segment.play_pause')}">▶</button>`
+        ? `<button class="segment-play-btn" data-seg-index="${index}" title="Play/Pause">▶</button>`
         : ''}
     </div>
     ${hasAudio
@@ -1685,15 +2281,14 @@ function renderSegment(seg, index, autoPlay = false) {
          </div>`
     }
     <div class="segment-text">${escapeHTML(displayText)}</div>
-    ${postprocessHTML}
     ${flagsHTML}
   `;
 
   transcriptBody.appendChild(card);
 
-  const speakerButton = card.querySelector('.segment-speaker');
-  if (speakerButton) {
-    speakerButton.addEventListener('click', (event) => {
+  const speakerControl = card.querySelector('.segment-speaker[data-speaker-id]');
+  if (speakerControl) {
+    speakerControl.addEventListener('click', (event) => {
       event.stopPropagation();
       renameSpeaker(speakerId);
     });
@@ -1731,7 +2326,7 @@ function renderSegment(seg, index, autoPlay = false) {
     // Click on card body (not button) also toggles play
     card.addEventListener('click', (e) => {
       // Don't trigger if clicking the button (handled above)
-      if (e.target.closest('button')) return;
+      if (e.target.closest('.segment-play-btn')) return;
       if (audioManager.activeIndex === index) {
         audioManager.pause();
       } else {
@@ -1754,13 +2349,11 @@ function escapeHTML(str) {
 // Sidebar Updates
 // ═══════════════════════════════════════════════════════════
 
-function updateStats(segmentsProcessed = null) {
-  const segments = allSegments.filter(Boolean);
-  const realCount = segmentsProcessed ?? segments.length;
-  if (statSegments) statSegments.textContent = realCount;
+function updateStats(segmentsProcessed) {
+  if (statSegments) statSegments.textContent = segmentsProcessed;
 
-  const logicCount = segments.reduce((sum, s) => sum + getVisibleLogicFlags(s).length, 0);
-  const corrCount = segments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
+  const logicCount = allSegments.reduce((sum, s) => sum + (s.logic_flags ? s.logic_flags.length : 0), 0);
+  const corrCount = allSegments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
 
   if (statLogicFlags) statLogicFlags.textContent = logicCount;
   if (statCorrections) statCorrections.textContent = corrCount;
@@ -1770,12 +2363,12 @@ function updateLogicPanel() {
   if (!logicPanel) return;
   const flags = [];
   for (const seg of allSegments) {
-    for (const f of getVisibleLogicFlags(seg)) {
+    for (const f of (seg.logic_flags || [])) {
       flags.push(f);
     }
   }
   if (flags.length === 0) {
-    logicPanel.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">${t('logic.no_flags')}</div>`;
+    logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No logic flags</div>';
     return;
   }
   logicPanel.innerHTML = flags.map(f => {
@@ -1810,7 +2403,7 @@ async function startDemo() {
 
   isPlaying = true;
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = t('controls.playing'); btnStart.disabled = true; }
+  if (btnStart) { btnStart.textContent = '播放中...'; btnStart.disabled = true; }
   updateConnectionStatus('connected');
 
   currentSegmentIndex = -1;
@@ -1829,11 +2422,10 @@ function playNextDemoSegment() {
   renderSegment(seg, currentSegmentIndex, false);  // demo: no audio, no auto-play
   updateStats(currentSegmentIndex + 1);
   updateProgress(currentSegmentIndex);
-  const visibleFlags = getVisibleLogicFlags(seg);
-  if (visibleFlags.length > 0) {
+  if (seg.logic_flags && seg.logic_flags.length > 0) {
     updateLogicPanel();
-    for (const f of visibleFlags) {
-      if (f.severity === 'warning') showToast(t('logic.toast_prefix') + (f.message || '').substring(0, 60));
+    for (const f of seg.logic_flags) {
+      if (f.severity === 'warning') showToast('逻辑冲突: ' + (f.message || '').substring(0, 60));
     }
   }
 
@@ -1844,9 +2436,9 @@ function playNextDemoSegment() {
 function finishDemo() {
   isPlaying = false;
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = t('controls.demo'); btnStart.disabled = false; }
+  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
   updateConnectionStatus('completed');
-  showToast(t('demo.completed'));
+  showToast('演示完成');
 }
 
 function updateProgress(segIndex) {
@@ -1859,15 +2451,15 @@ function updateProgress(segIndex) {
 
 function getEmbeddedDemoData() {
   return {
-    "title": "Q3 Product Review Demo",
+    "title": "Q3 产品回顾演示",
     "date": "2024-07-14 14:00",
     "duration": "04:30",
     "participants": [],
     "hotwords": ["BERT", "Q3", "Conversion"],
     "segments": [
-      {"start":0,"end":5,"snr_db":28,"quality_label":"high","display_text":"Demo segment 1: This is simulated meeting data. No audio available."},
-      {"start":6,"end":12,"snr_db":26,"quality_label":"high","display_text":"Demo segment 2: Upload a real audio file to see live waveforms."},
-      {"start":13,"end":18,"snr_db":27,"quality_label":"high","display_text":"Demo segment 3: Check backend logs for details."},
+      {"start":0,"end":5,"snr_db":28,"quality_label":"high","display_text":"演示分段1: 这是模拟会议数据，不含音频。"},
+      {"start":6,"end":12,"snr_db":26,"quality_label":"high","display_text":"演示分段2: 请上传真实音频文件以查看实时波形。"},
+      {"start":13,"end":18,"snr_db":27,"quality_label":"high","display_text":"演示分段3: 更多详情请查看后台日志。"},
     ],
     "summary": {"topics":["Demo"], "todos":[], "low_confidence_spots":[], "stats":{}}
   };
@@ -1882,22 +2474,22 @@ function getEmbeddedDemoData() {
  */
 function handleUploadHTTPResponse(result) {
   if (!result || uploadWsDelivered) return;
-  currentMeetingId = result.file_id || result.meeting_id || currentMeetingId;
 
   if (result.status === 'completed' && result.segments && result.segments.length > 0) {
     console.log('[Upload] Rendering from HTTP response:', result.segments.length, 'segments');
     uploadWsDelivered = true;  // prevent double processing
+    currentMeetingId = result.file_id || currentMeetingId;
     allSegments = result.segments;
     if (transcriptBody) transcriptBody.innerHTML = '';
     result.segments.forEach((seg, i) => renderSegment(seg, i, false));
     if (segmentCounter) segmentCounter.textContent = `${result.segments.length}/${result.segments.length}`;
-    updateStats(result.segments_count || result.segments.length);
+    if (statSegments) statSegments.textContent = result.segments_count || result.segments.length;
     updateLogicPanel();
-    showToast(t('upload.complete', { count: result.segments_count || result.segments.length }));
+    showToast(`完成: ${result.segments_count || result.segments.length} 个分段`);
     finishUploadUI('complete');
   } else if (result.status === 'demo_mode') {
     uploadWsDelivered = true;  // prevent double processing
-    showToast(t('upload.demo_mode'));
+    showToast('X-ASR 未加载，使用演示模式');
     if (result.demo_data) {
       demoData = result.demo_data;
       startDemo();
@@ -1918,28 +2510,27 @@ async function handleFileUpload(event) {
   uploadHttpResult = null;
   uploadWsDelivered = false;
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = t('upload.connecting'); btnUpload.disabled = true; }
+  if (btnUpload) { btnUpload.textContent = '连接中...'; btnUpload.disabled = true; }
 
   if (uploadWs) { try { uploadWs.close(); } catch(e) {} uploadWs = null; }
-
-  showToast(t('upload.uploading', { filename: file.name }));
-  if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
 
   // Clear previous state
   resetAll();
   allSegments = [];
   currentMeetingId = fileId;
+  showToast(`上传: ${file.name}`);
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
 
   // Show uploading state
   if (transcriptBody) transcriptBody.innerHTML = '';
   if (emptyState) {
     emptyState.style.display = 'flex';
     const msgEl = emptyState.querySelector('div:nth-child(2)');
-    if (msgEl) msgEl.textContent = t('processing.file', { filename: file.name });
+    if (msgEl) msgEl.textContent = `Processing: ${file.name}`;
   }
   if (processingPanel) {
     processingPanel.innerHTML = `<div class="upload-status-card">
-      <div class="stage">${t('processing.uploading', { filename: escapeHTML(file.name) })}</div>
+      <div class="stage">Uploading: ${file.name}</div>
       <div style="color:var(--text-muted);">${(file.size/1024/1024).toFixed(1)} MB</div>
     </div>`;
   }
@@ -1950,7 +2541,7 @@ async function handleFileUpload(event) {
       console.log('[Upload] WS timeout — rendering from HTTP fallback');
       handleUploadHTTPResponse(uploadHttpResult);
     } else if (!uploadWsDelivered && !uploadHttpResult) {
-      showToast(t('upload.timeout'));
+      showToast('处理超时，请检查后台日志');
       finishUploadUI('timeout');
     }
   }, 30000);
@@ -1960,7 +2551,7 @@ async function handleFileUpload(event) {
 
     uploadWs.onopen = async () => {
       console.log('[Upload] WS connected');
-      if (btnUpload) btnUpload.textContent = t('upload.in_progress');
+      if (btnUpload) btnUpload.textContent = '上传中...';
 
       // Now upload the file via HTTP
       try {
@@ -1974,7 +2565,7 @@ async function handleFileUpload(event) {
         uploadHttpResult = result;
 
         if (result.status === 'error') {
-          showToast(t('upload.error', { message: result.error || 'unknown' }));
+          showToast('错误: ' + (result.error || '未知'));
           clearTimeout(fallbackTimer);
           finishUploadUI('error');
         } else if (result.status === 'demo_mode') {
@@ -2037,7 +2628,7 @@ async function uploadFallback(file) {
     return;
   }
 
-  showToast(t('upload.without_live'));
+  showToast('正在上传（无实时预览）...');
   const fileId = uploadFileId || generateUUID();
   try {
     const formData = new FormData();
@@ -2050,11 +2641,11 @@ async function uploadFallback(file) {
     handleUploadHTTPResponse(result);
   } catch (e) {
     console.error('[Upload] Fallback failed:', e);
-    showToast(t('upload.failed'));
+    showToast('上传失败，请检查后台是否运行');
     finishUploadUI('error');
   }
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = t('controls.upload'); btnUpload.disabled = false; }
+  if (btnUpload) { btnUpload.textContent = '上传'; btnUpload.disabled = false; }
   const fileInput = $('fileUpload');
   if (fileInput) fileInput.value = '';
 }
@@ -2070,8 +2661,8 @@ function handleUploadWSMessage(msg) {
     case 'status':
       if (panel) {
         panel.innerHTML = `<div class="upload-status-card">
-          <div class="stage">${t('processing.file', { filename: escapeHTML(msg.data.filename || '') })}</div>
-          <div style="color:var(--text-muted);">${t('processing.engine', { engine: escapeHTML(msg.data.engine || '') })}</div>
+          <div class="stage">Processing: ${escapeHTML(msg.data.filename || '')}</div>
+          <div style="color:var(--text-muted);">Engine: ${escapeHTML(msg.data.engine || '')}</div>
         </div>`;
       }
       break;
@@ -2079,10 +2670,7 @@ function handleUploadWSMessage(msg) {
     case 'progress':
       if (panel) {
         const progEl = panel.querySelector('.stage');
-        if (progEl) progEl.textContent = t('processing.stage', {
-          stage: msg.data.stage,
-          percent: (msg.data.fraction * 100).toFixed(0),
-        });
+        if (progEl) progEl.textContent = `Stage: ${msg.data.stage} (${(msg.data.fraction*100).toFixed(0)}%)`;
       }
       break;
 
@@ -2108,7 +2696,7 @@ function handleUploadWSMessage(msg) {
       const realCount = allSegments.filter(Boolean).length;
       const totalEst = msg.data.total_estimated || realCount || 50;
       if (segmentCounter) segmentCounter.textContent = `${realCount}/${totalEst}`;
-      updateStats(msg.data.cumulative_stats?.segments_processed || realCount);
+      if (statSegments) statSegments.textContent = msg.data.cumulative_stats?.segments_processed || realCount;
       if (progressFill) progressFill.style.width = Math.min(95, (realCount / Math.max(1, totalEst)) * 100) + '%';
 
       updateLogicPanel();
@@ -2117,31 +2705,17 @@ function handleUploadWSMessage(msg) {
 
     case 'complete':
       currentMeetingId = msg.data.file_id || currentMeetingId;
-      showToast(t('upload.complete', {
-        count: msg.data.segments_count || allSegments.filter(Boolean).length,
-      }));
+      showToast(`完成: ${msg.data.segments_count || allSegments.filter(Boolean).length} 个分段`);
       // If WS delivered segments but 'complete' has the final full list with audio, use those
       if (msg.data.segments && msg.data.segments.length > 0) {
-        const wsCount = allSegments.filter(Boolean).length;
-        if (msg.data.segments.length > wsCount) {
-          // We got more segments in the complete message — render missing ones
-          msg.data.segments.forEach((seg, i) => {
-            if (!allSegments[i]) {
-              allSegments[i] = seg;
-              const existingCard = document.querySelector(`.segment[data-seg-index="${i}"]`);
-              if (!existingCard) {
-                renderSegment(seg, i, false);
-              }
-            }
-          });
-        }
+        allSegments = msg.data.segments;
+        rerenderTranscript();
       }
-      updateStats(allSegments.filter(Boolean).length);
       finishUploadUI('complete');
       break;
 
     case 'error':
-      showToast(t('upload.error', { message: msg.data?.message || 'unknown' }));
+      showToast('错误: ' + (msg.data?.message || '未知'));
       // Try HTTP fallback if WS delivered nothing
       if (!uploadWsDelivered && uploadHttpResult) {
         handleUploadHTTPResponse(uploadHttpResult);
@@ -2151,7 +2725,7 @@ function handleUploadWSMessage(msg) {
       break;
 
     case 'timeout':
-      showToast(t('upload.timeout'));
+      showToast('处理超时');
       if (!uploadWsDelivered && uploadHttpResult) {
         handleUploadHTTPResponse(uploadHttpResult);
       } else {
@@ -2163,12 +2737,11 @@ function handleUploadWSMessage(msg) {
 
 function finishUploadUI(status) {
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = t('controls.upload'); btnUpload.disabled = false; }
+  if (btnUpload) { btnUpload.textContent = '上传'; btnUpload.disabled = false; }
 
   if (status === 'complete') {
     updateConnectionStatus('completed');
     if (progressFill) progressFill.style.width = '100%';
-    updateStats(allSegments.filter(Boolean).length);
   } else {
     updateConnectionStatus('disconnected');
   }
@@ -2179,602 +2752,8 @@ function finishUploadUI(status) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Hotword Settings
-// ═══════════════════════════════════════════════════════════
-
-const SETTINGS_TABS = {
-  recognition: {
-    titleKey: 'settings.recognition.tab',
-    descriptionKey: 'settings.recognition.description',
-  },
-  microphone: {
-    titleKey: 'settings.microphone.tab',
-    descriptionKey: 'settings.microphone.description',
-  },
-  hotwords: {
-    titleKey: 'settings.hotwords.tab',
-    descriptionKey: 'settings.hotwords.description',
-  },
-};
-
-function switchSettingsTab(tabId) {
-  if (!SETTINGS_TABS[tabId]) return;
-  activeSettingsTab = tabId;
-  settingsNavButtons.forEach(button => {
-    const active = button.dataset.settingsTab === tabId;
-    button.classList.toggle('active', active);
-    button.setAttribute('aria-selected', String(active));
-    button.tabIndex = active ? 0 : -1;
-  });
-  settingsPanels.forEach(panel => {
-    const active = panel.dataset.settingsPanel === tabId;
-    panel.classList.toggle('active', active);
-    panel.setAttribute('aria-hidden', String(!active));
-  });
-  const metadata = SETTINGS_TABS[tabId];
-  const title = $('hotwordDialogTitle');
-  if (title) title.textContent = t(metadata.titleKey);
-  if (settingsPageDescription) settingsPageDescription.textContent = t(metadata.descriptionKey);
-  const body = hotwordModal?.querySelector('.hotword-dialog-body');
-  if (body) body.scrollTop = 0;
-}
-
-function filterSettingsNavigation(query) {
-  const normalized = String(query || '').trim().toLocaleLowerCase();
-  const visibleButtons = settingsNavButtons.filter(button => {
-    const haystack = `${button.textContent} ${button.dataset.settingsSearch || ''}`.toLocaleLowerCase();
-    const visible = !normalized || haystack.includes(normalized);
-    button.hidden = !visible;
-    return visible;
-  });
-  const activeVisible = visibleButtons.some(button => button.dataset.settingsTab === activeSettingsTab);
-  if (!activeVisible && visibleButtons.length === 1) {
-    switchSettingsTab(visibleButtons[0].dataset.settingsTab);
-  }
-}
-
-function refreshLocalizedInterface(language = null) {
-  if (language) i18n.setLanguage(language);
-  else i18n.apply();
-  if (languageSelect) languageSelect.value = i18n.language;
-  document.title = `${t('app.name')} - ${t('app.subtitle')}`;
-  updateConnectionStatus(currentConnectionState);
-  if (!currentMeetingId && !uploadFileId && allSegments.length === 0 && meetingTitleDisplay) {
-    meetingTitleDisplay.textContent = t('status.no_meeting');
-  }
-  if (audioStatusText && (audioManager.activeIndex == null || audioManager.activeIndex < 0)) {
-    audioStatusText.textContent = t('transcript.no_audio');
-  }
-  const btnStart = $('btnStart');
-  if (btnStart) btnStart.textContent = isPlaying ? t('controls.playing') : t('controls.demo');
-  const btnMic = $('btnMic');
-  if (btnMic) btnMic.textContent = isRecording ? t('controls.stop') : t('controls.mic');
-  const btnUpload = $('btnUpload');
-  if (btnUpload && !btnUpload.disabled) btnUpload.textContent = t('controls.upload');
-  const defaultMicOption = Array.from(microphoneDevice?.options || [])
-    .find(option => option.value === '');
-  if (defaultMicOption) defaultMicOption.textContent = t('settings.microphone.system_default');
-  if (appSettingsState?.models) renderModelProfiles(appSettingsState.models);
-  switchSettingsTab(activeSettingsTab);
-  renderDomainPresetButtons();
-  if (allSegments.filter(Boolean).length > 0) updateLogicPanel();
-}
-
-function renderDomainPresetButtons() {
-  if (!domainPresetGrid || !window.DiTingHotwordSettings) return;
-  domainPresetGrid.innerHTML = '';
-  window.DiTingHotwordSettings.getDomainPresets().forEach(preset => {
-    const localizedName = t(`settings.domain.${preset.id}.name`, {}, preset.name);
-    const localizedDescription = t(
-      `settings.domain.${preset.id}.description`,
-      {},
-      preset.description,
-    );
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'domain-preset-card';
-    button.dataset.presetId = preset.id;
-    button.dataset.wordCount = String(preset.word_count);
-    button.setAttribute('aria-pressed', 'false');
-
-    const heading = document.createElement('div');
-    heading.className = 'domain-preset-card-head';
-    const title = document.createElement('strong');
-    title.textContent = localizedName;
-    const check = document.createElement('b');
-    check.className = 'domain-preset-check';
-    check.setAttribute('aria-hidden', 'true');
-    check.textContent = '✓';
-    heading.append(title, check);
-    const description = document.createElement('span');
-    description.textContent = localizedDescription;
-    const action = document.createElement('em');
-    action.dataset.presetAction = 'true';
-    button.append(heading, description, action);
-    button.addEventListener('click', () => toggleHotwordDomainPreset(preset.id));
-    domainPresetGrid.appendChild(button);
-  });
-  updateDomainPresetSelectionUi();
-}
-
-function updateDomainPresetSelectionUi() {
-  const presets = window.DiTingHotwordSettings?.getDomainPresets() || [];
-  const presetNames = new Map(presets.map(preset => [
-    preset.id,
-    t(`settings.domain.${preset.id}.name`, {}, preset.name),
-  ]));
-  domainPresetGrid?.querySelectorAll('[data-preset-id]').forEach(button => {
-    const selected = selectedDomainPresetIds.has(button.dataset.presetId);
-    button.classList.toggle('selected', selected);
-    button.setAttribute('aria-pressed', String(selected));
-    const action = button.querySelector('[data-preset-action]');
-    if (action) {
-      action.textContent = selected
-        ? t('settings.hotwords.preset_disable')
-        : t('settings.hotwords.preset_enable', { count: button.dataset.wordCount });
-    }
-  });
-  const selectedNames = Array.from(selectedDomainPresetIds)
-    .map(id => presetNames.get(id))
-    .filter(Boolean);
-  if (domainSelectionNames) {
-    domainSelectionNames.textContent = selectedNames.join(i18n.language === 'zh-CN' ? '、' : ', ');
-  }
-  if (domainSelectionNotice) domainSelectionNotice.hidden = selectedNames.length === 0;
-}
-
-function syncDomainPresetSelection() {
-  if (!window.DiTingHotwordSettings) return;
-  selectedDomainPresetIds = new Set(
-    window.DiTingHotwordSettings.getSelectedDomainPresetIds(collectHotwordRows()),
-  );
-  updateDomainPresetSelectionUi();
-}
-
-function toggleHotwordDomainPreset(presetId) {
-  if (!hotwordSettingsState || !window.DiTingHotwordSettings) {
-    setHotwordStatus(t('settings.hotwords.loading'), true);
-    return;
-  }
-  const selected = !selectedDomainPresetIds.has(presetId);
-  const result = window.DiTingHotwordSettings.setDomainPresetSelection(
-    collectHotwordRows(),
-    presetId,
-    selected,
-    Array.from(selectedDomainPresetIds),
-    defaultHotwordScoreNumber?.value,
-  );
-  if (!result.preset) return;
-  hotwordSettingsState = { ...hotwordSettingsState, words: result.words };
-  if (selected && hotwordsEnabled) hotwordsEnabled.checked = true;
-  renderHotwordRows();
-  const localizedName = t(`settings.domain.${presetId}.name`, {}, result.preset.name);
-  setHotwordStatus(
-    selected
-      ? t('settings.hotwords.preset_selected', { name: localizedName, count: result.added_count })
-      : t('settings.hotwords.preset_deselected', { name: localizedName }),
-  );
-}
-
-function setSettingValue(id, value, checkbox = false) {
-  const element = $(id);
-  if (!element) return;
-  if (checkbox) element.checked = Boolean(value);
-  else element.value = String(value ?? '');
-}
-
-function renderRuntimeSettings(settings) {
-  const recognition = settings.recognition;
-  const microphone = settings.microphone;
-  setSettingValue('liveAsrProfile', recognition.live_asr_profile);
-  setSettingValue('finalAsrProfile', recognition.final_asr_profile);
-  setSettingValue('finalTranscriptionEnabled', recognition.final_transcription_enabled, true);
-  setSettingValue('fileVadThreshold', recognition.file_vad_threshold);
-  setSettingValue('fileVadMinSilence', recognition.file_vad_min_silence);
-  setSettingValue('fileVadMinSpeech', recognition.file_vad_min_speech);
-  setSettingValue('fileVadPrePadding', recognition.file_vad_pre_padding_ms);
-  setSettingValue('fileVadPostPadding', recognition.file_vad_post_padding_ms);
-  setSettingValue('microphoneLiveProfile', microphone.live_profile);
-  setSettingValue('microphoneVadGating', microphone.vad_gating, true);
-  setSettingValue('microphonePreRoll', microphone.pre_roll_ms);
-  setSettingValue('microphoneEndpointGrace', microphone.endpoint_grace_ms);
-  setSettingValue('microphoneTailPad', microphone.tail_pad_ms);
-  setSettingValue('microphoneVadThreshold', microphone.vad_threshold);
-  setSettingValue('microphoneVadMinSilence', microphone.vad_min_silence);
-  setSettingValue('microphoneVadMinSpeech', microphone.vad_min_speech);
-  setSettingValue('microphoneEchoCancellation', microphone.echo_cancellation, true);
-  setSettingValue('microphoneNoiseSuppression', microphone.noise_suppression, true);
-  setSettingValue('microphoneAutoGain', microphone.auto_gain_control, true);
-  renderModelProfiles(settings.models);
-}
-
-function renderModelProfiles(models = {}) {
-  const available = Array.isArray(models.available_profiles) ? models.available_profiles : [];
-  ['liveAsrProfile', 'finalAsrProfile'].forEach(id => {
-    const select = $(id);
-    if (!select) return;
-    Array.from(select.options).forEach(option => {
-      option.disabled = available.length > 0 && !available.includes(option.value);
-      const baseLabel = t(option.dataset.i18n, {}, option.textContent.replace(/ · (未部署|Not deployed)$/, ''));
-      option.textContent = baseLabel
-        + (option.disabled ? ` · ${t('settings.model_not_deployed')}` : '');
-    });
-  });
-  if (!modelProfileStatus) return;
-  const live = models.live || {};
-  const finalModel = models.final || {};
-  if (!live.chunk_ms) {
-    modelProfileStatus.textContent = t('settings.model_still_loading');
-    return;
-  }
-  const fallback = live.fallback || finalModel.fallback ? t('settings.model_fallback') : '';
-  modelProfileStatus.textContent = t('settings.model_status', {
-    live: live.chunk_ms,
-    final: finalModel.chunk_ms || live.chunk_ms,
-    provider: models.file_vad_provider || 'Silero VAD',
-    fallback,
-  });
-}
-
-function collectRuntimeSettings() {
-  if (!window.DiTingAppSettings) return null;
-  return window.DiTingAppSettings.normalizeAppSettings({
-    recognition: {
-      live_asr_profile: $('liveAsrProfile')?.value,
-      final_asr_profile: $('finalAsrProfile')?.value,
-      final_transcription_enabled: $('finalTranscriptionEnabled')?.checked !== false,
-      file_vad_threshold: $('fileVadThreshold')?.value,
-      file_vad_min_silence: $('fileVadMinSilence')?.value,
-      file_vad_min_speech: $('fileVadMinSpeech')?.value,
-      file_vad_pre_padding_ms: $('fileVadPrePadding')?.value,
-      file_vad_post_padding_ms: $('fileVadPostPadding')?.value,
-    },
-    microphone: {
-      device_id: microphoneDevice?.value || '',
-      live_profile: $('microphoneLiveProfile')?.value,
-      vad_gating: $('microphoneVadGating')?.checked === true,
-      echo_cancellation: $('microphoneEchoCancellation')?.checked !== false,
-      noise_suppression: $('microphoneNoiseSuppression')?.checked === true,
-      auto_gain_control: $('microphoneAutoGain')?.checked === true,
-      pre_roll_ms: $('microphonePreRoll')?.value,
-      endpoint_grace_ms: $('microphoneEndpointGrace')?.value,
-      tail_pad_ms: $('microphoneTailPad')?.value,
-      vad_threshold: $('microphoneVadThreshold')?.value,
-      vad_min_silence: $('microphoneVadMinSilence')?.value,
-      vad_min_speech: $('microphoneVadMinSpeech')?.value,
-    },
-  });
-}
-
-async function refreshMicrophoneDevices() {
-  if (!microphoneDevice || !navigator.mediaDevices?.enumerateDevices) return;
-  const selected = microphoneDevice.value || appSettingsState?.microphone?.device_id || '';
-  const devices = (await navigator.mediaDevices.enumerateDevices())
-    .filter(device => device.kind === 'audioinput');
-  microphoneDevice.innerHTML = `<option value="">${t('settings.microphone.system_default')}</option>`;
-  devices.forEach((device, index) => {
-    const option = document.createElement('option');
-    option.value = device.deviceId;
-    option.textContent = device.label || t('settings.microphone.generic', { count: index + 1 });
-    microphoneDevice.appendChild(option);
-  });
-  microphoneDevice.value = devices.some(device => device.deviceId === selected) ? selected : '';
-}
-
-async function stopMicrophoneTest() {
-  if (micTestAnimationFrame !== null) cancelAnimationFrame(micTestAnimationFrame);
-  micTestAnimationFrame = null;
-  micTestStream?.getTracks().forEach(track => track.stop());
-  micTestStream = null;
-  if (micTestAudioContext && micTestAudioContext.state !== 'closed') await micTestAudioContext.close();
-  micTestAudioContext = null;
-  if (micTestMeter) micTestMeter.style.width = '0%';
-  const button = $('btnTestMic');
-  if (button) button.textContent = t('controls.test');
-}
-
-async function toggleMicrophoneTest() {
-  if (micTestStream) {
-    await stopMicrophoneTest();
-    if (micTestStatus) micTestStatus.textContent = t('settings.microphone.test_stopped');
-    return;
-  }
-  const runtime = collectRuntimeSettings();
-  if (!runtime || !navigator.mediaDevices?.getUserMedia) return;
-  try {
-    micTestStream = await navigator.mediaDevices.getUserMedia(
-      window.DiTingAppSettings.buildMediaConstraints(runtime.microphone),
-    );
-    await refreshMicrophoneDevices();
-    micTestAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const analyser = micTestAudioContext.createAnalyser();
-    analyser.fftSize = 1024;
-    micTestAudioContext.createMediaStreamSource(micTestStream).connect(analyser);
-    const values = new Float32Array(analyser.fftSize);
-    const render = () => {
-      analyser.getFloatTimeDomainData(values);
-      let sum = 0;
-      for (const value of values) sum += value * value;
-      const rms = Math.sqrt(sum / values.length);
-      const db = rms > 0 ? 20 * Math.log10(rms) : -96;
-      const percent = Math.max(0, Math.min(100, (db + 60) * 1.7));
-      if (micTestMeter) micTestMeter.style.width = `${percent.toFixed(1)}%`;
-      if (micTestStatus) micTestStatus.textContent = t('settings.microphone.input_level', {
-        db: db.toFixed(1),
-        device: micTestStream.getAudioTracks()[0]?.label || t('settings.microphone.tab'),
-      });
-      micTestAnimationFrame = requestAnimationFrame(render);
-    };
-    const button = $('btnTestMic');
-    if (button) button.textContent = t('controls.stop');
-    render();
-  } catch (error) {
-    await stopMicrophoneTest();
-    if (micTestStatus) micTestStatus.textContent = t('settings.microphone.test_failed', { message: error.message });
-  }
-}
-
-function setHotwordStatus(message, isError = false) {
-  if (!hotwordSaveStatus) return;
-  hotwordSaveStatus.textContent = message || '';
-  hotwordSaveStatus.style.color = isError ? 'var(--accent-red)' : 'var(--text-muted)';
-}
-
-function setDefaultHotwordScore(value) {
-  if (!window.DiTingHotwordSettings) return;
-  const score = window.DiTingHotwordSettings.clamp(value);
-  if (defaultHotwordScore) defaultHotwordScore.value = String(Math.min(12, score));
-  if (defaultHotwordScoreNumber) defaultHotwordScoreNumber.value = String(score);
-  if (defaultScoreLabel) defaultScoreLabel.textContent = score.toFixed(1);
-  if (hotwordSettingsState) hotwordSettingsState.default_score = score;
-}
-
-function createHotwordRow(item) {
-  const row = document.createElement('div');
-  row.className = `hotword-row${item.enabled ? '' : ' disabled'}`;
-
-  const enabled = document.createElement('input');
-  enabled.type = 'checkbox';
-  enabled.checked = item.enabled !== false;
-  enabled.dataset.field = 'enabled';
-  enabled.setAttribute('aria-label', `启用 ${item.text}`);
-  enabled.addEventListener('change', () => {
-    row.classList.toggle('disabled', !enabled.checked);
-    syncDomainPresetSelection();
-  });
-
-  const textInput = document.createElement('input');
-  textInput.className = 'hotword-input';
-  textInput.value = item.text;
-  textInput.maxLength = 80;
-  textInput.dataset.field = 'text';
-  textInput.setAttribute('aria-label', '热词标准写法');
-  textInput.addEventListener('input', syncDomainPresetSelection);
-
-  const scoreInput = document.createElement('input');
-  scoreInput.className = 'hotword-input';
-  scoreInput.type = 'number';
-  scoreInput.min = '0.1';
-  scoreInput.max = '20';
-  scoreInput.step = '0.5';
-  scoreInput.value = String(item.score);
-  scoreInput.dataset.field = 'score';
-  scoreInput.setAttribute('aria-label', `${item.text} 权重`);
-
-  const remove = document.createElement('button');
-  remove.className = 'btn btn-secondary hotword-remove';
-  remove.type = 'button';
-  remove.textContent = '×';
-  remove.setAttribute('aria-label', `删除 ${item.text}`);
-  remove.addEventListener('click', () => {
-    row.remove();
-    syncDomainPresetSelection();
-  });
-
-  row.append(enabled, textInput, scoreInput, remove);
-  return row;
-}
-
-function renderHotwordRows() {
-  if (!hotwordList || !hotwordSettingsState) return;
-  hotwordList.innerHTML = '';
-  hotwordSettingsState.words.forEach(item => hotwordList.appendChild(createHotwordRow(item)));
-  syncDomainPresetSelection();
-  setHotwordStatus(t('settings.hotwords.count', { count: hotwordSettingsState.words.length }));
-}
-
-async function openHotwordSettings() {
-  if (!hotwordModal || !window.DiTingHotwordSettings || !window.DiTingAppSettings) return;
-  hotwordModal.classList.add('visible');
-  hotwordModal.setAttribute('aria-hidden', 'false');
-  if (settingsSearch) settingsSearch.value = '';
-  filterSettingsNavigation('');
-  switchSettingsTab(activeSettingsTab);
-  setHotwordStatus(t('settings.loading'));
-  try {
-    const response = await fetch(`${API_BASE}/api/settings`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(data);
-    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data.hotwords);
-    appSettingsState.hotwords = hotwordSettingsState;
-    renderRuntimeSettings(appSettingsState);
-    await refreshMicrophoneDevices();
-    if (hotwordsEnabled) hotwordsEnabled.checked = hotwordSettingsState.enabled;
-    if (fuzzyPinyinEnabled) fuzzyPinyinEnabled.checked = hotwordSettingsState.fuzzy_pinyin_enabled;
-    setDefaultHotwordScore(hotwordSettingsState.default_score);
-    renderHotwordRows();
-  } catch (error) {
-    console.error('[Hotwords] Load failed:', error);
-    setHotwordStatus(t('settings.hotwords.load_failed', { message: error.message }), true);
-  }
-}
-
-function closeHotwordSettings() {
-  if (!hotwordModal) return;
-  stopMicrophoneTest();
-  hotwordModal.classList.remove('visible');
-  hotwordModal.setAttribute('aria-hidden', 'true');
-}
-
-function addHotwordToEditor() {
-  const input = $('newHotwordInput');
-  const text = input?.value.trim();
-  if (!text || !hotwordList || !window.DiTingHotwordSettings) return;
-  const duplicate = Array.from(hotwordList.querySelectorAll('[data-field="text"]'))
-    .some(element => element.value.trim().toLocaleLowerCase() === text.toLocaleLowerCase());
-  if (duplicate) {
-    setHotwordStatus(t('settings.hotwords.duplicate'), true);
-    return;
-  }
-  const score = window.DiTingHotwordSettings.scoreForNewWord(
-    text,
-    defaultHotwordScoreNumber?.value,
-  );
-  hotwordList.appendChild(createHotwordRow({ text, score, enabled: true }));
-  input.value = '';
-  syncDomainPresetSelection();
-  setHotwordStatus(t('settings.hotwords.added'));
-}
-
-function collectHotwordRows() {
-  if (!hotwordList) return [];
-  return Array.from(hotwordList.querySelectorAll('.hotword-row')).map(row => ({
-    text: row.querySelector('[data-field="text"]')?.value || '',
-    score: row.querySelector('[data-field="score"]')?.value,
-    enabled: row.querySelector('[data-field="enabled"]')?.checked !== false,
-  }));
-}
-
-async function saveHotwordSettings() {
-  if (!hotwordSettingsState || !window.DiTingHotwordSettings) return;
-  const saveButton = $('btnSaveHotwords');
-  const hotwordPayload = window.DiTingHotwordSettings.buildPayload({
-    ...hotwordSettingsState,
-    enabled: hotwordsEnabled?.checked !== false,
-    fuzzy_pinyin_enabled: fuzzyPinyinEnabled?.checked !== false,
-    default_score: defaultHotwordScoreNumber?.value,
-  }, collectHotwordRows());
-  const runtimePayload = collectRuntimeSettings();
-  const payload = { ...runtimePayload, hotwords: hotwordPayload };
-  if (saveButton) saveButton.disabled = true;
-  setHotwordStatus(t('settings.hotwords.saving'));
-  try {
-    const response = await fetch(`${API_BASE}/api/settings`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(data);
-    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data.hotwords);
-    appSettingsState.hotwords = hotwordSettingsState;
-    renderRuntimeSettings(appSettingsState);
-    renderHotwordRows();
-    const activeCount = data.hotwords?.active_count ?? hotwordSettingsState.words.length;
-    const savedMessage = data.reloading_models
-      ? t('settings.hotwords.saved_reloading', { count: activeCount })
-      : t('settings.hotwords.saved', { count: activeCount });
-    setHotwordStatus(savedMessage);
-    showToast(savedMessage);
-  } catch (error) {
-    console.error('[Hotwords] Save failed:', error);
-    setHotwordStatus(t('settings.hotwords.save_failed', { message: error.message }), true);
-  } finally {
-    if (saveButton) saveButton.disabled = false;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
 // Live Mic Recording
 // ═══════════════════════════════════════════════════════════
-
-function updateMicLevel(rms, peak) {
-  if (!window.DiTingMicLevel) return;
-  micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
-  micLevelLastUpdate = performance.now();
-}
-
-function renderMicLevel(timestamp) {
-  if (!micOrbPanel?.classList.contains('visible') || !window.DiTingMicLevel) {
-    micLevelAnimationFrame = null;
-    return;
-  }
-  if (timestamp - micLevelLastUpdate > 100) {
-    micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
-  }
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const phase = reduceMotion ? 0 : timestamp / 180;
-  const scales = window.DiTingMicLevel.buildBarScales(
-    micDisplayLevel,
-    phase,
-    micLevelBars.length,
-  );
-  micLevelBars.forEach((bar, index) => {
-    bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
-  });
-  const orb = window.DiTingMicLevel.buildOrbStyle(micDisplayLevel);
-  if (micOrbWrap) {
-    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-ring-opacity', orb.ringOpacity.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-shadow', `${orb.shadow.toFixed(1)}px`);
-    micOrbWrap.style.setProperty('--orb-blur', `${orb.blur.toFixed(1)}px`);
-    micOrbWrap.style.setProperty('--orb-glow-opacity', orb.glowOpacity.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-core-shadow', `${orb.coreShadow.toFixed(1)}px`);
-  }
-  micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
-}
-
-function setMicVisualizerState(state) {
-  if (!micOrbPanel) return;
-  const active = state === 'recording' || state === 'finalizing';
-  micOrbPanel.classList.toggle('visible', active);
-  micOrbPanel.classList.toggle('listening', state === 'recording');
-  micOrbPanel.classList.toggle('finalizing', state === 'finalizing');
-  micOrbPanel.setAttribute('aria-hidden', active ? 'false' : 'true');
-  if (micOrbTitle) micOrbTitle.textContent = state === 'finalizing'
-    ? t('mic.orb_finalizing')
-    : t('mic.orb_listening');
-  if (micOrbSubtitle) micOrbSubtitle.textContent = state === 'finalizing'
-    ? t('mic.orb_finalizing_hint')
-    : t('mic.orb_hint');
-  if (active) {
-    if (micLevelAnimationFrame === null) {
-      micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
-    }
-    return;
-  }
-  if (micLevelAnimationFrame !== null) cancelAnimationFrame(micLevelAnimationFrame);
-  micLevelAnimationFrame = null;
-  micDisplayLevel = 0;
-  micLevelLastUpdate = 0;
-  micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
-  const orb = window.DiTingMicLevel?.buildOrbStyle(0);
-  if (micOrbWrap && orb) {
-    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
-  }
-}
-
-function setMicOrbMessage(title, subtitle) {
-  if (micOrbTitle && title) micOrbTitle.textContent = title;
-  if (micOrbSubtitle && subtitle) micOrbSubtitle.textContent = subtitle;
-}
-
-async function ensureAppSettingsLoaded() {
-  if (appSettingsState || !window.DiTingAppSettings) return appSettingsState;
-  try {
-    const response = await fetch(`${API_BASE}/api/settings`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(await response.json());
-  } catch (error) {
-    console.warn('[Settings] Falling back to local defaults:', error);
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings({});
-  }
-  return appSettingsState;
-}
 
 async function toggleMic() {
   const btnMic = $('btnMic');
@@ -2782,21 +2761,25 @@ async function toggleMic() {
 
   if (isRecording) {
     stopMicRecording();
-    if (btnMic) { btnMic.textContent = t('controls.mic'); btnMic.classList.remove('active'); }
+    if (btnMic) { btnMic.textContent = '录音'; btnMic.classList.remove('active'); }
     return;
   }
 
   try {
     if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
-      throw new Error('This browser does not support AudioWorklet microphone capture');
+      throw new Error('当前浏览器不支持 AudioWorklet 麦克风采集');
     }
     micSequence = 0;
     micStreamId = window.crypto?.randomUUID?.() || `mic-${Date.now()}`;
     micSegmentStartIndex = allSegments.length;
-    const settings = await ensureAppSettingsLoaded();
-    micStream = await navigator.mediaDevices.getUserMedia(
-      window.DiTingAppSettings.buildMediaConstraints(settings.microphone),
-    );
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
     micAudioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     if (micAudioContext.state === 'suspended') await micAudioContext.resume();
     await micAudioContext.audioWorklet.addModule('./audio-worklet.js');
@@ -2813,55 +2796,45 @@ async function toggleMic() {
           sample_format: 'pcm_s16le',
           browser_sample_rate: micAudioContext?.sampleRate,
           protocol_version: 2,
-          profile: settings.microphone.live_profile,
+          profile: 'meeting',
           stream_id: micStreamId,
         }));
       } else if (msg.type === 'configured') {
         micStreamId = msg.data.stream_id || micStreamId;
-        setMicOrbMessage(t('mic.orb_listening'), t('mic.live_connected', { vad: msg.data.vad }));
         if (micStatusEl) {
-          micStatusEl.textContent = t('mic.status_recording', { vad: msg.data.vad });
+          micStatusEl.textContent = `实时转写 · ${msg.data.vad}`;
           micStatusEl.style.color = 'var(--accent-red)';
         }
       } else if (msg.type === 'live_result' && msg.data.text) {
-        setMicOrbMessage(
-          msg.data.is_final ? t('mic.sentence_ready') : t('mic.transcribing'),
-          msg.data.is_final ? t('mic.keep_talking') : t('mic.capturing'),
-        );
         updateMicResult(msg.data);
       } else if (msg.type === 'finalizing') {
-        setMicOrbMessage(t('mic.orb_finalizing'), t('mic.orb_finalizing_hint'));
         if (micStatusEl) {
-          micStatusEl.textContent = t('mic.status_finalizing');
+          micStatusEl.textContent = '正在生成最终转写与说话人分离...';
           micStatusEl.style.color = 'var(--accent-yellow)';
         }
       } else if (msg.type === 'final_transcript') {
         replaceMicTranscript(msg.data);
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
-        setMicOrbMessage(t('mic.transcript_complete'), t('mic.audio_received', { seconds }));
         if (micStatusEl) {
-          micStatusEl.textContent = t('mic.status_complete');
+          micStatusEl.textContent = `已完成 ${seconds}s`;
           micStatusEl.style.color = 'var(--accent-green)';
         }
-        showToast(t('mic.recording_stopped', { seconds }));
         cleanupMicRecording();
       } else if (msg.type === 'error') {
-        setMicOrbMessage(t('mic.live_error'), msg.message || t('mic.retry'));
-        showToast(msg.message || t('mic.live_failed'));
+        showToast(msg.message || '实时转写失败');
       }
     };
     micWs.onerror = (event) => {
       console.error('[Mic] WebSocket error:', event);
-      setMicOrbMessage(t('mic.connection_error'), t('mic.service_unavailable'));
-      if (micStatusEl) { micStatusEl.textContent = t('mic.status_live_error'); micStatusEl.style.color = 'var(--accent-red)'; }
-    };
-    micWs.onclose = (event) => {
-      console.log('[Mic] WebSocket closed:', event.code, event.reason || 'no reason');
+      if (micStatusEl) {
+        micStatusEl.textContent = '实时转写连接失败';
+        micStatusEl.style.color = 'var(--accent-red)';
+      }
     };
     await new Promise((resolve, reject) => {
       micWs.addEventListener('open', resolve, { once: true });
-      micWs.addEventListener('error', () => reject(new Error('Cannot connect to live ASR')), { once: true });
+      micWs.addEventListener('error', () => reject(new Error('无法连接实时转写服务')), { once: true });
     });
 
     const source = micAudioContext.createMediaStreamSource(micStream);
@@ -2870,41 +2843,35 @@ async function toggleMic() {
     silent.gain.value = 0;
     micWorklet.port.onmessage = (event) => {
       if (event.data?.type === 'audio.pcm' && micWs?.readyState === WebSocket.OPEN) {
-        const frame = window.DiTingLiveProtocol
-          ? window.DiTingLiveProtocol.encodePcmFrame(micSequence++, event.data.payload)
-          : event.data.payload;
+        const frame = window.DiTingLiveProtocol.encodePcmFrame(
+          micSequence++,
+          event.data.payload,
+        );
         micWs.send(frame);
-      } else if (event.data?.type === 'audio.level') {
-        updateMicLevel(event.data.rms, event.data.peak);
       }
     };
     source.connect(micWorklet).connect(silent).connect(micAudioContext.destination);
     isRecording = true;
-    setMicVisualizerState('recording');
-    if (btnMic) { btnMic.textContent = t('controls.stop'); btnMic.classList.add('active'); }
+    if (btnMic) { btnMic.textContent = '停止'; btnMic.classList.add('active'); }
     if (micStatusEl) {
       micStatusEl.textContent = `${micAudioContext.sampleRate}Hz → 16kHz`;
       micStatusEl.style.color = 'var(--accent-red)';
     }
-    showToast(t('mic.recording_started'));
+    showToast('开始录音');
   } catch (err) {
     console.error('Mic error:', err);
-    const micError = err.name === 'NotAllowedError'
-      ? t('mic.permission_denied')
-      : t('upload.error', { message: err.name || 'unknown' });
-    if (micStatusEl) { micStatusEl.textContent = micError; micStatusEl.style.color = 'var(--accent-red)'; }
-    showToast(err.message || t('mic.access_failed'));
+    if (micStatusEl) { micStatusEl.textContent = err.message; micStatusEl.style.color = 'var(--accent-red)'; }
+    showToast(err.message || '无法访问麦克风');
     cleanupMicRecording();
   }
 }
 
 function stopMicRecording() {
   isRecording = false;
-  setMicVisualizerState('finalizing');
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   micWorklet?.port.postMessage({ type: 'capture.stop' });
   if (micStatus) {
-    micStatus.textContent = t('mic.status_finalizing_short');
+    micStatus.textContent = '正在完成最终转写...';
     micStatus.style.color = 'var(--accent-yellow)';
   }
   setTimeout(() => {
@@ -2927,7 +2894,6 @@ async function cleanupMicRecording() {
     await micAudioContext.close();
   }
   micAudioContext = null;
-  setMicVisualizerState('idle');
   if (micWs) {
     if (micWs.readyState === WebSocket.OPEN) micWs.close(1000, 'capture complete');
     micWs = null;
@@ -2947,11 +2913,11 @@ function updateMicResult(data) {
     }
     const html = `<div class="segment no-audio" id="live-result" style="opacity:0.7;">
       <div class="segment-top">
-        <span class="segment-speaker" style="color:var(--accent-blue);">${t('mic.live_label')}</span>
+        <span class="segment-speaker" style="color:var(--accent-blue);">Live</span>
         <span class="segment-snr medium">SNR ${(data.snr_db||20).toFixed(0)}dB</span>
       </div>
       <div class="segment-waveform-placeholder"><div class="mini-wave">${Array.from({length: 28}, () => `<div class="mini-wave-bar" style="height:${Math.floor(Math.random()*10+2)}px;"></div>`).join('')}</div></div>
-      <div class="segment-text">${escapeHTML(data.text || t('mic.listening_placeholder'))}</div>
+      <div class="segment-text">${escapeHTML(data.text || '(listening...)')}</div>
     </div>`;
     transcriptBody.insertAdjacentHTML('beforeend', html);
   } else if (data.is_final && data.text) {
@@ -2963,30 +2929,102 @@ function updateMicResult(data) {
   transcriptBody.scrollTop = transcriptBody.scrollHeight;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Debug Log Panel
-// ═══════════════════════════════════════════════════════════
-
 function replaceMicTranscript(data) {
   const segments = Array.isArray(data?.segments) ? data.segments : [];
-  if (!segments.length || !transcriptBody) return;
+  if (!segments.length) return;
   currentMeetingId = data.stream_id || currentMeetingId;
   document.getElementById('live-result')?.remove();
-  transcriptBody.querySelectorAll('.segment[data-seg-index]').forEach(card => {
-    const index = Number(card.getAttribute('data-seg-index'));
-    if (index >= micSegmentStartIndex) {
-      audioManager.destroy(index);
-      card.remove();
-    }
-  });
   allSegments.splice(micSegmentStartIndex);
-  segments.forEach(segment => {
-    const index = allSegments.length;
-    allSegments.push(segment);
-    renderSegment(segment, index, false);
-  });
+  allSegments.push(...segments);
+  rerenderTranscript();
   updateStats(allSegments.length);
-  showToast(t('mic.canonical_ready', { count: segments.length }));
+  showToast(`最终转写已完成，共 ${segments.length} 个分段`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Volume Sphere (mic-based on homepage)
+// ═══════════════════════════════════════════════════════════
+
+let volumeAudioCtx = null;
+let volumeAnalyser = null;
+let volumeAnimId = null;
+let volumeStream = null;
+
+async function startVolumeMeter() {
+  const canvas = $('freqRing');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 260, cy = 260;
+  const innerR = 110, outerR = 300;
+  const N = 180;
+
+  try {
+    volumeStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    volumeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = volumeAudioCtx.createMediaStreamSource(volumeStream);
+    volumeAnalyser = volumeAudioCtx.createAnalyser();
+    volumeAnalyser.fftSize = 512;
+    volumeAnalyser.smoothingTimeConstant = 0.82;
+    source.connect(volumeAnalyser);
+
+    const dataArray = new Uint8Array(volumeAnalyser.frequencyBinCount);
+    const binCount = dataArray.length;
+    let level = 0;
+
+    function tick() {
+      if (!volumeAnalyser) return;
+      volumeAnalyser.getByteFrequencyData(dataArray);
+      ctx.clearRect(0, 0, 520, 520);
+
+      let sum = 0;
+      for (let j = 0; j < binCount; j++) sum += dataArray[j];
+      const raw = Math.min(1, (sum / binCount) / 60);
+      level = level * 0.7 + raw * 0.3;
+
+      const r = innerR + level * (outerR - innerR);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(139,92,246,0.6)';
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(139,92,246,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      volumeAnimId = requestAnimationFrame(tick);
+    }
+    tick();
+  } catch (e) {
+    console.log('[Volume] Mic not available, drawing static ring');
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR + 10, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(139,92,246,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    canvas.style.cursor = 'pointer';
+    canvas.title = '点击启用麦克风';
+    canvas.addEventListener('click', () => {
+      canvas.style.cursor = '';
+      canvas.title = '';
+      startVolumeMeter();
+    }, { once: true });
+  }
+}
+
+function stopVolumeMeter() {
+  if (volumeAnimId) { cancelAnimationFrame(volumeAnimId); volumeAnimId = null; }
+  if (volumeStream) { volumeStream.getTracks().forEach(t => t.stop()); volumeStream = null; }
+  if (volumeAudioCtx) { volumeAudioCtx.close(); volumeAudioCtx = null; }
+  volumeAnalyser = null;
 }
 
 function toggleLogPanel() {
@@ -3030,12 +3068,12 @@ function resetAll() {
   currentSegmentIndex = -1;
   clearTimeout(playbackTimer);
   allSegments = [];
-  demoData = null;
   currentMeetingId = null;
+  demoData = null;
   audioManager.reset();
 
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = t('controls.demo'); btnStart.disabled = false; }
+  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
 
   if (transcriptBody) {
     transcriptBody.innerHTML = '';
@@ -3043,12 +3081,12 @@ function resetAll() {
   if (emptyState) {
     emptyState.style.display = 'flex';
     const msgEl = emptyState.querySelector('div:nth-child(2)');
-    if (msgEl) msgEl.textContent = t('transcript.waiting');
+    if (msgEl) msgEl.textContent = '等待会议开始...';
   }
 
-  if (logicPanel) logicPanel.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">${t('logic.no_data')}</div>`;
-  if (processingPanel) processingPanel.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">${t('processing.waiting')}</div>`;
-  if (summaryPanel) summaryPanel.innerHTML = `<div style="font-size:12px;color:var(--text-muted);text-align:center;">${t('summary.waiting')}</div>`;
+  if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>';
+  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>';
+  if (summaryPanel) summaryPanel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;">会议处理完成后将生成摘要...</div>';
 
   if (progressFill) progressFill.style.width = '0%';
   if (timeDisplay) timeDisplay.textContent = '--:--';
@@ -3056,8 +3094,8 @@ function resetAll() {
   if (statSegments) statSegments.textContent = '0';
   if (statLogicFlags) statLogicFlags.textContent = '0';
   if (statCorrections) statCorrections.textContent = '0';
-  if (meetingTitleDisplay) meetingTitleDisplay.textContent = t('status.no_meeting');
-  updateConnectionStatus('disconnected');
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = '未加载会议';
+  if (connectionStatus) connectionStatus.textContent = '离线';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3070,23 +3108,18 @@ async function checkBackendStatus() {
     const resp = await fetch(`${API_BASE}/api/xasr/status`);
     const data = await resp.json();
     if (data.model_available) {
-      const chunk = data.models?.live?.chunk_ms;
-      const modelStatus = t('status.xasr_ready', { chunk: chunk ? `${chunk} ms` : 'Ready' });
-      const speakerStatus = data.diarization?.available
-        ? t('status.speakers_ready')
-        : t('status.speakers_off');
-      xasrStatus.textContent = `${modelStatus} · ${speakerStatus}${data.loading ? ` · ${t('status.reloading')}` : ''}`;
-      xasrStatus.style.color = data.loading ? 'var(--accent-yellow)' : 'var(--accent-green)';
+      xasrStatus.innerHTML = 'X-ASR 就绪';
+      xasrStatus.style.color = 'var(--accent-green)';
     } else if (data.loading) {
-      xasrStatus.textContent = t('status.xasr_loading');
+      xasrStatus.innerHTML = 'X-ASR 加载中...';
       xasrStatus.style.color = 'var(--accent-yellow)';
     } else {
-      xasrStatus.textContent = t('status.xasr_demo');
+      xasrStatus.innerHTML = 'X-ASR 演示模式';
       xasrStatus.style.color = 'var(--accent-orange)';
     }
     updateConnectionStatus('connected');
   } catch (e) {
-    xasrStatus.textContent = t('status.backend_offline');
+    xasrStatus.innerHTML = '后端离线';
     xasrStatus.style.color = 'var(--accent-red)';
     updateConnectionStatus('disconnected');
   }
@@ -3103,16 +3136,16 @@ async function checkBackendStatus() {
 // ═══════════════════════════════════════════════════════════
 
 function initApp() {
-  refreshLocalizedInterface();
   checkBackendStatus();
   connectLogStream();
+  restoreLogin();
+  startVolumeMeter();
 
   // Button wiring
   const btnStart = $('btnStart');
   const btnReset = $('btnReset');
   const btnMic = $('btnMic');
   const btnUpload = $('btnUpload');
-  const btnHotwords = $('btnHotwords');
   const fileUpload = $('fileUpload');
   const btnLog = $('btnLog');
   const logPanelHeader = $('logPanelHeader');
@@ -3121,31 +3154,60 @@ function initApp() {
   if (btnReset) btnReset.addEventListener('click', resetAll);
   if (btnMic) btnMic.addEventListener('click', toggleMic);
   if (btnUpload) btnUpload.addEventListener('click', () => { if (fileUpload) fileUpload.click(); });
-  if (btnHotwords) btnHotwords.addEventListener('click', openHotwordSettings);
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
   if (btnLog) btnLog.addEventListener('click', toggleLogPanel);
   if (logPanelHeader) logPanelHeader.addEventListener('click', toggleLogPanel);
-  languageSelect?.addEventListener('change', event => {
-    refreshLocalizedInterface(event.target.value);
-    checkBackendStatus();
+
+  // Login form
+  if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  const registerForm = $('registerForm');
+  if (registerForm) registerForm.addEventListener('submit', handleRegisterSubmit);
+
+  const showRegister = $('showRegister');
+  const showLoginLink = $('showLogin');
+  if (showRegister) showRegister.addEventListener('click', showRegisterForm);
+  if (showLoginLink) showLoginLink.addEventListener('click', showLoginForm);
+  if (topbarLogin) topbarLogin.addEventListener('click', showLogin);
+  if (topbarLogout) topbarLogout.addEventListener('click', logout);
+
+  document.querySelectorAll('.topbar-nav-item').forEach(item => {
+    item.addEventListener('click', () => switchModule(item.dataset.module));
   });
-  settingsNavButtons.forEach(button => {
-    button.addEventListener('click', () => switchSettingsTab(button.dataset.settingsTab));
+
+  // Management panel
+  const btnCloseManagement = $('btnCloseManagement');
+  if (btnCloseManagement) btnCloseManagement.addEventListener('click', toggleManagementPanel);
+
+  // Module cards (in moduleOverlay - hidden by default)
+  document.querySelectorAll('.module-card').forEach(card => {
+    card.addEventListener('click', () => switchModule(card.dataset.module));
   });
-  settingsSearch?.addEventListener('input', event => filterSettingsNavigation(event.target.value));
-  $('btnCloseHotwords')?.addEventListener('click', closeHotwordSettings);
-  $('btnCancelHotwords')?.addEventListener('click', closeHotwordSettings);
-  $('btnSaveHotwords')?.addEventListener('click', saveHotwordSettings);
-  $('btnRefreshMics')?.addEventListener('click', refreshMicrophoneDevices);
-  $('btnTestMic')?.addEventListener('click', toggleMicrophoneTest);
-  $('btnAddHotword')?.addEventListener('click', addHotwordToEditor);
-  $('newHotwordInput')?.addEventListener('keydown', event => {
-    if (event.key === 'Enter') { event.preventDefault(); addHotwordToEditor(); }
-  });
-  defaultHotwordScore?.addEventListener('input', event => setDefaultHotwordScore(event.target.value));
-  defaultHotwordScoreNumber?.addEventListener('change', event => setDefaultHotwordScore(event.target.value));
-  hotwordModal?.addEventListener('click', event => {
-    if (event.target === hotwordModal) closeHotwordSettings();
+
+  // Management CRUD
+  const btnSearchUsers = $('btnSearchUsers');
+  if (btnSearchUsers) btnSearchUsers.addEventListener('click', searchFriends);
+  const friendSearch = $('friendSearch');
+  if (friendSearch) friendSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchFriends(); });
+  const btnCreateReservation = $('btnCreateReservation');
+  const btnJoinMeeting = $('btnJoinMeeting');
+  if (btnCreateReservation) btnCreateReservation.addEventListener('click', createReservation);
+  if (btnJoinMeeting) btnJoinMeeting.addEventListener('click', joinMeeting);
+
+  // Analysis buttons
+  const btnSaveAnalysis = $('btnSaveAnalysis');
+  const btnRefreshAnalyses = $('btnRefreshAnalyses');
+  if (btnSaveAnalysis) btnSaveAnalysis.addEventListener('click', saveAnalysis);
+  if (btnRefreshAnalyses) btnRefreshAnalyses.addEventListener('click', loadAnalyses);
+
+  // Expose analysis functions to global scope for onclick handlers
+  window.viewAnalysis = viewAnalysis;
+  window.deleteAnalysis = deleteAnalysis;
+
+  initCalendar();
+
+  // Browser back button → return to module selector
+  window.addEventListener('popstate', () => {
+    showHome();
   });
 
   console.log('[DiTing] App initialized — all event listeners registered');
@@ -3156,10 +3218,6 @@ initApp();
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && hotwordModal?.classList.contains('visible')) {
-    closeHotwordSettings();
-    return;
-  }
   if (e.code === 'Space' && !e.target.closest('input,textarea')) {
     e.preventDefault();
     if (!isPlaying) startDemo();
@@ -3174,5 +3232,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 </script>
+</div><!-- /#mainApp -->
 </body>
 </html>

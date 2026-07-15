@@ -26,6 +26,10 @@ class ASRResult:
     quality_score: float = 0.85
     quality_label: str = "high"
     corrections: list[dict] = field(default_factory=list)
+    postprocessed: bool = False
+    original_text: str = ""
+    fillers_removed: list[str] = field(default_factory=list)
+    repetitions_merged: list[str] = field(default_factory=list)
     logic_flags: list[dict] = field(default_factory=list)
     uncertainty: dict = field(default_factory=dict)
     terms: list[str] = field(default_factory=list)

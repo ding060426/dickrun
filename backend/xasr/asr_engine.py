@@ -644,9 +644,11 @@ class XASREngine:
 
         self._total_segments_processed += 1
 
-        # Acoustic estimation
-        self._current_snr = estimate_snr(audio_chunk, sr)
-        self._current_rt60 = estimate_rt60(audio_chunk, sr)
+        # Acoustic estimation is substantially more expensive than accepting
+        # one streaming chunk. Sample immediately, then periodically.
+        if self._total_segments_processed == 1 or self._total_segments_processed % 5 == 0:
+            self._current_snr = estimate_snr(audio_chunk, sr)
+            self._current_rt60 = estimate_rt60(audio_chunk, sr)
 
         # X-ASR inference
         if self.asr:
@@ -657,6 +659,18 @@ class XASREngine:
         else:
             raw_text = ""
             is_endpoint = False
+
+        if not raw_text and not is_endpoint:
+            return ASRResult(
+                text="",
+                raw_text="",
+                is_partial=True,
+                is_final=False,
+                timestamp=time.time(),
+                snr_db=round(self._current_snr, 1),
+                rt60=round(self._current_rt60, 2),
+                quality_label="medium",
+            )
 
         result = self._build_result(
             raw_text=raw_text,
@@ -681,6 +695,7 @@ class XASREngine:
         if self._session_active:
             if self.asr:
                 self.asr.input_finished()
+                self.asr = None
             self._session_active = False
             logger.debug("Session ended")
 
@@ -717,6 +732,7 @@ class XASREngine:
             self.asr.reset()
         else:
             self._session_active = False
+            self.asr = None
         return result
 
     # ------------------------------------------------------------------
@@ -752,17 +768,27 @@ class XASREngine:
 
         # 2.5 Text post-processing (filler removal + punctuation + sentence splitting)
         # Only apply to final results — partial results are shown as-is for low latency
+        postprocessed = False
+        original_text = display_text
+        fillers_removed = []
+        repetitions_merged = []
         if self.enable_text_postprocess and is_final and display_text.strip():
-            from modules.text_post_processor import process_asr_text
-            postprocessed = process_asr_text(
+            from modules.text_post_processor import process_asr_text_with_details
+            processed_text, postprocess_info = process_asr_text_with_details(
                 display_text,
                 enable_filler_filter=True,
                 enable_punctuation=True,
                 enable_force_split=True,
                 enable_normalize=True,
             )
-            if postprocessed.strip():
-                display_text = postprocessed
+            if processed_text.strip():
+                display_text = processed_text
+            fillers_removed = postprocess_info["fillers_removed"]
+            repetitions_merged = postprocess_info["repetitions_merged"]
+            corrections.extend(postprocess_info["corrections"])
+            postprocessed = display_text != original_text or bool(
+                fillers_removed or repetitions_merged or postprocess_info["corrections"]
+            )
 
         # 3. Data points extraction
         data_points = self._extract_data_points(display_text)
@@ -809,6 +835,10 @@ class XASREngine:
             quality_score=round(quality, 2),
             quality_label=quality_label,
             corrections=corrections,
+            postprocessed=postprocessed,
+            original_text=original_text,
+            fillers_removed=fillers_removed,
+            repetitions_merged=repetitions_merged,
             logic_flags=logic_flags,
             uncertainty=uncertainty,
             terms=terms, data_points=data_points,

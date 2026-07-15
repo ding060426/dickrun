@@ -1012,6 +1012,20 @@ function renderSegment(seg, index, autoPlay = false) {
     ).join('');
   }
 
+  const cleanupParts = [];
+  if (seg.fillers_removed?.length) {
+    cleanupParts.push(`停顿词: ${seg.fillers_removed.join(', ')}`);
+  }
+  if (seg.repetitions_merged?.length) {
+    cleanupParts.push(`合并重复: ${seg.repetitions_merged.join(', ')}`);
+  }
+  if (seg.corrections?.length) {
+    cleanupParts.push(`纠错: ${seg.corrections.map(c => `${c.original}→${c.corrected}`).join(', ')}`);
+  }
+  const postprocessHTML = cleanupParts.length
+    ? `<div style="margin-top:4px;padding:4px 10px;font-size:11px;color:var(--text-muted);background:rgba(88,166,255,0.08);border-radius:4px;border-left:2px solid var(--accent-blue);">${escapeHTML(cleanupParts.join(' | '))}</div>`
+    : '';
+
   // Build the card
   const card = document.createElement('div');
   card.className = 'segment' + (hasAudio ? ' has-audio' : ' no-audio');
@@ -1045,6 +1059,7 @@ function renderSegment(seg, index, autoPlay = false) {
          </div>`
     }
     <div class="segment-text">${escapeHTML(displayText)}</div>
+    ${postprocessHTML}
     ${flagsHTML}
   `;
 
@@ -1605,6 +1620,7 @@ async function toggleMic() {
       }
     });
     micAudioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    if (micAudioContext.state === 'suspended') await micAudioContext.resume();
     await micAudioContext.audioWorklet.addModule('./audio-worklet.js');
 
     micWs = new WebSocket(`${WS_BASE}/ws/live`);
@@ -1649,8 +1665,12 @@ async function toggleMic() {
         showToast(msg.message || 'Live recognition failed');
       }
     };
-    micWs.onerror = () => {
+    micWs.onerror = (event) => {
+      console.error('[Mic] WebSocket error:', event);
       if (micStatusEl) { micStatusEl.textContent = 'Live error'; micStatusEl.style.color = 'var(--accent-red)'; }
+    };
+    micWs.onclose = (event) => {
+      console.log('[Mic] WebSocket closed:', event.code, event.reason || 'no reason');
     };
     await new Promise((resolve, reject) => {
       micWs.addEventListener('open', resolve, { once: true });

@@ -12,6 +12,7 @@ ASR 转写文本的后处理管线：
   - 零外部依赖 (punct 模型可选)
 """
 
+import os
 import re
 import logging
 from typing import List, Tuple, Optional
@@ -355,3 +356,87 @@ def process_transcript_segments(
 ) -> List[str]:
     """批量处理多个转写片段。"""
     return [process_asr_text(seg, **kwargs) for seg in segments]
+
+
+# ======================================================================
+# Structured result + optional MacBERT layer (adapted from tep/be69440)
+# ======================================================================
+
+_macbert_corrector = None
+_macbert_load_attempted = False
+
+
+def _get_macbert_corrector():
+    """Lazy-load pycorrector only when explicitly enabled."""
+    global _macbert_corrector, _macbert_load_attempted
+    if _macbert_corrector is not None:
+        return _macbert_corrector
+    if _macbert_load_attempted:
+        return None
+    _macbert_load_attempted = True
+    try:
+        from pycorrector import MacBertCorrector
+
+        logger.info("Loading optional MacBERT text corrector")
+        _macbert_corrector = MacBertCorrector()
+    except Exception as error:
+        logger.warning("MacBERT unavailable; continuing with rule pipeline: %s", error)
+    return _macbert_corrector
+
+
+def _macbert_correct(text: str) -> Tuple[str, List[dict]]:
+    corrector = _get_macbert_corrector()
+    if corrector is None:
+        return text, []
+    try:
+        results = corrector.correct_batch([text])
+        if not results:
+            return text, []
+        item = results[0]
+        corrections = [
+            {
+                "original": error[0],
+                "corrected": error[1],
+                "position": error[2],
+                "source": "macbert",
+            }
+            for error in item.get("errors", [])
+            if len(error) >= 3
+        ]
+        return item.get("target", text), corrections
+    except Exception as error:
+        logger.warning("MacBERT correction failed: %s", error)
+        return text, []
+
+
+def _collect_cleanup_details(text: str) -> Tuple[List[str], List[str]]:
+    fillers: List[str] = []
+    for phrase, _ in _FILLER_PHRASES:
+        if phrase and phrase in text and phrase not in fillers:
+            fillers.append(phrase)
+    for pattern in (_FILLER_SENTENCE_START, _FILLER_SENTENCE_END):
+        match = pattern.search(text)
+        if match:
+            value = match.group(0).strip(" ,.，。！？!?")
+            if value and value not in fillers:
+                fillers.append(value)
+    repetitions = [match.group(0) for match in _REPEATED_CHAR.finditer(text)]
+    return fillers, repetitions
+
+
+def process_asr_text_with_details(raw_text: str, **kwargs) -> Tuple[str, dict]:
+    """Run the established pipeline and expose user-visible edit metadata."""
+    fillers, repetitions = _collect_cleanup_details(raw_text)
+    rule_text = process_asr_text(raw_text, **kwargs)
+    final_text = rule_text
+    corrections: List[dict] = []
+    if os.getenv("DITING_ENABLE_MACBERT", "").strip().lower() in {"1", "true", "yes"}:
+        final_text, corrections = _macbert_correct(rule_text)
+    return final_text, {
+        "original_text": raw_text,
+        "rule_cleaned": rule_text,
+        "final_text": final_text,
+        "fillers_removed": fillers,
+        "repetitions_merged": repetitions,
+        "corrections": corrections,
+    }

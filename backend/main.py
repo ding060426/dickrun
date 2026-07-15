@@ -439,6 +439,10 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
         "quality_score": round(float(result.quality_score), 3),
         "quality_label": result.quality_label,
         "corrections": result.corrections,
+        "postprocessed": bool(result.postprocessed),
+        "original_text": result.original_text,
+        "fillers_removed": result.fillers_removed,
+        "repetitions_merged": result.repetitions_merged,
         "logic_flags": result.logic_flags,
         "terms": result.terms,
         "data_points": result.data_points,
@@ -451,9 +455,9 @@ def _live_result_to_dict(result: ASRResult) -> dict:
     """Convert a streaming result while preserving partial/final semantics."""
     payload = _result_to_dict(result, 0)
     payload.update({
-        "timestamp": result.timestamp,
-        "is_partial": result.is_partial,
-        "is_final": result.is_final,
+        "timestamp": float(result.timestamp),
+        "is_partial": bool(result.is_partial),
+        "is_final": bool(result.is_final),
     })
     return payload
 

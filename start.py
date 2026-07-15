@@ -102,6 +102,7 @@ def start_frontend_server():
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(FRONTEND_DIR), **kwargs)
 
+    socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer(("", 3000), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

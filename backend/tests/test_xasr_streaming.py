@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -22,6 +23,26 @@ class _FakeStreamingAsr:
 
     def get_final_result(self):
         return "实时识别结果"
+
+    def input_finished(self):
+        pass
+
+
+class _SilentStreamingAsr:
+    def accept_waveform(self, samples, sample_rate=16000):
+        pass
+
+    def decode(self):
+        return 0
+
+    def get_partial_result(self):
+        return ""
+
+    def is_endpoint(self):
+        return False
+
+    def input_finished(self):
+        pass
 
 
 class _FakeRuntime:
@@ -46,6 +67,51 @@ def _write_model_files(model_dir: str, chunk_ms: int = 160) -> None:
 
 
 class XASRStreamingSessionTests(unittest.TestCase):
+    def test_final_result_exposes_text_cleanup_metadata(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            engine = XASREngine(
+                model_dir=model_dir,
+                enable_logic_validation=False,
+                enable_uncertainty=False,
+            )
+
+        result = engine._build_result(
+            raw_text="嗯，就是说好好好我们开始开会啊",
+            is_partial=False,
+            is_final=True,
+        )
+
+        self.assertTrue(result.postprocessed)
+        self.assertIn("就是说", result.fillers_removed)
+        self.assertIn("好好好", result.repetitions_merged)
+
+    def test_silent_partial_uses_fast_path_and_samples_acoustics_periodically(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            engine = XASREngine(model_dir=model_dir)
+        engine.asr = _SilentStreamingAsr()
+        engine._session_active = True
+        chunk = np.zeros(640, dtype=np.float32)
+
+        with (
+            patch("xasr.asr_engine.estimate_snr", return_value=20.0) as snr,
+            patch("xasr.asr_engine.estimate_rt60", return_value=0.2) as rt60,
+        ):
+            results = [engine.process_chunk(chunk) for _ in range(6)]
+
+        self.assertTrue(all(result.text == "" for result in results))
+        self.assertEqual(snr.call_count, 2)
+        self.assertEqual(rt60.call_count, 2)
+
+    def test_end_session_releases_stream_reference(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            engine = XASREngine(model_dir=model_dir)
+        engine.asr = _SilentStreamingAsr()
+        engine._session_active = True
+
+        engine.end_session()
+
+        self.assertIsNone(engine.asr)
+
     def test_empty_recording_finishes_without_dividing_by_zero(self):
         with tempfile.TemporaryDirectory() as model_dir:
             engine = XASREngine(model_dir=model_dir)

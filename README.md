@@ -131,6 +131,14 @@ $env:DITING_PROCESSING_WORKERS = "2"
 python start.py
 ```
 
+如已安装 `torch` 与 `pycorrector`，可显式启用 tep 分支同步来的 MacBERT
+同音字/形似字纠错。默认关闭，避免首次加载模型阻塞最终转写：
+
+```powershell
+$env:DITING_ENABLE_MACBERT = "1"
+python start.py
+```
+
 无需物理麦克风也可以用音频文件验证同一条 WebSocket 链路：
 
 ```bash

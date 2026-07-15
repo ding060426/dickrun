@@ -26,5 +26,18 @@
     });
   }
 
-  return { nextMicLevel, buildBarScales };
+  function buildOrbStyle(level) {
+    const normalized = clamp(level);
+    return {
+      scale: 1 + normalized * 0.42,
+      ringOpacity: 0.25 + normalized * 0.65,
+      shadow: 18 + normalized * 34,
+      blur: 0.5 + normalized * 3,
+      glowOpacity: 0.82 + normalized * 0.18,
+      coreScale: 1 + normalized * 0.22,
+      coreShadow: 20 + normalized * 50,
+    };
+  }
+
+  return { nextMicLevel, buildBarScales, buildOrbStyle };
 }));

@@ -276,66 +276,95 @@ body {
 .btn-secondary:hover { border-color: var(--border-active); }
 .btn-secondary.active { border-color: var(--accent-blue); background: rgba(74,144,217,0.1); }
 .btn-danger { background: rgba(224,85,106,0.15); color: var(--accent-red); border: 1px solid rgba(224,85,106,0.3); }
-.mic-level-meter {
-  --mic-level: 0;
+.mic-orb-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  width: 240px;
+  min-height: 150px;
+  padding: 18px 18px 14px;
+  border: 1px solid rgba(74, 144, 217, 0.18);
+  border-radius: 24px;
+  background: rgba(15, 17, 23, 0.74);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 450;
+  transform: translateX(-50%) translateY(18px) scale(0.96);
+  transition: opacity 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+}
+.mic-orb-panel.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.mic-orb-panel.listening { border-color: rgba(139, 108, 232, 0.42); }
+.mic-orb-panel.finalizing { border-color: rgba(224, 185, 85, 0.42); }
+.mic-orb-wrap {
   position: relative;
-  width: 0;
-  height: 30px;
-  padding: 0;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  opacity: 0;
-  border: 1px solid transparent;
-  border-radius: 15px;
-  background: rgba(13, 16, 25, 0.82);
-  transition: width 0.24s ease, padding 0.24s ease, opacity 0.2s ease, border-color 0.2s ease;
 }
-.mic-level-meter.active {
-  width: 94px;
-  padding: 0 10px;
-  opacity: 1;
-  border-color: rgba(139, 108, 232, 0.38);
-  box-shadow: 0 0 18px rgba(74, 144, 217, 0.12);
-}
-.mic-level-glow {
+.mic-orb-ring,
+.mic-orb-glow {
   position: absolute;
-  inset: 3px 20px;
+  inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(93, 183, 255, 0.48), rgba(139, 108, 232, 0.2) 48%, transparent 72%);
-  opacity: var(--mic-glow-opacity, 0.18);
-  filter: blur(7px);
-  transform: scale(var(--mic-glow-scale, 0.72));
-  transition: opacity 0.08s linear, transform 0.08s linear;
+  transform: scale(var(--orb-scale, 1));
+  transition: transform 0.08s linear, opacity 0.08s linear;
 }
-.mic-level-bars {
+.mic-orb-ring {
+  border: 1px solid rgba(139, 108, 232, 0.48);
+  opacity: var(--orb-ring-opacity, 0.35);
+  box-shadow: 0 0 var(--orb-shadow, 18px) rgba(139, 108, 232, 0.42);
+}
+.mic-orb-glow {
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.98), rgba(112,190,255,0.95) 18%, rgba(139,108,232,0.74) 48%, rgba(74,144,217,0.18) 72%, transparent 100%);
+  filter: blur(var(--orb-blur, 0.5px));
+  opacity: var(--orb-glow-opacity, 0.82);
+}
+.mic-orb-core {
   position: relative;
-  z-index: 1;
-  height: 20px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 28%, #fff 0%, #bfe8ff 22%, #7a8cff 52%, #6b46e8 100%);
+  box-shadow: inset -10px -12px 24px rgba(28,18,86,0.38), inset 8px 8px 16px rgba(255,255,255,0.28), 0 0 var(--orb-core-shadow, 20px) rgba(74,144,217,0.58);
+  transform: scale(var(--orb-core-scale, 1));
+  transition: transform 0.08s linear, box-shadow 0.08s linear;
+}
+.mic-orb-wave {
+  height: 28px;
+  margin: 0 auto 8px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 3px;
 }
-.mic-level-bar {
+.mic-orb-wave span {
   width: 3px;
-  height: 20px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #6ee7ff 0%, #7196ff 45%, #b878ff 72%, #ff78b8 100%);
-  transform: scaleY(0.12);
-  transform-origin: center;
-  opacity: 0.72;
-  transition: transform 0.07s linear, opacity 0.12s ease;
-  box-shadow: 0 0 5px rgba(113, 150, 255, 0.35);
-}
-.mic-level-meter.finalizing .mic-level-bar {
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #bfe8ff, #8b6ce8);
   opacity: 0.42;
-  transition-duration: 0.16s;
+  transform: scaleY(0.12);
+  transition: transform 0.08s linear, opacity 0.08s linear;
 }
+.mic-orb-panel.listening .mic-orb-wave span { opacity: 0.82; }
+.mic-orb-panel.finalizing .mic-orb-wave span { opacity: 0.34; }
+.mic-orb-title { font-size: 13px; font-weight: 700; text-align: center; }
+.mic-orb-subtitle { margin-top: 2px; font-size: 11px; color: var(--text-muted); text-align: center; }
 @media (prefers-reduced-motion: reduce) {
-  .mic-level-meter,
-  .mic-level-glow,
-  .mic-level-bar { transition: none; }
+  .mic-orb-panel,
+  .mic-orb-ring,
+  .mic-orb-glow,
+  .mic-orb-core,
+  .mic-orb-wave span { transition: none; }
 }
 .progress-bar {
   flex: 1; height: 4px;
@@ -516,23 +545,27 @@ body {
   <button class="btn btn-secondary" id="btnReset">Reset</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">Mic</button>
-  <div class="mic-level-meter" id="micLevelMeter" aria-hidden="true">
-    <div class="mic-level-glow"></div>
-    <div class="mic-level-bars">
-      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
-      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
-      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
-      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
-      <span class="mic-level-bar"></span><span class="mic-level-bar"></span>
-      <span class="mic-level-bar"></span>
-    </div>
-  </div>
   <button class="btn btn-secondary" id="btnUpload">Upload</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
   <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">Log</button>
+</div>
+
+<div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true" role="status" aria-live="polite">
+  <div class="mic-orb-wrap" id="micOrbWrap">
+    <div class="mic-orb-ring"></div>
+    <div class="mic-orb-glow"></div>
+    <div class="mic-orb-core"></div>
+  </div>
+  <div class="mic-orb-wave" id="micOrbWave">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <div class="mic-orb-title" id="micOrbTitle">正在听你说话</div>
+  <div class="mic-orb-subtitle" id="micOrbSubtitle">音量越大，语音球越活跃</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -613,9 +646,12 @@ const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
 const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
-const micLevelMeter = $('micLevelMeter');
-const micLevelGlow = micLevelMeter?.querySelector('.mic-level-glow');
-const micLevelBars = Array.from(micLevelMeter?.querySelectorAll('.mic-level-bar') || []);
+const micOrbPanel = $('micOrbPanel');
+const micOrbWrap = $('micOrbWrap');
+const micOrbWave = $('micOrbWave');
+const micOrbTitle = $('micOrbTitle');
+const micOrbSubtitle = $('micOrbSubtitle');
+const micLevelBars = Array.from(micOrbWave?.querySelectorAll('span') || []);
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1550,7 +1586,7 @@ function updateMicLevel(rms, peak) {
 }
 
 function renderMicLevel(timestamp) {
-  if (!micLevelMeter?.classList.contains('active') || !window.DiTingMicLevel) {
+  if (!micOrbPanel?.classList.contains('visible') || !window.DiTingMicLevel) {
     micLevelAnimationFrame = null;
     return;
   }
@@ -1567,19 +1603,30 @@ function renderMicLevel(timestamp) {
   micLevelBars.forEach((bar, index) => {
     bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
   });
-  micLevelMeter.style.setProperty('--mic-level', micDisplayLevel.toFixed(3));
-  if (micLevelGlow) {
-    micLevelGlow.style.setProperty('--mic-glow-opacity', (0.18 + micDisplayLevel * 0.72).toFixed(3));
-    micLevelGlow.style.setProperty('--mic-glow-scale', (0.72 + micDisplayLevel * 0.5).toFixed(3));
+  const orb = window.DiTingMicLevel.buildOrbStyle(micDisplayLevel);
+  if (micOrbWrap) {
+    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-ring-opacity', orb.ringOpacity.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-shadow', `${orb.shadow.toFixed(1)}px`);
+    micOrbWrap.style.setProperty('--orb-blur', `${orb.blur.toFixed(1)}px`);
+    micOrbWrap.style.setProperty('--orb-glow-opacity', orb.glowOpacity.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-shadow', `${orb.coreShadow.toFixed(1)}px`);
   }
   micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
 }
 
 function setMicVisualizerState(state) {
-  if (!micLevelMeter) return;
+  if (!micOrbPanel) return;
   const active = state === 'recording' || state === 'finalizing';
-  micLevelMeter.classList.toggle('active', active);
-  micLevelMeter.classList.toggle('finalizing', state === 'finalizing');
+  micOrbPanel.classList.toggle('visible', active);
+  micOrbPanel.classList.toggle('listening', state === 'recording');
+  micOrbPanel.classList.toggle('finalizing', state === 'finalizing');
+  micOrbPanel.setAttribute('aria-hidden', active ? 'false' : 'true');
+  if (micOrbTitle) micOrbTitle.textContent = state === 'finalizing' ? '正在整理转写' : '正在听你说话';
+  if (micOrbSubtitle) micOrbSubtitle.textContent = state === 'finalizing'
+    ? '请稍候，正在生成最终文本'
+    : '音量越大，语音球越活跃';
   if (active) {
     if (micLevelAnimationFrame === null) {
       micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
@@ -1591,7 +1638,16 @@ function setMicVisualizerState(state) {
   micDisplayLevel = 0;
   micLevelLastUpdate = 0;
   micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
-  micLevelMeter.style.setProperty('--mic-level', '0');
+  const orb = window.DiTingMicLevel?.buildOrbStyle(0);
+  if (micOrbWrap && orb) {
+    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
+    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
+  }
+}
+
+function setMicOrbMessage(title, subtitle) {
+  if (micOrbTitle && title) micOrbTitle.textContent = title;
+  if (micOrbSubtitle && subtitle) micOrbSubtitle.textContent = subtitle;
 }
 
 async function toggleMic() {
@@ -1640,13 +1696,19 @@ async function toggleMic() {
         }));
       } else if (msg.type === 'configured') {
         micStreamId = msg.data.stream_id || micStreamId;
+        setMicOrbMessage('正在听你说话', `实时识别已连接 · ${msg.data.vad}`);
         if (micStatusEl) {
           micStatusEl.textContent = `Recording · ${msg.data.vad}`;
           micStatusEl.style.color = 'var(--accent-red)';
         }
       } else if (msg.type === 'live_result' && msg.data.text) {
+        setMicOrbMessage(
+          msg.data.is_final ? '已识别一句话' : '正在实时转写',
+          msg.data.is_final ? '继续说话，语音球会持续响应' : '正在捕捉你的声音',
+        );
         updateMicResult(msg.data);
       } else if (msg.type === 'finalizing') {
+        setMicOrbMessage('正在整理转写', '请稍候，正在生成最终文本');
         if (micStatusEl) {
           micStatusEl.textContent = 'Finalizing canonical transcript...';
           micStatusEl.style.color = 'var(--accent-yellow)';
@@ -1655,6 +1717,7 @@ async function toggleMic() {
         replaceMicTranscript(msg.data);
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
+        setMicOrbMessage('转写完成', `已接收 ${seconds} 秒音频`);
         if (micStatusEl) {
           micStatusEl.textContent = 'Complete';
           micStatusEl.style.color = 'var(--accent-green)';
@@ -1662,11 +1725,13 @@ async function toggleMic() {
         showToast(`Recording stopped · ${seconds}s received`);
         cleanupMicRecording();
       } else if (msg.type === 'error') {
+        setMicOrbMessage('实时识别异常', msg.message || '请停止后重试');
         showToast(msg.message || 'Live recognition failed');
       }
     };
     micWs.onerror = (event) => {
       console.error('[Mic] WebSocket error:', event);
+      setMicOrbMessage('连接异常', '无法连接实时识别服务');
       if (micStatusEl) { micStatusEl.textContent = 'Live error'; micStatusEl.style.color = 'var(--accent-red)'; }
     };
     micWs.onclose = (event) => {

@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 
-const { nextMicLevel, buildBarScales } = require('../mic-level.js');
+const { nextMicLevel, buildBarScales, buildOrbStyle } = require('../mic-level.js');
 
 
 function testSpeechAttackAndSilenceDecay() {
@@ -24,6 +24,18 @@ function testBarScalesStayVisibleAndReactToVolume() {
 }
 
 
+function testOrbStyleExpandsWithVolume() {
+  const quiet = buildOrbStyle(0);
+  const loud = buildOrbStyle(1);
+
+  assert.equal(quiet.scale, 1);
+  assert.equal(loud.scale, 1.42);
+  assert.ok(loud.ringOpacity > quiet.ringOpacity);
+  assert.ok(loud.coreShadow > quiet.coreShadow);
+}
+
+
 testSpeechAttackAndSilenceDecay();
 testBarScalesStayVisibleAndReactToVolume();
+testOrbStyleExpandsWithVolume();
 console.log('mic-level tests passed');

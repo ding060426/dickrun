@@ -29,6 +29,8 @@ asr_output.txt
 venv/
 .venv/
 env/
+.env
+.env.local
 
 # ── IDE ──
 .vscode/
@@ -40,6 +42,12 @@ Thumbs.db
 
 # ── X-ASR source (third-party, cloned separately) ──
 xasr_source/
+
+# ── Local memory database ──
+backend/storage/
+*.db
+*.sqlite
+*.sqlite3
 
 # ── Temp files ──
 *.tmp

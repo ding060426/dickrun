@@ -58,6 +58,11 @@ from .hotword_engine import (
     extract_and_match,
 )
 
+from .asr_optimizer import (
+    ASROptimizer,
+    ASROptimizerReport,
+)
+
 from .cognitive_engine import (
     ContentPredictor,
     DomainInferrer,

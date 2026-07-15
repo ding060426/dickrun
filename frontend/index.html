@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>谛听 v3.0 - 智能会议语音认知系统</title>
+<title>谛听 v4.5 - 智能会议语音认知系统</title>
 <style>
 /* ============================================================
-   DiTing v3.0 - Global Styles (with wavesurfer.js integration)
+   DiTing v4.5 - Global Styles (with wavesurfer.js integration)
    ============================================================ */
 :root {
   --bg-primary: #0f1117;
@@ -105,7 +105,7 @@ body {
 .transcript-body::-webkit-scrollbar { width: 4px; }
 .transcript-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* ── Segment Card (v3.0: with waveform) ── */
+/* ── Segment Card (v4.5: with waveform) ── */
 .segment {
   margin-bottom: 8px;
   background: var(--bg-card);
@@ -304,7 +304,7 @@ body {
 .results-panel {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 2fr;
+  grid-template-columns: 1fr 1fr 2fr;
   gap: 10px;
   max-height: 210px; overflow: hidden;
 }
@@ -332,34 +332,6 @@ body {
 }
 .results-card-body::-webkit-scrollbar { width: 3px; }
 .results-card-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-
-/* Domain card */
-.domain-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 13px; font-weight: 600;
-  background: rgba(74,144,217,0.12);
-  color: #6db3f2;
-  margin-bottom: 8px;
-}
-.domain-meta {
-  font-size: 11px; color: var(--text-muted);
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.domain-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); }
-.domain-sub { margin-top: 6px; }
-.domain-sub-tag {
-  display: inline-block;
-  padding: 2px 8px; margin: 2px 4px 2px 0;
-  border-radius: 10px; font-size: 10px;
-  background: rgba(255,255,255,0.04); color: var(--text-secondary);
-  border: 1px solid rgba(255,255,255,0.06);
-}
-.domain-matched {
-  margin-top: 6px; font-size: 10px; color: var(--text-muted);
-  opacity: 0.7;
-}
 
 /* Hotword card */
 .hotword-tag {
@@ -459,6 +431,44 @@ body {
   color: var(--text-secondary);
 }
 
+.memory-panel {
+  position: fixed; bottom: 0; left: 0;
+  width: 460px; max-height: 360px;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 8px 8px 0 0;
+  z-index: 501;
+  display: none;
+  flex-direction: column;
+}
+.memory-panel.visible { display: flex; }
+.memory-panel-header {
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px 8px 0 0;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; cursor: pointer;
+}
+.memory-panel-search { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); }
+.memory-panel-search input {
+  flex: 1; background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 11px;
+}
+.memory-panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+.memory-item {
+  padding: 8px; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+  margin-bottom: 6px; cursor: pointer; background: rgba(255,255,255,0.02);
+}
+.memory-item:hover { border-color: rgba(74,144,217,0.35); background: rgba(74,144,217,0.06); }
+.memory-item-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+.memory-item-meta { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+.memory-item-preview { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.memory-item-fulltext {
+  margin-top: 6px; padding: 6px 7px; border-radius: 6px;
+  background: rgba(0,0,0,0.18); color: var(--text-secondary);
+  font-size: 11px; line-height: 1.6; white-space: pre-wrap;
+  max-height: 118px; overflow: hidden;
+}
+
 /* Upload status */
 .upload-status-card {
   margin-top: 6px; padding: 8px;
@@ -467,6 +477,15 @@ body {
 }
 .upload-status-card .stage { color: var(--accent-blue); }
 .upload-status-card .done { color: var(--accent-green); }
+.optimizer-report { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
+.optimizer-report-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.optimizer-chip {
+  display: inline-block; padding: 2px 7px; margin: 2px 4px 2px 0;
+  border-radius: 9px; font-size: 10px;
+  background: rgba(74,144,217,0.08); color: #6db3f2;
+  border: 1px solid rgba(74,144,217,0.12);
+}
+.optimizer-tip { font-size: 10px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
 
 /* ── Live Mic Voice Orb ── */
 .mic-orb-panel {
@@ -573,7 +592,7 @@ body {
   <div class="header-brand">
     <div class="header-logo">E</div>
     <div>
-      <div class="header-title">DiTing v3.0</div>
+      <div class="header-title">DiTing v4.5</div>
       <div class="header-subtitle">智能会议语音认知系统</div>
     </div>
   </div>
@@ -673,14 +692,6 @@ body {
 <!-- 分析结果面板 (v3.1)                                         -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="results-panel" id="resultsPanel">
-  <!-- 领域卡片 -->
-  <div class="results-card">
-    <div class="results-card-header">会议领域</div>
-    <div class="results-card-body" id="domainCard">
-      <div class="summary-empty">分析中…</div>
-    </div>
-  </div>
-
   <!-- 热词卡片 -->
   <div class="results-card">
     <div class="results-card-header">关键术语</div>
@@ -715,10 +726,11 @@ body {
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">麦克风</button>
   <button class="btn btn-secondary" id="btnUpload">上传</button>
-  <input type="file" id="fileUpload" accept="audio/*" style="display:none">
+  <input type="file" id="fileUpload" accept="audio/*,video/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
+  <button class="btn btn-secondary" id="btnMemory" style="font-size:10px;">历史</button>
   <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">日志</button>
 </div>
 
@@ -751,12 +763,24 @@ body {
   <div class="log-panel-body" id="logPanelBody"><div>连接中...</div></div>
 </div>
 
+<div class="memory-panel" id="memoryPanel">
+  <div class="memory-panel-header" id="memoryPanelHeader">
+    <span>历史记忆</span>
+    <span style="font-size:10px;color:var(--text-muted);">点击关闭</span>
+  </div>
+  <div class="memory-panel-search">
+    <input id="memorySearchInput" placeholder="搜索全文 / 文件名 / 热词">
+    <button class="btn btn-secondary" id="btnMemorySearch" style="font-size:10px;">搜索</button>
+  </div>
+  <div class="memory-panel-body" id="memoryPanelBody"><div style="font-size:11px;color:var(--text-muted);">暂无历史</div></div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Scripts                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <script type="module">
 // ============================================================
-// DiTing v3.0 - Frontend with wavesurfer.js
+// DiTing v4.5 - Frontend with wavesurfer.js
 // ============================================================
 
 // ── Import wavesurfer.js (non-blocking — don't block UI init) ──
@@ -815,7 +839,6 @@ const micOrbWrap = $('micOrbWrap');
 const micOrbWave = $('micOrbWave');
 const micOrbTitle = $('micOrbTitle');
 const micOrbSubtitle = $('micOrbSubtitle');
-const domainCard = $('domainCard');
 const hotwordCard = $('hotwordCard');
 const speakerCard = $('speakerCard');
 const summaryCard = $('summaryCard');
@@ -849,6 +872,9 @@ let isRecording = false;
 // Log stream
 let logWs = null;
 let logVisible = false;
+
+// Local memory history
+let memoryVisible = false;
 
 // ═══════════════════════════════════════════════════════════
 // AudioPlaybackManager (wavesurfer.js based)
@@ -1360,7 +1386,6 @@ function updateLogicPanel() {
 const SPEAKER_COLORS = ['#4A90D9', '#E8743C', '#50B86C', '#e8b83c', '#8b6ce8', '#e0556a'];
 
 function resetResultsPanel() {
-  if (domainCard) domainCard.innerHTML = '<div class="summary-empty">分析中…</div>';
   if (hotwordCard) hotwordCard.innerHTML = '<div class="summary-empty">提取中…</div>';
   if (speakerCard) speakerCard.innerHTML = '<div class="summary-empty">识别中…</div>';
   if (summaryCard) summaryCard.innerHTML = '<div class="summary-empty">会议处理完成后将自动生成摘要…</div>';
@@ -1369,13 +1394,9 @@ function resetResultsPanel() {
 function renderResultsPanel(data) {
   if (!data) return;
 
-  // 1. 领域
-  if (data.domain) {
-    renderDomainCard(data.domain);
-  } else {
-    if (domainCard) domainCard.innerHTML = '<div class="summary-empty">尚未识别</div>';
+  if (data.asr_optimizer) {
+    renderASROptimizerReport(data.asr_optimizer);
   }
-
   // 2. 热词
   renderHotwordCard(data.hotwords || []);
 
@@ -1388,41 +1409,41 @@ function renderResultsPanel(data) {
   }
 }
 
-function renderDomainCard(domain) {
-  const card = document.getElementById('domainCard');
-  if (!card) return;
+function renderASROptimizerReport(report) {
+  if (!processingPanel || !report) return;
 
-  if (!domain || !domain.domain) {
-    card.innerHTML = '<div class="summary-empty">未检测到领域</div>';
+  if (report.enabled === false) {
+    processingPanel.innerHTML = `<div class="upload-status-card">
+      <div class="stage">ASR 优化未启用</div>
+      <div style="color:var(--text-muted);">${escapeHTML(report.reason || '当前后端未返回优化报告')}</div>
+    </div>`;
     return;
   }
 
-  const pct = domain.confidence ? Math.round(domain.confidence * 100) : '--';
-  const methodLabel = domain.method === 'llm' ? 'LLM 推理' : (domain.method === 'demo' ? '演示' : '规则匹配');
+  const profile = report.profile || {};
+  const vad = report.vad_config || {};
+  const audioActions = report.audio_actions || [];
+  const textActions = report.text_actions || [];
+  const suggestions = report.suggestions || [];
+  const chips = [...audioActions, ...textActions].slice(0, 8)
+    .map(a => `<span class="optimizer-chip">${escapeHTML(a)}</span>`).join('');
+  const tips = suggestions.slice(0, 3)
+    .map(t => `<div class="optimizer-tip">${escapeHTML(t)}</div>`).join('');
+  const silencePct = profile.silence_ratio != null ? Math.round(profile.silence_ratio * 100) + '%' : '--';
+  const clippingPct = profile.clipping_ratio != null ? (profile.clipping_ratio * 100).toFixed(1) + '%' : '--';
 
-  let h = `<div class="domain-badge">${escapeHTML(domain.domain)}</div>`;
-  h += `<div class="domain-meta">`;
-  h += `<span>置信度 ${pct}%</span>`;
-  h += `<span class="dot"></span>`;
-  h += `<span>${methodLabel}</span>`;
-  h += `</div>`;
-
-  if (domain.sub_domains && domain.sub_domains.length > 0) {
-    h += '<div class="domain-sub">';
-    domain.sub_domains.forEach(sd => { h += `<span class="domain-sub-tag">${escapeHTML(sd)}</span>`; });
-    h += '</div>';
-  }
-
-  if (domain.matched_terms && domain.matched_terms.length > 0) {
-    h += '<div class="domain-matched">匹配词：' + domain.matched_terms.slice(0, 6).map(t => escapeHTML(t)).join(' · ') + '</div>';
-  }
-
-  if (domain.reason) {
-    h += `<div class="domain-matched" style="margin-top:2px;">${escapeHTML(domain.reason)}</div>`;
-  }
-
-  card.innerHTML = h;
+  processingPanel.innerHTML = `<div class="upload-status-card">
+    <div class="stage">ASR 优化完成</div>
+    <div style="color:var(--text-muted);">时长 ${profile.duration_sec || '--'}s · 静音 ${silencePct} · 动态范围 ${profile.dynamic_range || '--'} · 削波 ${clippingPct}</div>
+    <div class="optimizer-report">
+      <div class="optimizer-report-title">优化动作</div>
+      ${chips || '<span class="optimizer-chip">保持默认优化</span>'}
+      <div class="optimizer-tip">VAD 阈值 ${vad.energy_threshold_ratio || '--'} · 静音帧 ${vad.min_silence_frames || '--'} · 最短片段 ${vad.min_segment_duration || '--'}s</div>
+      ${tips}
+    </div>
+  </div>`;
 }
+
 
 function renderHotwordCard(hotwords) {
   const card = document.getElementById('hotwordCard');
@@ -1585,6 +1606,9 @@ function finishDemo() {
   const btnStart = $('btnStart');
   if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
   updateConnectionStatus('completed');
+  if (demoData && demoData.asr_optimizer) {
+    renderASROptimizerReport(demoData.asr_optimizer);
+  }
   showToast('演示完成');
 }
 
@@ -1608,7 +1632,15 @@ function getEmbeddedDemoData() {
       {"start":6,"end":12,"snr_db":26,"quality_label":"high","display_text":"演示片段 2：上传真实音频后可以查看实时波形。"},
       {"start":13,"end":18,"snr_db":27,"quality_label":"high","display_text":"演示片段 3：可查看后端日志了解处理细节。"},
     ],
-    "summary": {"topics":["Demo"], "todos":[], "low_confidence_spots":[], "stats":{}}
+    "summary": {"topics":["Demo"], "todos":[], "low_confidence_spots":[], "stats":{}},
+    "asr_optimizer": {
+      "enabled": true,
+      "profile": {"duration_sec": 18, "silence_ratio": 0.28, "dynamic_range": 4.2, "clipping_ratio": 0},
+      "vad_config": {"energy_threshold_ratio": 0.06, "min_silence_frames": 30, "min_segment_duration": 0.8},
+      "audio_actions": ["音频幅度正常，保持原始动态"],
+      "text_actions": ["会议指标与中英混排规范化"],
+      "suggestions": []
+    }
   };
 }
 
@@ -1633,6 +1665,7 @@ function handleUploadHTTPResponse(result, generation = resetGeneration) {
     updateStats(result.segments_count || result.segments.length);
     updateLogicPanel();
     renderResultsPanel(result);
+    if (memoryVisible) loadMemoryHistory();
     showToast(`完成：${result.segments_count || result.segments.length} 个片段`);
     finishUploadUI('complete');
   } else if (result.status === 'demo_mode') {
@@ -1742,7 +1775,7 @@ async function handleFileUpload(event) {
         if (msg.type === 'segment') uploadWsDelivered = true;
         if (msg.type === 'complete') {
           uploadWsDelivered = true;
-          clearTimeout(fallbackTimer);
+          clearUploadTimers();
         }
         handleUploadWSMessage(msg);
       } catch (e) {
@@ -1758,11 +1791,11 @@ async function handleFileUpload(event) {
       console.log('[Upload] WS closed');
       // If WS closed without delivering segments, use HTTP fallback
       if (!uploadWsDelivered && uploadHttpResult) {
-        clearTimeout(fallbackTimer);
+        clearUploadTimers();
         // Small delay to let any in-flight messages arrive
-        setTimeout(() => {
+        uploadCloseFallbackTimer = setTimeout(() => {
           if (!uploadWsDelivered) {
-            handleUploadHTTPResponse(uploadHttpResult);
+            handleUploadHTTPResponse(uploadHttpResult, generation);
           }
         }, 1500);
       }
@@ -1770,8 +1803,8 @@ async function handleFileUpload(event) {
 
   } catch (e) {
     console.error('[Upload] WS creation failed:', e);
-    clearTimeout(fallbackTimer);
-    uploadFallback(file);
+    clearUploadTimers();
+    uploadFallback(file, generation);
   }
 }
 
@@ -1863,8 +1896,10 @@ function handleUploadWSMessage(msg) {
 
     case 'progress':
       if (panel) {
-        const progEl = panel.querySelector('.stage');
-        if (progEl) progEl.textContent = `阶段：${msg.data.stage} (${(msg.data.fraction*100).toFixed(0)}%)`;
+        panel.innerHTML = `<div class="upload-status-card">
+          <div class="stage">处理阶段：${escapeHTML(msg.data.stage || '')} (${(msg.data.fraction*100).toFixed(0)}%)</div>
+          <div style="color:var(--text-muted);">ASR 优化器将自动分析音量、静音比例和 VAD 参数</div>
+        </div>`;
       }
       break;
 
@@ -1917,6 +1952,7 @@ function handleUploadWSMessage(msg) {
       }
       updateStats(allSegments.filter(Boolean).length);
       renderResultsPanel(msg.data);
+      if (memoryVisible) loadMemoryHistory();
       finishUploadUI('complete');
       break;
 
@@ -2223,6 +2259,107 @@ function updateMicResult(data) {
   transcriptBody.scrollTop = transcriptBody.scrollHeight;
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// Local Memory History
+// ═══════════════════════════════════════════════════════════
+
+function toggleMemoryPanel() {
+  const panel = $('memoryPanel');
+  if (!panel) return;
+  memoryVisible = !memoryVisible;
+  panel.classList.toggle('visible', memoryVisible);
+  if (memoryVisible) loadMemoryHistory();
+}
+
+async function loadMemoryHistory(q = '') {
+  const body = $('memoryPanelBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">正在加载历史...</div>';
+  try {
+    const url = q
+      ? `${API_BASE}/api/memory/history?limit=30&q=${encodeURIComponent(q)}`
+      : `${API_BASE}/api/memory/history?limit=30`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!resp.ok || !data.available) {
+      const detail = data.reason || data.error || data.detail || `HTTP ${resp.status}`;
+      body.innerHTML = `<div style="font-size:11px;color:var(--text-muted);">历史记忆不可用：${escapeHTML(detail)}</div>`;
+      return;
+    }
+    renderMemoryList(data.items || []);
+  } catch (e) {
+    body.innerHTML = '<div style="font-size:11px;color:var(--accent-red);">加载历史失败，请检查后端是否运行</div>';
+  }
+}
+
+function renderMemoryList(items) {
+  const body = $('memoryPanelBody');
+  if (!body) return;
+  if (!items.length) {
+    body.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:12px 0;">暂无历史记录</div>';
+    return;
+  }
+  body.innerHTML = items.map(item => {
+    const title = item.filename || item.id || '未命名记录';
+    const created = (item.created_at || '').replace('T', ' ').slice(0, 19);
+    const hotwords = (item.hotwords || []).slice(0, 5).map(h => typeof h === 'string' ? h : (h.word || '')).filter(Boolean).join(' · ');
+    const preview = item.summary_preview || '';
+    const fullText = item.full_text_preview || '';
+    return `<div class="memory-item" data-memory-id="${escapeHTML(item.id)}">
+      <div class="memory-item-title">${escapeHTML(title)}</div>
+      <div class="memory-item-meta">${created || '未知时间'} · ${item.segments_count || 0} 段 · ${Math.round(item.duration_sec || 0)}s</div>
+      ${hotwords ? `<div class="memory-item-meta">${escapeHTML(hotwords)}</div>` : ''}
+      ${preview ? `<div class="memory-item-preview">${escapeHTML(preview)}</div>` : ''}
+      <div class="memory-item-fulltext">${escapeHTML(fullText || '该记录暂无可预览文本，点击载入完整详情')}</div>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.memory-item').forEach(el => {
+    el.addEventListener('click', () => openMemoryDetail(el.dataset.memoryId));
+  });
+}
+
+async function openMemoryDetail(id) {
+  if (!id) return;
+  const body = $('memoryPanelBody');
+  try {
+    if (body) body.insertAdjacentHTML('afterbegin', '<div style="font-size:10px;color:var(--text-muted);padding-bottom:4px;">正在载入详情...</div>');
+    const resp = await fetch(`${API_BASE}/api/memory/history/${encodeURIComponent(id)}`);
+    const record = await resp.json();
+    if (record.error) {
+      showToast('历史记录读取失败：' + record.error);
+      return;
+    }
+    applyMemoryRecord(record);
+    showToast('已载入历史记录');
+  } catch (e) {
+    showToast('历史记录读取失败');
+  }
+}
+
+function applyMemoryRecord(record) {
+  resetAll();
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = record.filename || '历史记录';
+  allSegments = record.segments || [];
+  if (transcriptBody) transcriptBody.innerHTML = '';
+  if (emptyState) emptyState.style.display = allSegments.length ? 'none' : 'flex';
+  allSegments.forEach((seg, i) => renderSegment(seg, i, false));
+  if (segmentCounter) segmentCounter.textContent = `${allSegments.length}/${allSegments.length}`;
+  updateStats(allSegments.length);
+  updateLogicPanel();
+  renderResultsPanel({
+    hotwords: record.hotwords || [],
+    speaker_stats: record.speaker_stats || {},
+    summary: record.summary || null,
+    asr_optimizer: record.asr_optimizer || null,
+  });
+  if (summaryPanel) {
+    const text = record.full_text || '';
+    summaryPanel.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);white-space:pre-wrap;line-height:1.7;">${escapeHTML(text.slice(0, 1200) || '该历史记录暂无全文')}</div>`;
+  }
+  updateConnectionStatus('completed');
+}
+
 // ═══════════════════════════════════════════════════════════
 // Debug Log Panel
 // ═══════════════════════════════════════════════════════════
@@ -2355,6 +2492,10 @@ function initApp() {
   const fileUpload = $('fileUpload');
   const btnLog = $('btnLog');
   const logPanelHeader = $('logPanelHeader');
+  const btnMemory = $('btnMemory');
+  const memoryPanelHeader = $('memoryPanelHeader');
+  const btnMemorySearch = $('btnMemorySearch');
+  const memorySearchInput = $('memorySearchInput');
 
   if (btnStart) btnStart.addEventListener('click', startDemo);
   if (btnReset) btnReset.addEventListener('click', resetAll);
@@ -2363,6 +2504,10 @@ function initApp() {
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
   if (btnLog) btnLog.addEventListener('click', toggleLogPanel);
   if (logPanelHeader) logPanelHeader.addEventListener('click', toggleLogPanel);
+  if (btnMemory) btnMemory.addEventListener('click', toggleMemoryPanel);
+  if (memoryPanelHeader) memoryPanelHeader.addEventListener('click', toggleMemoryPanel);
+  if (btnMemorySearch) btnMemorySearch.addEventListener('click', () => loadMemoryHistory(memorySearchInput?.value || ''));
+  if (memorySearchInput) memorySearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadMemoryHistory(memorySearchInput.value || ''); });
 
   console.log('[DiTing] App initialized — all event listeners registered');
 }
@@ -2383,6 +2528,10 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyL' && e.ctrlKey) {
     e.preventDefault();
     toggleLogPanel();
+  }
+  if (e.code === 'KeyH' && e.ctrlKey) {
+    e.preventDefault();
+    toggleMemoryPanel();
   }
 });
 </script>

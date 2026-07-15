@@ -41,7 +41,7 @@ def _env(name: str, default: str = None) -> Optional[str]:
 
 
 LLM_PROVIDER = _env("PROVIDER", "gpt55").lower()
-LLM_API_KEY = _env("API_KEY", "sk-2oXnz6vux4PMt7SzA8StvK8SUOlqTMrcBskt8VUWI9wOmNmK")
+LLM_API_KEY = _env("API_KEY", "")
 LLM_MODEL = _env("MODEL", "gpt-5.5")
 LLM_BASE_URL = _env("BASE_URL", "https://apifusion.aispeech.com.cn")
 

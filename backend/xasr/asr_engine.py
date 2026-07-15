@@ -30,6 +30,10 @@ from modules.audio_processor import (
     estimate_snr, estimate_rt60, acoustic_quality_score,
     HotwordCorrector, LogicValidator, UncertaintyEstimator
 )
+try:
+    from modules.asr_optimizer import ASROptimizer
+except Exception:
+    ASROptimizer = None
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -215,6 +219,45 @@ def _energy_vad(
     return merged
 
 
+def _split_long_segments(
+    segments: List[tuple],
+    max_duration: float = 28.0,
+    min_tail_duration: float = 6.0,
+) -> List[tuple]:
+    """
+    Split overly long VAD regions into bounded ASR windows.
+
+    Streaming transducer models can become slow or unstable when a single
+    uploaded VAD segment spans minutes. This keeps file upload responsive while
+    preserving enough context for punctuation and hotword correction.
+    """
+    if not segments:
+        return segments
+
+    bounded = []
+    for start_s, end_s in segments:
+        duration = end_s - start_s
+        if duration <= max_duration:
+            bounded.append((start_s, end_s))
+            continue
+
+        cursor = start_s
+        while cursor < end_s:
+            next_end = min(end_s, cursor + max_duration)
+            if end_s - next_end < min_tail_duration and bounded:
+                bounded.append((cursor, end_s))
+                break
+            bounded.append((cursor, next_end))
+            cursor = next_end
+
+    if len(bounded) != len(segments):
+        logger.info(
+            f"VAD: split {len(segments)} long regions into {len(bounded)} ASR windows "
+            f"(max {max_duration:.0f}s each)"
+        )
+    return bounded
+
+
 # ===========================================================================
 # XASREngine
 # ===========================================================================
@@ -341,6 +384,10 @@ class XASREngine:
         self._meeting_domain: Optional[dict] = None
         self._meeting_hotwords: List[str] = []
 
+        # ASR optimization state (v4.5)
+        self.asr_optimizer = ASROptimizer(hotwords or [], sample_rate=sample_rate) if ASROptimizer else None
+        self._last_optimizer_report: Optional[dict] = None
+
         # Session state
         self._session_active = False
         self._current_snr = 25.0
@@ -413,6 +460,9 @@ class XASREngine:
         if on_progress:
             on_progress("loading", 0.0)
         data, sr = self._load_audio(file_path)
+        if self.asr_optimizer:
+            data, opt_report = self.asr_optimizer.prepare_audio(data, sr)
+            self._last_optimizer_report = opt_report.to_dict()
         duration = len(data) / sr
         logger.info(f"Audio loaded: {duration:.1f}s @ {sr}Hz, {len(data)} samples")
 
@@ -422,16 +472,20 @@ class XASREngine:
             return []
         if on_progress:
             on_progress("vad", 0.05)
+        vad_cfg = (self._last_optimizer_report or {}).get("vad_config", {})
         segments = _energy_vad(
             data, sr,
-            energy_threshold_ratio=0.06,   # filter out background hum & light breathing
-            min_speech_frames=15,          # ~150ms — catch short utterances, skip clicks
-            min_silence_frames=30,         # ~300ms — cut at natural pauses
-            pre_padding_ms=200,
-            post_padding_ms=200,
-            min_segment_duration=0.8,      # keep brief but meaningful phrases
+            energy_threshold_ratio=vad_cfg.get("energy_threshold_ratio", 0.06),
+            min_speech_frames=vad_cfg.get("min_speech_frames", 15),
+            min_silence_frames=vad_cfg.get("min_silence_frames", 30),
+            pre_padding_ms=vad_cfg.get("pre_padding_ms", 200),
+            post_padding_ms=vad_cfg.get("post_padding_ms", 200),
+            min_segment_duration=vad_cfg.get("min_segment_duration", 0.8),
         )
         total_segments = len(segments)
+        if duration > 60:
+            segments = _split_long_segments(segments, max_duration=28.0, min_tail_duration=6.0)
+            total_segments = len(segments)
         logger.info(f"VAD found {total_segments} speech segments")
 
         # 3. Speaker diarization (v3.1 — cluster-based, before per-segment processing)
@@ -791,6 +845,44 @@ class XASREngine:
                 if hw in display_text:
                     terms.append(hw)
 
+        # 2.5 Text post-processing (filler removal + punctuation + sentence splitting)
+        # Only apply to final results — partial results are shown as-is for low latency
+        if self.enable_text_postprocess and is_final and display_text.strip():
+            try:
+                from modules.text_post_processor import process_asr_text
+                postprocessed = process_asr_text(
+                    display_text,
+                    enable_filler_filter=True,
+                    enable_punctuation=True,
+                    enable_force_split=True,
+                    enable_normalize=True,
+                )
+                if postprocessed.strip():
+                    display_text = postprocessed
+            except Exception as e:
+                logger.debug(f"Text post-process skipped: {e}")
+
+        # 2.8 ASR optimizer text pass (input-method style candidates + meeting normalization)
+        if self.asr_optimizer and is_final and display_text.strip():
+            try:
+                optimized_text, opt_corrections, opt_actions = self.asr_optimizer.enhance_text(
+                    display_text,
+                    list(self.hotword_corrector.hotwords) if self.hotword_corrector else [],
+                )
+                if optimized_text.strip():
+                    display_text = optimized_text
+                if opt_corrections:
+                    corrections.extend(opt_corrections)
+                if opt_actions:
+                    if self._last_optimizer_report is None:
+                        self._last_optimizer_report = self.asr_optimizer.last_report.to_dict()
+                    actions = self._last_optimizer_report.setdefault("text_actions", [])
+                    for action in opt_actions:
+                        if action not in actions:
+                            actions.append(action)
+            except Exception as e:
+                logger.debug(f"ASR optimizer text pass skipped: {e}")
+
         # 3. Data points extraction
         data_points = self._extract_data_points(display_text)
 
@@ -988,6 +1080,15 @@ class XASREngine:
     def get_meeting_hotwords(self) -> List[str]:
         """Get auto-extracted meeting hotwords."""
         return self._meeting_hotwords
+
+    def get_asr_optimizer_report(self) -> dict:
+        """Get the last ASR optimizer report for frontend/status APIs."""
+        if self._last_optimizer_report:
+            return self._last_optimizer_report
+        if self.asr_optimizer:
+            status = self.asr_optimizer.get_status()
+            return status.get("last_report") or status
+        return {"enabled": False, "reason": "ASR optimizer unavailable"}
 
     @property
     def is_model_available(self) -> bool:

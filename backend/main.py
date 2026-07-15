@@ -40,6 +40,19 @@ from utils.logger import init_logging, get_logger, get_recent_logs as get_recent
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
 
+# ── Local Memory Store ───────────────────────────────────────────
+try:
+    from utils.local_db import (
+        init_db, save_meeting_result, list_meetings,
+        get_meeting as get_memory_meeting, delete_meeting as delete_memory_meeting,
+        strip_audio_payload, build_full_text,
+    )
+    HAS_MEMORY_STORE = True
+    logger.info("Local memory store loaded")
+except Exception as e:
+    HAS_MEMORY_STORE = False
+    logger.warning(f"Local memory store unavailable: {e}")
+
 # ── X-ASR ───────────────────────────────────────────────────────
 try:
     from xasr.asr_engine import XASREngine, ASRResult
@@ -116,6 +129,12 @@ def _load_xasr_engine():
 async def lifespan(app: FastAPI):
     """Startup: fire-and-forget model loading."""
     logger.info("Starting DiTing backend server...")
+    if HAS_MEMORY_STORE:
+        try:
+            init_db()
+            logger.info("Local memory DB initialized")
+        except Exception as e:
+            logger.warning(f"Local memory DB init failed: {e}")
     threading.Thread(target=_load_xasr_engine, daemon=True).start()
     yield
     logger.info("Shutting down DiTing backend...")
@@ -248,6 +267,16 @@ async def get_xasr_status():
         },
         "loading": False,
     }
+
+
+@app.get("/api/xasr/optimizer")
+async def get_xasr_optimizer_status():
+    """Get ASR optimizer capability and last processing report."""
+    if not xasr_engine:
+        return {"enabled": False, "reason": "X-ASR engine not loaded"}
+    if hasattr(xasr_engine, "get_asr_optimizer_report"):
+        return xasr_engine.get_asr_optimizer_report()
+    return {"enabled": False, "reason": "ASR optimizer not integrated"}
 
 
 @app.get("/api/meeting/demo")
@@ -447,6 +476,71 @@ async def get_cognitive_status():
 
 
 # ===========================================================================
+# Memory / History endpoints
+# ===========================================================================
+
+@app.get("/api/memory/history")
+async def get_memory_history(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    q: str = Query(None),
+):
+    """List locally persisted recognition history."""
+    if not HAS_MEMORY_STORE:
+        return {"available": False, "items": [], "total": 0, "reason": "Local memory store unavailable"}
+    try:
+        return list_meetings(limit=limit, offset=offset, q=q)
+    except Exception as e:
+        logger.warning(f"Memory history query failed: {e}")
+        return {"available": False, "items": [], "total": 0, "error": str(e)}
+
+
+@app.get("/api/memory/search")
+async def search_memory(
+    q: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Search locally persisted meeting text, filenames, summaries and hotwords."""
+    if not HAS_MEMORY_STORE:
+        return {"available": False, "items": [], "total": 0, "reason": "Local memory store unavailable"}
+    try:
+        return list_meetings(limit=limit, offset=offset, q=q or None)
+    except Exception as e:
+        logger.warning(f"Memory search failed: {e}")
+        return {"available": False, "items": [], "total": 0, "error": str(e)}
+
+
+@app.get("/api/memory/history/{meeting_id}")
+async def get_memory_detail(meeting_id: str):
+    """Get one persisted recognition record with segments and full text."""
+    if not HAS_MEMORY_STORE:
+        return {"available": False, "error": "Local memory store unavailable"}
+    try:
+        record = get_memory_meeting(meeting_id)
+        if not record:
+            return {"available": True, "error": "Memory record not found", "id": meeting_id}
+        record["available"] = True
+        return record
+    except Exception as e:
+        logger.warning(f"Memory detail query failed: {e}")
+        return {"available": False, "error": str(e), "id": meeting_id}
+
+
+@app.delete("/api/memory/history/{meeting_id}")
+async def delete_memory_history(meeting_id: str):
+    """Delete one local memory record."""
+    if not HAS_MEMORY_STORE:
+        return {"ok": False, "error": "Local memory store unavailable"}
+    try:
+        deleted = delete_memory_meeting(meeting_id)
+        return {"ok": deleted, "id": meeting_id}
+    except Exception as e:
+        logger.warning(f"Memory delete failed: {e}")
+        return {"ok": False, "error": str(e), "id": meeting_id}
+
+
+# ===========================================================================
 # Audio Upload (with real-time WebSocket progress)
 # ===========================================================================
 
@@ -532,6 +626,76 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
         "uncertain_spans": result.uncertain_spans,
         "uncertainty": result.uncertainty,
     })
+
+
+def _build_speaker_stats_from_results(results) -> dict:
+    stats = {}
+    for r in results or []:
+        sid = getattr(r, 'speaker_id', None) or 'unknown'
+        stats[sid] = stats.get(sid, 0) + 1
+    return stats
+
+
+def _build_speaker_stats_from_segments(segments: list[dict]) -> dict:
+    stats = {}
+    for seg in segments or []:
+        sid = seg.get('speaker_id') or seg.get('speaker') or 'unknown'
+        stats[sid] = stats.get(sid, 0) + 1
+    return stats
+
+
+def _build_meeting_summary(filename: str, results: list, meeting_domain: dict = None):
+    if not results:
+        return None
+    try:
+        from modules.cognitive_engine import MeetingSummarizer
+        from modules.llm_client import get_llm_client
+
+        llm = get_llm_client()
+        summarizer = MeetingSummarizer(llm_client=llm)
+        meeting_data = {
+            "title": filename,
+            "segments": [
+                {
+                    "speaker": getattr(r, 'speaker_id', 'unknown'),
+                    "text": getattr(r, 'text', ''),
+                    "terms": getattr(r, 'terms', []),
+                }
+                for r in results or []
+            ],
+            "domain": meeting_domain,
+            "participants": [
+                {"id": name, "name": name, "role": info.get("role", "")}
+                for name, info in (xasr_engine.speaker_identifier.enrolled.items()
+                                  if xasr_engine and xasr_engine.speaker_identifier else {}.items())
+            ][:10],
+        }
+        summary = summarizer.summarize(meeting_data)
+        if llm and llm.is_available:
+            logger.info("Meeting summary generated via LLM API")
+        else:
+            logger.info("Meeting summary generated via rule fallback")
+        return summary
+    except Exception as e:
+        logger.warning(f"Summary generation failed: {e}")
+        return None
+
+
+def _persist_meeting_safely(data: dict) -> Optional[str]:
+    """Persist upload result to local memory DB. Never blocks ASR response on failure."""
+    if not HAS_MEMORY_STORE or not data:
+        return None
+    try:
+        segments = strip_audio_payload(data.get("segments") or [])
+        meeting = dict(data)
+        meeting["segments"] = segments
+        meeting["source"] = "upload"
+        meeting_id = save_meeting_result(meeting, segments)
+        logger.info(f"Meeting persisted to local memory: {meeting_id}")
+        return meeting_id
+    except Exception as e:
+        logger.warning(f"Failed to persist meeting memory: {e}")
+        return None
 
 
 @app.post("/api/audio/upload/{file_id}/cancel")
@@ -663,57 +827,30 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
                             seg["audio_wav_base64"] = audio_b64
                             final_segments.append(seg)
-                        # Build speaker distribution stats
-                        speaker_stats = {}
-                        for r in results:
-                            sid = getattr(r, 'speaker_id', 'unknown')
-                            speaker_stats[sid] = speaker_stats.get(sid, 0) + 1
+                        # Build meeting-level cognitive data
+                        speaker_stats = _build_speaker_stats_from_results(results)
+                        meeting_domain = xasr_engine.get_meeting_domain() if getattr(xasr_engine, 'enable_cognitive', False) else None
+                        meeting_hotwords = xasr_engine.get_meeting_hotwords() if getattr(xasr_engine, 'enable_cognitive', False) else []
+                        meeting_summary = _build_meeting_summary(file.filename, results, meeting_domain)
 
-                        # Generate meeting summary (v3.1)
-                        meeting_summary = None
-                        meeting_domain = None
-                        meeting_hotwords = []
-                        if xasr_engine and xasr_engine.enable_cognitive:
-                            meeting_domain = xasr_engine.get_meeting_domain()
-                            meeting_hotwords = xasr_engine.get_meeting_hotwords()
-                            try:
-                                from modules.cognitive_engine import MeetingSummarizer
-                                summarizer = MeetingSummarizer()
-                                meeting_data = {
-                                    "title": file.filename,
-                                    "segments": [
-                                        {"speaker": r.speaker_id if hasattr(r, 'speaker_id') else "unknown",
-                                         "text": r.text, "terms": getattr(r, 'terms', [])}
-                                        for r in results
-                                    ],
-                                    "domain": meeting_domain,
-                                    "participants": [
-                                        {"id": name, "name": name, "role": info.get("role", "")}
-                                        for name, info in (xasr_engine.speaker_identifier.enrolled.items()
-                                                          if xasr_engine.speaker_identifier else {}.items())
-                                    ][:10],
-                                }
-                                meeting_summary = summarizer.summarize(meeting_data)
-                                logger.info("Meeting summary generated")
-                            except Exception as e:
-                                logger.debug(f"Summary generation skipped: {e}")
+                        complete_data = {
+                            "file_id": file_id,
+                            "memory_id": file_id,
+                            "filename": file.filename,
+                            "status": "completed",
+                            "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                            "segments_count": len(results),
+                            "segments": final_segments,
+                            "summary": meeting_summary,
+                            "domain": meeting_domain,
+                            "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
+                            "speaker_stats": speaker_stats,
+                            "asr_optimizer": xasr_engine.get_asr_optimizer_report() if hasattr(xasr_engine, "get_asr_optimizer_report") else None,
+                        }
+                        _persist_meeting_safely(complete_data)
 
                         asyncio.run_coroutine_threadsafe(
-                            queue.put({
-                                "type": "complete",
-                                "data": {
-                                    "file_id": file_id,
-                                    "filename": file.filename,
-                                    "status": "completed",
-                                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
-                                    "segments_count": len(results),
-                                    "segments": final_segments,
-                                    "summary": meeting_summary,
-                                    "domain": meeting_domain,
-                                    "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
-                                    "speaker_stats": speaker_stats,
-                                }
-                            }),
+                            queue.put({"type": "complete", "data": complete_data}),
                             loop
                         )
                     except Exception as e:
@@ -765,25 +902,28 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                 if xasr_engine.logic_validator:
                     xasr_engine.logic_validator.reset()
 
-                speaker_stats = {}
-                for r in results:
-                    sid = getattr(r, 'speaker_id', 'unknown')
-                    speaker_stats[sid] = speaker_stats.get(sid, 0) + 1
+                speaker_stats = _build_speaker_stats_from_results(results)
                 meeting_domain = xasr_engine.get_meeting_domain() if getattr(xasr_engine, 'enable_cognitive', False) else None
                 meeting_hotwords = xasr_engine.get_meeting_hotwords() if getattr(xasr_engine, 'enable_cognitive', False) else []
+                meeting_summary = _build_meeting_summary(file.filename, results, meeting_domain)
 
                 logger.info(f"Done: {len(segments)} segments from {file.filename}")
-                return {
+                response_data = {
                     "file_id": file_id,
+                    "memory_id": file_id,
                     "filename": file.filename,
                     "status": "completed",
                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
                     "segments_count": len(segments),
                     "segments": segments,
+                    "summary": meeting_summary,
                     "domain": meeting_domain,
                     "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
                     "speaker_stats": speaker_stats,
+                    "asr_optimizer": xasr_engine.get_asr_optimizer_report() if hasattr(xasr_engine, "get_asr_optimizer_report") else None,
                 }
+                _persist_meeting_safely(response_data)
+                return response_data
         else:
             # ── X-ASR unavailable ──────────────────────────────
             try:
@@ -947,6 +1087,7 @@ async def ws_live(websocket: WebSocket):
                                 "logic_flags": result.logic_flags or [],
                                 "terms": result.terms or [],
                                 "uncertain_spans": result.uncertain_spans or [],
+                                "asr_optimizer": engine.get_asr_optimizer_report() if hasattr(engine, "get_asr_optimizer_report") else None,
                             }
                             if postproc_info:
                                 resp_data["postprocessed"] = True

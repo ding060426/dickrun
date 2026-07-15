@@ -16,12 +16,77 @@ import webbrowser
 import http.server
 import socketserver
 import threading
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent.absolute()
 FRONTEND_DIR = ROOT_DIR / "frontend"
 BACKEND_DIR = ROOT_DIR / "backend"
 XASR_MODELS_DIR = BACKEND_DIR / "xasr" / "models"
+
+
+def _request_json(url, timeout=2):
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        import json
+        return resp.status, json.loads(resp.read().decode("utf-8", errors="replace"))
+
+
+def _port_has_current_backend() -> bool:
+    """Return True only when port 8765 is serving this codebase with memory APIs."""
+    try:
+        _, health = _request_json("http://localhost:8765/api/health")
+        _, memory = _request_json("http://localhost:8765/api/memory/history?limit=1")
+        return isinstance(health, dict) and isinstance(memory, dict) and "items" in memory
+    except Exception:
+        return False
+
+
+def _kill_port(port: int) -> None:
+    """Best-effort Windows cleanup for stale services occupying a port."""
+    if os.name != "nt":
+        return
+    try:
+        out = subprocess.check_output(
+            ["cmd", "/c", f"netstat -ano | findstr :{port}"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except Exception:
+        return
+    pids = set()
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[-2].upper() == "LISTENING":
+            pids.add(parts[-1])
+    for pid in sorted(pids):
+        print(f"[DiTing] Stopping stale process on port {port}: PID {pid}")
+        subprocess.run(["cmd", "/c", "taskkill", "/PID", pid, "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def cleanup_stale_services():
+    """Avoid false-ready state caused by older DiTing backends/frontends still occupying ports."""
+    _kill_port(8765)
+    _kill_port(3000)
+    time.sleep(0.8)
+
+
+def load_env_file():
+    """Load local .env settings for API-backed cognitive features."""
+    env_path = ROOT_DIR / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def check_xasr_models():
@@ -102,7 +167,10 @@ def start_frontend_server():
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(FRONTEND_DIR), **kwargs)
 
-    server = socketserver.TCPServer(("", 3000), Handler)
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+
+    server = ReusableTCPServer(("", 3000), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     print(f"[DiTing] Frontend ready -> http://localhost:3000")
@@ -110,6 +178,7 @@ def start_frontend_server():
 
 
 def main():
+    load_env_file()
     print("=" * 62)
     print("  DiTing v2.0 - Smart Meeting Speech Cognitive System")
     print("  Environment x Hotwords x Logic Validation")
@@ -121,6 +190,7 @@ def main():
     check_xasr_models()
 
     # Start backend
+    cleanup_stale_services()
     backend_proc = start_backend()
 
     # Start frontend

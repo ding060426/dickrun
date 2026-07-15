@@ -199,6 +199,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 upload_sessions: dict = {}
+upload_cancel_events: dict = {}
 
 # ===========================================================================
 # API Routes
@@ -422,6 +423,22 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
     })
 
 
+@app.post("/api/audio/upload/{file_id}/cancel")
+async def cancel_upload(file_id: str):
+    """Cancel an in-progress upload recognition task."""
+    event = upload_cancel_events.get(file_id)
+    if event:
+        event.set()
+    queue = upload_sessions.get(file_id)
+    if queue:
+        await queue.put({
+            "type": "cancelled",
+            "data": {"file_id": file_id, "message": "Upload processing cancelled"},
+        })
+    logger.info(f"Upload cancellation requested: {file_id[:8]}...")
+    return {"ok": True, "file_id": file_id, "cancelled": bool(event or queue)}
+
+
 @app.post("/api/audio/upload")
 async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None)):
     """Upload audio file for X-ASR processing with real-time WebSocket progress."""
@@ -440,6 +457,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
         logger.info(f"Upload: {file.filename} ({file_size_mb:.1f}MB) file_id={file_id[:8]}...")
 
         queue = upload_sessions.get(file_id)
+        cancel_event = threading.Event()
+        upload_cancel_events[file_id] = cancel_event
 
         if xasr_engine and xasr_engine.is_model_available:
             if queue:
@@ -458,6 +477,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                 loop = asyncio.get_event_loop()
 
                 def on_segment(result, idx, total):
+                    if cancel_event.is_set():
+                        return
                     seg_data = _result_to_dict(result, idx)
                     # Encode raw audio to base64 WAV for frontend waveform
                     audio_b64 = None
@@ -482,6 +503,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                     )
 
                 def on_progress(stage, fraction):
+                    if cancel_event.is_set():
+                        return
                     asyncio.run_coroutine_threadsafe(
                         queue.put({
                             "type": "progress",
@@ -492,10 +515,32 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
 
                 def do_process():
                     try:
+                        if cancel_event.is_set():
+                            logger.info(f"Processing cancelled before start: {file.filename}")
+                            asyncio.run_coroutine_threadsafe(
+                                queue.put({
+                                    "type": "cancelled",
+                                    "data": {"file_id": file_id, "message": "Upload processing cancelled"},
+                                }),
+                                loop
+                            )
+                            return
+
                         results = xasr_engine.process_file(
-                            tmp_path, on_segment=on_segment, on_progress=on_progress
+                            tmp_path, on_segment=on_segment, on_progress=on_progress, cancel_event=cancel_event
                         )
                         # Build final segments list with audio
+                        if cancel_event.is_set():
+                            logger.info(f"Processing cancelled after ASR: {file.filename}")
+                            asyncio.run_coroutine_threadsafe(
+                                queue.put({
+                                    "type": "cancelled",
+                                    "data": {"file_id": file_id, "message": "Upload processing cancelled"},
+                                }),
+                                loop
+                            )
+                            return
+
                         final_segments = []
                         for i, r in enumerate(results):
                             seg = _result_to_dict(r, i + 1)
@@ -529,6 +574,7 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                             loop
                         )
                     finally:
+                        upload_cancel_events.pop(file_id, None)
                         if xasr_engine.logic_validator:
                             xasr_engine.logic_validator.reset()
                         try:
@@ -815,7 +861,7 @@ async def ws_upload_progress(websocket: WebSocket, file_id: str):
             try:
                 msg = await asyncio.wait_for(queue.get(), timeout=600)
                 await websocket.send_json(msg)
-                if msg["type"] in ("complete", "error"):
+                if msg["type"] in ("complete", "error", "cancelled"):
                     break
             except asyncio.TimeoutError:
                 await websocket.send_json({

@@ -342,6 +342,7 @@ class XASREngine:
         file_path: str,
         on_segment: Callable[[ASRResult, int, int], None] = None,
         on_progress: Callable[[str, float], None] = None,
+        cancel_event=None,
     ) -> List[ASRResult]:
         """
         Process an entire audio file.
@@ -360,6 +361,7 @@ class XASREngine:
             file_path: Path to audio file (wav/flac/mp3, 16kHz mono recommended)
             on_segment: Optional callback for each recognized utterance
             on_progress: Optional callback for progress updates (stage, fraction)
+            cancel_event: Optional threading.Event-like object used to stop processing early
 
         Returns:
             List of ASRResult, one per recognized utterance
@@ -376,6 +378,9 @@ class XASREngine:
         logger.info(f"Audio loaded: {duration:.1f}s @ {sr}Hz, {len(data)} samples")
 
         # 2. VAD segmentation
+        if cancel_event is not None and cancel_event.is_set():
+            logger.info("Processing cancelled before VAD")
+            return []
         if on_progress:
             on_progress("vad", 0.05)
         segments = _energy_vad(data, sr)
@@ -387,6 +392,10 @@ class XASREngine:
         results = []
 
         for seg_idx, (start_s, end_s) in enumerate(segments):
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info(f"Processing cancelled at segment {seg_idx + 1}/{total_segments}")
+                break
+
             progress = 0.1 + 0.85 * (seg_idx / max(1, total_segments))
             if on_progress:
                 on_progress("processing", progress)

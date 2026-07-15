@@ -3,8 +3,9 @@
 ============================================================================
 ASR 转写文本的后处理管线：
 
-  raw ASR text → ① 语气词过滤 → ② 标点恢复(模型优先, 规则兜底)
-               → ③ 强制断句 → ④ 规范化
+  raw ASR text → ① 语气词过滤 → ② 中文数字 ITN
+               → ③ 标点恢复(模型优先, 规则兜底)
+               → ④ 强制断句 → ⑤ 规范化
 
 标点恢复：
   - 优先使用 sherpa-onnx CT-Transformer 模型 (高精度)
@@ -76,13 +77,10 @@ _FILLER_PHRASES = [
     ('那么就是说', '那么'),
     ('咱们就是说', '咱们'),
     ('其实吧', '其实'),
-    ('我个人觉得吧', '我觉得'),
     ('怎么说呢', ''),
     ('怎么说吧', ''),
     ('说白了就是', '就是'),
     ('说白了', ''),
-    ('毋庸置疑', ''),
-    ('众所周知', ''),
 ]
 
 
@@ -99,7 +97,123 @@ def remove_fillers(text: str) -> str:
 
 
 # ======================================================================
-# ② 标点恢复 (规则)
+# ② 中文逆文本规范化 (ITN)
+# ======================================================================
+
+_CN_DIGITS = {
+    '零': 0, '〇': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+    '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '幺': 1,
+}
+_CN_UNITS = {'十': 10, '百': 100, '千': 1000}
+_CN_BIG_UNITS = {'万': 10000, '亿': 100000000}
+_CN_NUMBER_CLASS = '零〇一二两三四五六七八九十百千万亿幺'
+
+
+def _cn_to_int(value: str) -> Optional[int]:
+    """Parse a structured Chinese number, rejecting bare counted digit runs."""
+    total = section = current = 0
+    seen = False
+    for char in value:
+        if char in _CN_DIGITS:
+            if current != 0:
+                return None
+            current = _CN_DIGITS[char]
+            seen = True
+        elif char in _CN_UNITS:
+            section += (current or 1) * _CN_UNITS[char]
+            current = 0
+            seen = True
+        elif char in _CN_BIG_UNITS:
+            section += current
+            total += section * _CN_BIG_UNITS[char]
+            section = current = 0
+            seen = True
+        else:
+            return None
+    return total + section + current if seen else None
+
+
+def _cn_digits(value: str) -> str:
+    return ''.join(str(_CN_DIGITS[char]) for char in value if char in _CN_DIGITS)
+
+
+def _replace_if_parsed(pattern: str, text: str, transform) -> str:
+    def replacement(match: re.Match) -> str:
+        result = transform(match)
+        return match.group(0) if result is None else result
+    return re.sub(pattern, replacement, text)
+
+
+def inverse_text_normalize(text: str) -> str:
+    """Conservatively convert spoken Chinese numbers into written forms."""
+    if not text:
+        return text
+    number = f'[{_CN_NUMBER_CLASS}]'
+    output = text
+    output = _replace_if_parsed(
+        rf'百分之({number}+)', output,
+        lambda match: f'{value}%' if (value := _cn_to_int(match.group(1))) is not None else None,
+    )
+
+    time_pattern = re.compile(
+        r'(上午|下午|早上|晚上|凌晨|中午)?'
+        r'([一二两三四五六七八九十]+)点'
+        r'(半|一刻|三刻|[零一二三四五六七八九十]+分|钟)?'
+    )
+
+    def normalize_time(match: re.Match) -> Optional[str]:
+        period, hour_text, tail = match.group(1) or '', match.group(2), match.group(3) or ''
+        hour = _cn_to_int(hour_text)
+        if hour is None or hour > 24 or (not period and not tail):
+            return None
+        if '半' in tail:
+            minute = 30
+        elif '一刻' in tail:
+            minute = 15
+        elif '三刻' in tail:
+            minute = 45
+        elif '分' in tail:
+            minute = _cn_to_int(tail.replace('分', ''))
+            if minute is None:
+                return None
+        else:
+            minute = 0
+        return f'{period}{hour}:{minute:02d}'
+
+    output = time_pattern.sub(lambda match: normalize_time(match) or match.group(0), output)
+    output = re.sub(
+        r'([零〇一二三四五六七八九]{2,4})年',
+        lambda match: _cn_digits(match.group(1)) + '年',
+        output,
+    )
+    output = _replace_if_parsed(
+        rf'({number}+)(月|号|日)', output,
+        lambda match: f'{value}{match.group(2)}' if (value := _cn_to_int(match.group(1))) is not None else None,
+    )
+    units = '块钱|块|元|美元|美金|港币|人民币|度|倍|公斤|千克|公里|千米|毫米|厘米|米|小时|分钟|秒|个百分点'
+    output = _replace_if_parsed(
+        rf'({number}+)({units})', output,
+        lambda match: f'{value}{match.group(2)}' if (value := _cn_to_int(match.group(1))) is not None else None,
+    )
+    output = _replace_if_parsed(
+        r'([零〇一二两三四五六七八九十百千万亿]+)点([零〇一二三四五六七八九]+)',
+        output,
+        lambda match: f'{value}.{_cn_digits(match.group(2))}' if (value := _cn_to_int(match.group(1))) is not None else None,
+    )
+    output = _replace_if_parsed(
+        rf'[零〇一二两三四五六七八九]*[十百千万亿]{number}*', output,
+        lambda match: str(value) if (value := _cn_to_int(match.group(0))) is not None else None,
+    )
+    output = re.sub(
+        r'[幺零〇一二三四五六七八九]*[零〇][幺零〇一二三四五六七八九]*',
+        lambda match: _cn_digits(match.group(0)) if len(match.group(0)) >= 2 else match.group(0),
+        output,
+    )
+    return output
+
+
+# ======================================================================
+# ③ 标点恢复 (规则)
 # ======================================================================
 
 # 句间停顿词 → 前插句号或逗号
@@ -189,6 +303,10 @@ def restore_punctuation(text: str, use_model: bool = True) -> str:
     return text
 
 
+# ======================================================================
+# ④ 长句分割
+# ======================================================================
+
 def force_split_long_sentence(text: str, max_chars: int = None) -> str:
     """
     如果一句话太长且中间没有标点，在弱语义边界插入逗号。
@@ -260,7 +378,7 @@ def force_split_long_sentence(text: str, max_chars: int = None) -> str:
 
 
 # ======================================================================
-# ④ 规范化
+# ⑤ 规范化
 # ======================================================================
 
 # 连续重复字 (3 次及以上)
@@ -312,6 +430,7 @@ def normalize_text(text: str) -> str:
 def process_asr_text(
     raw_text: str,
     enable_filler_filter: bool = True,
+    enable_itn: bool = True,
     enable_punctuation: bool = True,
     enable_force_split: bool = True,
     enable_normalize: bool = True,
@@ -337,6 +456,9 @@ def process_asr_text(
 
     if enable_filler_filter:
         text = remove_fillers(text)
+
+    if enable_itn:
+        text = inverse_text_normalize(text)
 
     if enable_punctuation:
         text = restore_punctuation(text)
@@ -427,6 +549,12 @@ def _collect_cleanup_details(text: str) -> Tuple[List[str], List[str]]:
 def process_asr_text_with_details(raw_text: str, **kwargs) -> Tuple[str, dict]:
     """Run the established pipeline and expose user-visible edit metadata."""
     fillers, repetitions = _collect_cleanup_details(raw_text)
+    itn_original = remove_fillers(raw_text) if kwargs.get("enable_filler_filter", True) else raw_text
+    itn_normalized = (
+        inverse_text_normalize(itn_original)
+        if kwargs.get("enable_itn", True)
+        else itn_original
+    )
     rule_text = process_asr_text(raw_text, **kwargs)
     final_text = rule_text
     corrections: List[dict] = []
@@ -438,5 +566,7 @@ def process_asr_text_with_details(raw_text: str, **kwargs) -> Tuple[str, dict]:
         "final_text": final_text,
         "fillers_removed": fillers,
         "repetitions_merged": repetitions,
+        "itn_original": itn_original,
+        "itn_normalized": itn_normalized,
         "corrections": corrections,
     }

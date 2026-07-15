@@ -27,14 +27,15 @@ class HotwordAssetTests(unittest.TestCase):
                 model_dir,
                 ["openai", "你好"],
                 score=5.0,
+                scores={"openai": 4.0, "你好": 7.5},
                 runtime_dir=runtime_dir,
             )
 
             self.assertEqual(assets.decoding_method, "modified_beam_search")
             hotword_text = assets.hotwords_file.read_text(encoding="utf-8")
-            self.assertIn("openai :2.5", hotword_text)
-            self.assertIn("Openai :2.5", hotword_text)
-            self.assertIn("你 好 :5", hotword_text)
+            self.assertIn("openai :4", hotword_text)
+            self.assertIn("Openai :4", hotword_text)
+            self.assertIn("你 好 :7.5", hotword_text)
             vocab_text = assets.bpe_vocab.read_text(encoding="utf-8")
             self.assertIn("▁\t-1", vocab_text)
             self.assertIn("你\t-999999", vocab_text)

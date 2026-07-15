@@ -30,6 +30,7 @@ def prepare_hotword_assets(
     hotwords: list[str],
     *,
     score: float = 5.0,
+    scores: dict[str, float] | None = None,
     runtime_dir: str | Path | None = None,
 ) -> HotwordAssets:
     normalized = [word.strip() for word in hotwords if word and word.strip()]
@@ -48,7 +49,7 @@ def prepare_hotword_assets(
     prepared_lines = [
         variant
         for word in normalized
-        for variant in _expand_hotword(word, score)
+        for variant in _expand_hotword(word, (scores or {}).get(word, score), explicit=word in (scores or {}))
     ]
     hotword_payload = ("\n".join(prepared_lines) + "\n").encode("utf-8")
     hotword_hash = hashlib.sha256(hotword_payload).hexdigest()[:12]
@@ -82,20 +83,20 @@ def _format_score(score: float) -> str:
     return str(int(score)) if score == int(score) else f"{score:.3f}".rstrip("0").rstrip(".")
 
 
-def _with_boost(value: str, score: float) -> str:
+def _with_boost(value: str, score: float, *, explicit: bool = False) -> str:
     if _SCORE_SUFFIX.search(value):
         match = _SCORE_SUFFIX.search(value)
         return f"{_space_cjk(value[:match.start()])} {match.group(0).strip()}"
-    applied = score if any(_is_cjk(char) for char in value) else min(score, 2.5)
+    applied = score if explicit or any(_is_cjk(char) for char in value) else min(score, 2.5)
     return f"{_space_cjk(value)} :{_format_score(applied)}"
 
 
-def _expand_hotword(value: str, score: float) -> list[str]:
+def _expand_hotword(value: str, score: float, *, explicit: bool = False) -> list[str]:
     if _SCORE_SUFFIX.search(value) or any(_is_cjk(char) for char in value):
-        return [_with_boost(value, score)]
+        return [_with_boost(value, score, explicit=explicit)]
     capitalized = value[:1].upper() + value[1:]
     variants = [value] if capitalized == value else [value, capitalized]
-    return [_with_boost(variant, score) for variant in variants]
+    return [_with_boost(variant, score, explicit=explicit) for variant in variants]
 
 
 def _write_bpe_vocab(tokens_text: str, output_path: Path) -> None:

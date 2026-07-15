@@ -363,8 +363,9 @@ float32 numpy 数组 ([-1, 1])
 | `GET` | `/api/health` | 健康检查 (X-ASR 状态、模型加载状态) |
 | `GET` | `/api/xasr/status` | X-ASR 详细状态 (模型路径、功能开关、热词数) |
 | `GET` | `/api/meeting/demo` | 获取演示会议数据 (2个预设片段) |
-| `GET` | `/api/hotwords` | 获取当前热词列表 |
-| `POST` | `/api/hotwords` | 添加自定义热词 (`{"words": [...]}`) |
+| `GET` | `/api/hotwords` | 获取热词、逐词权重和模糊拼音设置 |
+| `POST` | `/api/hotwords` | 兼容接口：向现有配置追加热词 (`{"words": [...]}`) |
+| `PUT` | `/api/hotwords` | 替换并持久化完整热词设置；新识别会话生效 |
 | `POST` | `/api/audio/upload` | **上传音频** (multipart, `?file_id=UUID`) |
 | `GET` | `/api/logs/recent` | 获取最近 N 条日志 (`?n=50`) |
 | `GET` | `/api/logs/download` | 下载完整日志文件 |

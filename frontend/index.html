@@ -430,6 +430,94 @@ body {
 }
 .upload-status-card .stage { color: var(--accent-blue); }
 .upload-status-card .done { color: var(--accent-green); }
+
+/* ── Hotword Settings ── */
+.hotword-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 7, 12, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1200;
+}
+.hotword-modal.visible { display: flex; }
+.hotword-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-active);
+  border-radius: 16px;
+  background: rgba(24, 27, 36, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+.hotword-dialog-header,
+.hotword-dialog-footer {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.hotword-dialog-footer { border-top: 1px solid var(--border); border-bottom: 0; }
+.hotword-dialog-body { padding: 14px 16px; overflow-y: auto; }
+.hotword-setting-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.hotword-setting-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-card);
+}
+.hotword-setting-card label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+.hotword-score-controls { display: grid; grid-template-columns: 1fr 70px; gap: 8px; margin-top: 9px; }
+.hotword-input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+.hotword-input:focus { border-color: var(--accent-blue); }
+.hotword-list-header,
+.hotword-row {
+  display: grid;
+  grid-template-columns: 34px minmax(160px, 1fr) 88px 38px;
+  gap: 8px;
+  align-items: center;
+}
+.hotword-list-header { padding: 0 4px 5px; font-size: 10px; color: var(--text-muted); }
+.hotword-list { display: flex; flex-direction: column; gap: 6px; max-height: 310px; overflow-y: auto; }
+.hotword-row {
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 17, 23, 0.48);
+}
+.hotword-row.disabled { opacity: 0.55; }
+.hotword-remove { padding: 5px 0; color: var(--accent-red); }
+.hotword-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+.hotword-note { margin-top: 10px; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
+.hotword-save-status { min-height: 16px; font-size: 10px; color: var(--text-muted); }
+@media (max-width: 620px) {
+  .hotword-setting-grid { grid-template-columns: 1fr; }
+  .hotword-list-header,
+  .hotword-row { grid-template-columns: 30px minmax(120px, 1fr) 72px 34px; }
+}
 </style>
 </head>
 <body>
@@ -546,11 +634,57 @@ body {
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">Mic</button>
   <button class="btn btn-secondary" id="btnUpload">Upload</button>
+  <button class="btn btn-secondary" id="btnHotwords">Hotwords</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
   <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">Log</button>
+</div>
+
+<div class="hotword-modal" id="hotwordModal" aria-hidden="true">
+  <section class="hotword-dialog" role="dialog" aria-modal="true" aria-labelledby="hotwordDialogTitle">
+    <div class="hotword-dialog-header">
+      <div>
+        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">热词与模糊拼音</div>
+        <div style="font-size:10px;color:var(--text-muted);">调整后从下一次麦克风或文件识别会话开始生效</div>
+      </div>
+      <button class="btn btn-secondary" id="btnCloseHotwords" aria-label="关闭热词设置">Close</button>
+    </div>
+    <div class="hotword-dialog-body">
+      <div class="hotword-setting-grid">
+        <div class="hotword-setting-card">
+          <label><span>启用解码热词增强</span><input type="checkbox" id="hotwordsEnabled"></label>
+          <div class="hotword-note">启用 modified beam search，并将每个热词的权重注入 X-ASR 解码器。</div>
+        </div>
+        <div class="hotword-setting-card">
+          <label><span>启用模糊拼音纠错</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
+          <div class="hotword-note">支持平翘舌、n/l 和前后鼻音；只处理至少两个汉字的中文热词。</div>
+        </div>
+        <div class="hotword-setting-card" style="grid-column:1/-1;">
+          <label><span>新热词默认权重</span><span id="defaultScoreLabel">5.0</span></label>
+          <div class="hotword-score-controls">
+            <input type="range" id="defaultHotwordScore" min="0.5" max="12" step="0.5" value="5">
+            <input class="hotword-input" type="number" id="defaultHotwordScoreNumber" min="0.1" max="20" step="0.5" value="5">
+          </div>
+        </div>
+      </div>
+      <div class="hotword-list-header"><span>启用</span><span>标准写法</span><span>权重</span><span></span></div>
+      <div class="hotword-list" id="hotwordList"></div>
+      <div class="hotword-add">
+        <input class="hotword-input" id="newHotwordInput" placeholder="输入专业词、人名或缩写，例如 贾扬清 / OpenAI">
+        <button class="btn btn-secondary" id="btnAddHotword">Add</button>
+      </div>
+      <div class="hotword-note">英文默认限制为 2.5，避免过度偏置；你仍可为单个词显式调整。中文同音替换采用最长词优先，单字不会参与模糊匹配。</div>
+    </div>
+    <div class="hotword-dialog-footer">
+      <div class="hotword-save-status" id="hotwordSaveStatus"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="btnCancelHotwords">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveHotwords">Save &amp; Apply</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <div class="mic-orb-panel" id="micOrbPanel" aria-hidden="true" role="status" aria-live="polite">
@@ -584,6 +718,7 @@ body {
 <!-- ═══════════════════════════════════════════════════════════ -->
 <script src="./mic-level.js"></script>
 <script src="./live-protocol.js"></script>
+<script src="./hotword-settings.js"></script>
 <script type="module">
 // ============================================================
 // DiTing v3.0 - Frontend with wavesurfer.js
@@ -652,6 +787,14 @@ const micOrbWave = $('micOrbWave');
 const micOrbTitle = $('micOrbTitle');
 const micOrbSubtitle = $('micOrbSubtitle');
 const micLevelBars = Array.from(micOrbWave?.querySelectorAll('span') || []);
+const hotwordModal = $('hotwordModal');
+const hotwordList = $('hotwordList');
+const hotwordsEnabled = $('hotwordsEnabled');
+const fuzzyPinyinEnabled = $('fuzzyPinyinEnabled');
+const defaultHotwordScore = $('defaultHotwordScore');
+const defaultHotwordScoreNumber = $('defaultHotwordScoreNumber');
+const defaultScoreLabel = $('defaultScoreLabel');
+const hotwordSaveStatus = $('hotwordSaveStatus');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -679,6 +822,7 @@ let isRecording = false;
 let micSequence = 0;
 let micStreamId = null;
 let micSegmentStartIndex = 0;
+let hotwordSettingsState = null;
 
 // Log stream
 let logWs = null;
@@ -1576,6 +1720,155 @@ function finishUploadUI(status) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Hotword Settings
+// ═══════════════════════════════════════════════════════════
+
+function setHotwordStatus(message, isError = false) {
+  if (!hotwordSaveStatus) return;
+  hotwordSaveStatus.textContent = message || '';
+  hotwordSaveStatus.style.color = isError ? 'var(--accent-red)' : 'var(--text-muted)';
+}
+
+function setDefaultHotwordScore(value) {
+  if (!window.DiTingHotwordSettings) return;
+  const score = window.DiTingHotwordSettings.clamp(value);
+  if (defaultHotwordScore) defaultHotwordScore.value = String(Math.min(12, score));
+  if (defaultHotwordScoreNumber) defaultHotwordScoreNumber.value = String(score);
+  if (defaultScoreLabel) defaultScoreLabel.textContent = score.toFixed(1);
+  if (hotwordSettingsState) hotwordSettingsState.default_score = score;
+}
+
+function createHotwordRow(item) {
+  const row = document.createElement('div');
+  row.className = `hotword-row${item.enabled ? '' : ' disabled'}`;
+
+  const enabled = document.createElement('input');
+  enabled.type = 'checkbox';
+  enabled.checked = item.enabled !== false;
+  enabled.dataset.field = 'enabled';
+  enabled.setAttribute('aria-label', `启用 ${item.text}`);
+  enabled.addEventListener('change', () => row.classList.toggle('disabled', !enabled.checked));
+
+  const textInput = document.createElement('input');
+  textInput.className = 'hotword-input';
+  textInput.value = item.text;
+  textInput.maxLength = 80;
+  textInput.dataset.field = 'text';
+  textInput.setAttribute('aria-label', '热词标准写法');
+
+  const scoreInput = document.createElement('input');
+  scoreInput.className = 'hotword-input';
+  scoreInput.type = 'number';
+  scoreInput.min = '0.1';
+  scoreInput.max = '20';
+  scoreInput.step = '0.5';
+  scoreInput.value = String(item.score);
+  scoreInput.dataset.field = 'score';
+  scoreInput.setAttribute('aria-label', `${item.text} 权重`);
+
+  const remove = document.createElement('button');
+  remove.className = 'btn btn-secondary hotword-remove';
+  remove.type = 'button';
+  remove.textContent = '×';
+  remove.setAttribute('aria-label', `删除 ${item.text}`);
+  remove.addEventListener('click', () => row.remove());
+
+  row.append(enabled, textInput, scoreInput, remove);
+  return row;
+}
+
+function renderHotwordRows() {
+  if (!hotwordList || !hotwordSettingsState) return;
+  hotwordList.innerHTML = '';
+  hotwordSettingsState.words.forEach(item => hotwordList.appendChild(createHotwordRow(item)));
+  setHotwordStatus(`${hotwordSettingsState.words.length} 个热词`);
+}
+
+async function openHotwordSettings() {
+  if (!hotwordModal || !window.DiTingHotwordSettings) return;
+  hotwordModal.classList.add('visible');
+  hotwordModal.setAttribute('aria-hidden', 'false');
+  setHotwordStatus('正在加载...');
+  try {
+    const response = await fetch(`${API_BASE}/api/hotwords`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(await response.json());
+    if (hotwordsEnabled) hotwordsEnabled.checked = hotwordSettingsState.enabled;
+    if (fuzzyPinyinEnabled) fuzzyPinyinEnabled.checked = hotwordSettingsState.fuzzy_pinyin_enabled;
+    setDefaultHotwordScore(hotwordSettingsState.default_score);
+    renderHotwordRows();
+  } catch (error) {
+    console.error('[Hotwords] Load failed:', error);
+    setHotwordStatus(`加载失败：${error.message}`, true);
+  }
+}
+
+function closeHotwordSettings() {
+  if (!hotwordModal) return;
+  hotwordModal.classList.remove('visible');
+  hotwordModal.setAttribute('aria-hidden', 'true');
+}
+
+function addHotwordToEditor() {
+  const input = $('newHotwordInput');
+  const text = input?.value.trim();
+  if (!text || !hotwordList || !window.DiTingHotwordSettings) return;
+  const duplicate = Array.from(hotwordList.querySelectorAll('[data-field="text"]'))
+    .some(element => element.value.trim().toLocaleLowerCase() === text.toLocaleLowerCase());
+  if (duplicate) {
+    setHotwordStatus('这个热词已经存在', true);
+    return;
+  }
+  const score = window.DiTingHotwordSettings.scoreForNewWord(
+    text,
+    defaultHotwordScoreNumber?.value,
+  );
+  hotwordList.appendChild(createHotwordRow({ text, score, enabled: true }));
+  input.value = '';
+  setHotwordStatus('已加入编辑列表，保存后生效');
+}
+
+function collectHotwordRows() {
+  if (!hotwordList) return [];
+  return Array.from(hotwordList.querySelectorAll('.hotword-row')).map(row => ({
+    text: row.querySelector('[data-field="text"]')?.value || '',
+    score: row.querySelector('[data-field="score"]')?.value,
+    enabled: row.querySelector('[data-field="enabled"]')?.checked !== false,
+  }));
+}
+
+async function saveHotwordSettings() {
+  if (!hotwordSettingsState || !window.DiTingHotwordSettings) return;
+  const saveButton = $('btnSaveHotwords');
+  const payload = window.DiTingHotwordSettings.buildPayload({
+    ...hotwordSettingsState,
+    enabled: hotwordsEnabled?.checked !== false,
+    fuzzy_pinyin_enabled: fuzzyPinyinEnabled?.checked !== false,
+    default_score: defaultHotwordScoreNumber?.value,
+  }, collectHotwordRows());
+  if (saveButton) saveButton.disabled = true;
+  setHotwordStatus('正在保存并重建热词解码器...');
+  try {
+    const response = await fetch(`${API_BASE}/api/hotwords`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
+    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data);
+    renderHotwordRows();
+    setHotwordStatus(`已应用 ${data.active_count ?? hotwordSettingsState.words.length} 个热词；新会话生效`);
+    showToast('Hotword settings applied to new ASR sessions');
+  } catch (error) {
+    console.error('[Hotwords] Save failed:', error);
+    setHotwordStatus(`保存失败：${error.message}`, true);
+  } finally {
+    if (saveButton) saveButton.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // Live Mic Recording
 // ═══════════════════════════════════════════════════════════
 
@@ -1982,6 +2275,7 @@ function initApp() {
   const btnReset = $('btnReset');
   const btnMic = $('btnMic');
   const btnUpload = $('btnUpload');
+  const btnHotwords = $('btnHotwords');
   const fileUpload = $('fileUpload');
   const btnLog = $('btnLog');
   const logPanelHeader = $('logPanelHeader');
@@ -1990,9 +2284,22 @@ function initApp() {
   if (btnReset) btnReset.addEventListener('click', resetAll);
   if (btnMic) btnMic.addEventListener('click', toggleMic);
   if (btnUpload) btnUpload.addEventListener('click', () => { if (fileUpload) fileUpload.click(); });
+  if (btnHotwords) btnHotwords.addEventListener('click', openHotwordSettings);
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
   if (btnLog) btnLog.addEventListener('click', toggleLogPanel);
   if (logPanelHeader) logPanelHeader.addEventListener('click', toggleLogPanel);
+  $('btnCloseHotwords')?.addEventListener('click', closeHotwordSettings);
+  $('btnCancelHotwords')?.addEventListener('click', closeHotwordSettings);
+  $('btnSaveHotwords')?.addEventListener('click', saveHotwordSettings);
+  $('btnAddHotword')?.addEventListener('click', addHotwordToEditor);
+  $('newHotwordInput')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); addHotwordToEditor(); }
+  });
+  defaultHotwordScore?.addEventListener('input', event => setDefaultHotwordScore(event.target.value));
+  defaultHotwordScoreNumber?.addEventListener('change', event => setDefaultHotwordScore(event.target.value));
+  hotwordModal?.addEventListener('click', event => {
+    if (event.target === hotwordModal) closeHotwordSettings();
+  });
 
   console.log('[DiTing] App initialized — all event listeners registered');
 }
@@ -2002,6 +2309,10 @@ initApp();
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && hotwordModal?.classList.contains('visible')) {
+    closeHotwordSettings();
+    return;
+  }
   if (e.code === 'Space' && !e.target.closest('input,textarea')) {
     e.preventDefault();
     if (!isPlaying) startDemo();

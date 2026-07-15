@@ -37,6 +37,7 @@ sys.path.insert(0, BACKEND_DIR)
 # ── Logging ─────────────────────────────────────────────────────
 from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
 from upload_storage import UploadTooLargeError, save_upload_to_temp
+from xasr.hotword_config import HotwordConfigStore
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -49,6 +50,7 @@ try:
         LiveAudioSession,
         create_live_vad,
         find_silero_vad_model,
+        get_live_endpoint_grace_ms,
         get_live_audio_profile,
     )
     from xasr.recording import LiveRecording
@@ -81,6 +83,10 @@ PROCESSING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 RECORDINGS_DIR = Path(
     os.getenv("DITING_RECORDINGS_DIR", os.path.join(BACKEND_DIR, "recordings"))
 )
+HOTWORDS_CONFIG_PATH = Path(
+    os.getenv("DITING_HOTWORDS_CONFIG", os.path.join(BACKEND_DIR, "data", "hotwords.json"))
+)
+hotword_config_store = None
 
 def _load_xasr_engine():
     """Load X-ASR engine in background thread (fire-and-forget)."""
@@ -91,10 +97,15 @@ def _load_xasr_engine():
     xasr_loading = True
     logger.info("Loading X-ASR model in background thread (~300MB)...")
     try:
+        settings = hotword_config_store.load()
+        hotwords, hotword_scores = hotword_config_store.engine_inputs(settings)
         engine = XASREngine(
-            hotwords=DEMO_MEETING["hotwords"],
+            hotwords=hotwords,
+            hotword_scores=hotword_scores,
+            hotwords_score=settings["default_score"],
             enable_logic_validation=True,
-            enable_hotword_correction=True,
+            enable_hotword_correction=settings["enabled"],
+            enable_fuzzy_pinyin=settings["fuzzy_pinyin_enabled"],
             enable_uncertainty=True,
             # Live VAD owns utterance boundaries, avoiding two competing
             # endpoint detectors in the same stream.
@@ -186,6 +197,11 @@ DEMO_MEETING = {
     }
 }
 
+hotword_config_store = HotwordConfigStore(
+    HOTWORDS_CONFIG_PATH,
+    DEMO_MEETING["hotwords"],
+)
+
 # ===========================================================================
 # WebSocket Manager
 # ===========================================================================
@@ -256,10 +272,11 @@ async def get_xasr_status():
             ),
             "endpoint_grace_ms": get_live_endpoint_grace_ms() if vad_model else 0,
         },
-        "hotwords_count": len(xasr_engine.hotword_corrector.hotwords) if xasr_engine.hotword_corrector else 0,
+        "hotwords_count": hotword_config_store.load()["active_count"],
         "features": {
             "logic_validation": xasr_engine.enable_logic_validation,
             "hotword_correction": xasr_engine.enable_hotword_correction,
+            "fuzzy_pinyin": xasr_engine.enable_fuzzy_pinyin,
             "uncertainty_estimation": xasr_engine.enable_uncertainty,
         },
         "loading": False,
@@ -274,23 +291,42 @@ async def get_demo_meeting():
 
 @app.get("/api/hotwords")
 async def get_hotwords():
-    """Get current hotword list."""
-    engine_words = list(xasr_engine.hotword_corrector.hotwords) if (
-        xasr_engine and xasr_engine.hotword_corrector
-    ) else []
-    return {
-        "hotwords": list(set(DEMO_MEETING["hotwords"] + engine_words)),
-        "count": len(DEMO_MEETING["hotwords"]) + len(engine_words),
-    }
+    """Get persistent hotword settings used by future ASR sessions."""
+    return {**hotword_config_store.load(), "applies_to": "new_sessions"}
+
+
+def _apply_hotword_settings(settings: dict) -> None:
+    if not xasr_engine:
+        return
+    words, scores = hotword_config_store.engine_inputs(settings)
+    xasr_engine.configure_hotwords(
+        words,
+        scores=scores,
+        default_score=settings["default_score"],
+        enabled=settings["enabled"],
+        fuzzy_pinyin_enabled=settings["fuzzy_pinyin_enabled"],
+    )
 
 
 @app.post("/api/hotwords")
 async def add_hotwords(data: dict):
-    """Add custom hotwords."""
-    new_words = data.get("words", [])
-    if xasr_engine:
-        xasr_engine.add_hotwords(new_words)
-    return {"added": new_words, "ok": True}
+    """Compatibility endpoint: add words while preserving current settings."""
+    raw_words = data.get("words", [])
+    new_words = [
+        item.get("text", "") if isinstance(item, dict) else item
+        for item in raw_words
+    ]
+    settings = hotword_config_store.add_words(new_words)
+    _apply_hotword_settings(settings)
+    return {**settings, "added": new_words, "ok": True, "applies_to": "new_sessions"}
+
+
+@app.put("/api/hotwords")
+async def replace_hotword_settings(data: dict):
+    """Persist the complete list, per-word scores, and fuzzy-pinyin switches."""
+    settings = hotword_config_store.save(data)
+    _apply_hotword_settings(settings)
+    return {**settings, "ok": True, "applies_to": "new_sessions"}
 
 
 # ===========================================================================

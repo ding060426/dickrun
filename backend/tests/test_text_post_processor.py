@@ -9,6 +9,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from modules.text_post_processor import (
+    inverse_text_normalize,
     process_asr_text,
     process_asr_text_with_details,
     restore_punctuation,
@@ -75,6 +76,29 @@ class TextPostProcessorTests(unittest.TestCase):
         )
 
         self.assertEqual(result, "大家好。今天开始开会。")
+
+    def test_inverse_text_normalization_handles_common_dictation_numbers(self):
+        source = "二零二六年百分之二十五下午三点半端口八零八零预算五千八百元"
+
+        result = inverse_text_normalize(source)
+
+        self.assertEqual(result, "2026年25%下午3:30端口8080预算5800元")
+
+    def test_filler_cleanup_preserves_meaningful_words_and_short_repetition(self):
+        result = process_asr_text(
+            "嗯金额额外看看那个那个我们开始",
+            enable_punctuation=False,
+            enable_force_split=False,
+        )
+
+        self.assertEqual(result, "金额额外看看那个我们开始")
+
+    def test_detailed_pipeline_reports_number_normalization(self):
+        text, details = process_asr_text_with_details("预算一百二十三元")
+
+        self.assertIn("123元", text.replace(" ", ""))
+        self.assertEqual(details["itn_original"], "预算一百二十三元")
+        self.assertIn("123元", details["itn_normalized"])
 
 
 if __name__ == "__main__":

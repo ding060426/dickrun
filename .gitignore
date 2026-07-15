@@ -19,6 +19,7 @@ __pycache__/
 
 # ── Logs ──
 backend/logs/
+backend/data/hotwords.json
 *.log
 
 # ── Demo output ──

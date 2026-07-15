@@ -32,8 +32,9 @@ from .sherpa_streaming_infer import (
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.audio_processor import (
     estimate_snr, estimate_rt60, acoustic_quality_score,
-    HotwordCorrector, LogicValidator, UncertaintyEstimator
+    LogicValidator, UncertaintyEstimator
 )
+from modules.hotword_processor import HotwordProcessor
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -209,6 +210,8 @@ class XASREngine:
         recognizer_runtime: SherpaRecognizerRuntime | None = None,
         asr_profile: str | None = None,
         hotwords_score: float = 5.0,
+        hotword_scores: Dict[str, float] = None,
+        enable_fuzzy_pinyin: bool = True,
     ):
         """
         Initialize X-ASR engine.
@@ -244,6 +247,8 @@ class XASREngine:
         self._text_format = text_format
         self._hotwords = list(hotwords or [])
         self._hotwords_score = hotwords_score
+        self._hotword_scores = dict(hotword_scores or {})
+        self.enable_fuzzy_pinyin = enable_fuzzy_pinyin
         self._recognizer_runtime = recognizer_runtime
         self.asr_profile, self.chunk_ms = resolve_asr_profile(asr_profile)
 
@@ -272,7 +277,13 @@ class XASREngine:
             self.asr = None
 
         # Cognitive enhancement modules
-        self.hotword_corrector = HotwordCorrector(self._hotwords) if enable_hotword_correction else None
+        self.hotword_corrector = (
+            HotwordProcessor(
+                self._hotwords,
+                fuzzy_pinyin_enabled=self.enable_fuzzy_pinyin,
+            )
+            if enable_hotword_correction and self._hotwords else None
+        )
         self.logic_validator = LogicValidator() if enable_logic_validation else None
         self.uncertainty_estimator = UncertaintyEstimator() if enable_uncertainty else None
 
@@ -298,6 +309,7 @@ class XASREngine:
                 self.model_dir,
                 self._hotwords,
                 score=self._hotwords_score,
+                scores=self._hotword_scores,
             )
             self._recognizer_runtime = SherpaRecognizerRuntime(
                 tokens=self._tokens,
@@ -351,6 +363,8 @@ class XASREngine:
             "recognizer_runtime": self._get_recognizer_runtime(),
             "asr_profile": self.asr_profile,
             "hotwords_score": self._hotwords_score,
+            "hotword_scores": dict(self._hotword_scores),
+            "enable_fuzzy_pinyin": self.enable_fuzzy_pinyin,
         }
         runtime_affecting = {
             "hotwords",
@@ -364,6 +378,7 @@ class XASREngine:
             "text_format",
             "asr_profile",
             "hotwords_score",
+            "hotword_scores",
         }
         if runtime_affecting.intersection(overrides):
             options["recognizer_runtime"] = None
@@ -755,16 +770,8 @@ class XASREngine:
         display_text = raw_text
         terms = []
         if self.hotword_corrector and raw_text:
-            corrections = self.hotword_corrector.pinyin_correct(raw_text)
-            display_text = raw_text
-            for c in sorted(corrections, key=lambda x: x.get('position', 0), reverse=True):
-                orig = c.get('original', '')
-                corr = c.get('corrected', '')
-                if orig in display_text:
-                    display_text = display_text.replace(orig, corr, 1)
-            for hw in self.hotword_corrector.hotwords:
-                if hw in display_text:
-                    terms.append(hw)
+            display_text, corrections = self.hotword_corrector.rewrite(raw_text)
+            terms = self.hotword_corrector.matched_terms(display_text)
 
         # 2.5 Text post-processing (filler removal + punctuation + sentence splitting)
         # Only apply to final results — partial results are shown as-is for low latency
@@ -878,16 +885,43 @@ class XASREngine:
 
     def add_hotwords(self, words: List[str]):
         """Add hotwords and rebuild the shared runtime for future sessions."""
-        changed = False
+        merged = list(self._hotwords)
         for word in words:
             normalized = str(word).strip()
-            if normalized and normalized not in self._hotwords:
-                self._hotwords.append(normalized)
-                changed = True
-            if normalized and self.hotword_corrector:
-                self.hotword_corrector.hotwords.add(normalized)
-        if changed:
-            self._recognizer_runtime = None
+            if normalized and normalized not in merged:
+                merged.append(normalized)
+        self.configure_hotwords(
+            merged,
+            scores=self._hotword_scores,
+            default_score=self._hotwords_score,
+            enabled=self.enable_hotword_correction,
+            fuzzy_pinyin_enabled=self.enable_fuzzy_pinyin,
+        )
+
+    def configure_hotwords(
+        self,
+        words: List[str],
+        *,
+        scores: Dict[str, float] = None,
+        default_score: float = None,
+        enabled: bool = True,
+        fuzzy_pinyin_enabled: bool = True,
+    ):
+        """Apply hotword settings to future streams without disrupting active ones."""
+        self._hotwords = [str(word).strip() for word in words if str(word).strip()]
+        self._hotword_scores = dict(scores or {})
+        if default_score is not None:
+            self._hotwords_score = float(default_score)
+        self.enable_hotword_correction = bool(enabled)
+        self.enable_fuzzy_pinyin = bool(fuzzy_pinyin_enabled)
+        self.hotword_corrector = (
+            HotwordProcessor(
+                self._hotwords,
+                fuzzy_pinyin_enabled=self.enable_fuzzy_pinyin,
+            )
+            if self.enable_hotword_correction and self._hotwords else None
+        )
+        self._recognizer_runtime = None
 
     def set_speaker(self, speaker_id: str):
         """Switch speaker."""

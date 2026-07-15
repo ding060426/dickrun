@@ -1984,8 +1984,6 @@ let micTestAudioContext = null;
 let micTestAnimationFrame = null;
 let activeSettingsTab = 'recognition';
 
-let logVisible = false;
-
 // 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// AudioPlaybackManager (wavesurfer.js based)
 let micDisplayLevel = 0;
 let micLevelLastUpdate = 0;
@@ -3890,7 +3888,7 @@ function renderDomainPresetButtons() {
     const check = document.createElement('b');
     check.className = 'domain-preset-check';
     check.setAttribute('aria-hidden', 'true');
-    check.textContent = '鉁?;
+    check.textContent = '\u2713';
     heading.append(title, check);
     const description = document.createElement('span');
     description.textContent = localizedDescription;
@@ -3924,7 +3922,7 @@ function updateDomainPresetSelectionUi() {
     .map(id => presetNames.get(id))
     .filter(Boolean);
   if (domainSelectionNames) {
-    domainSelectionNames.textContent = selectedNames.join(i18n.language === 'zh-CN' ? '銆? : ', ');
+    domainSelectionNames.textContent = selectedNames.join(i18n.language === 'zh-CN' ? '\u3001' : ', ');
   }
   if (domainSelectionNotice) domainSelectionNotice.hidden = selectedNames.length === 0;
 }
@@ -4847,15 +4845,6 @@ function initApp() {
   if ($('btnEditProfile')) $('btnEditProfile').addEventListener('click', openProfileEditor);
   if ($('btnSwitchUser')) $('btnSwitchUser').addEventListener('click', switchUser);
   if ($('btnAccountLogout')) $('btnAccountLogout').addEventListener('click', logout);
-// Keyboard shortcuts
-
-initApp();
-// Run immediately 鈥?DOM is already parsed (module scripts are deferred)
-
-}
-  console.log('[DiTing] App initialized 鈥?all event listeners registered');
-
-  });
   settingsNavButtons.forEach(button => {
     button.addEventListener('click', () => switchSettingsTab(button.dataset.settingsTab));
   });
@@ -4889,20 +4878,6 @@ initApp();
       if (event.target === profileOverlay) closeProfileEditor();
     });
   }
-  document.addEventListener('click', event => {
-    if (accountMenuRoot && !accountMenuRoot.contains(event.target)) setAccountMenuOpen(false);
-  if (e.code === 'Space' && !e.target.closest('input,textarea')) {
-  }
-    return;
-    closeHotwordSettings();
-  if (e.code === 'Escape' && hotwordModal?.classList.contains('visible')) {
-document.addEventListener('keydown', (e) => {
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key !== 'Escape') return;
-    if (profileOverlay?.classList.contains('visible')) closeProfileEditor();
-    else setAccountMenuOpen(false);
-  });
 
   document.querySelectorAll('.topbar-nav-item').forEach(item => {
     item.addEventListener('click', () => switchModule(item.dataset.module));
@@ -4949,10 +4924,8 @@ document.addEventListener('keydown', (e) => {
   console.log('[会悟] App initialized — all event listeners registered');
 }
 
-// Run immediately — DOM is already parsed (module scripts are deferred)
 initApp();
 
-// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR' && e.ctrlKey) {
     e.preventDefault();
@@ -4964,6 +4937,3 @@ document.addEventListener('keydown', (e) => {
   }
 });
 </script>
-</div><!-- /#mainApp -->
-</body>
-</html>

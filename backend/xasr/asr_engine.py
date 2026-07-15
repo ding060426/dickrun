@@ -17,12 +17,16 @@ import sys
 import time
 import logging
 from typing import Optional, List, Dict, Callable
-from dataclasses import dataclass, field
-# field is already imported above — ensure it's present
-
 import numpy as np
 
-from .sherpa_streaming_infer import SherpaStreamingASR, format_text
+from .contracts import ASRResult
+from .config import resolve_asr_profile
+from .hotwords import prepare_hotword_assets
+from .sherpa_streaming_infer import (
+    SherpaRecognizerRuntime,
+    SherpaStreamingASR,
+    format_text,
+)
 
 # Import cognitive enhancement modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,49 +47,6 @@ if not logger.handlers:
     ))
     logger.addHandler(h)
     logger.setLevel(logging.INFO)
-
-
-# ===========================================================================
-# Data class
-# ===========================================================================
-
-@dataclass
-class ASRResult:
-    """ASR recognition result with full cognitive enhancement info."""
-    # Basic
-    text: str = ""
-    raw_text: str = ""
-    is_partial: bool = False
-    is_final: bool = False
-    timestamp: float = 0.0
-    start_sec: float = 0.0      # segment start time in audio
-    end_sec: float = 0.0        # segment end time in audio
-
-    # Audio waveform data (raw float32 numpy array, not serialized to JSON)
-    audio_data: Optional[np.ndarray] = field(default=None, repr=False)
-
-    # ASR confidence
-    asr_confidence: float = 0.8
-
-    # Acoustic environment
-    snr_db: float = 25.0
-    rt60: float = 0.3
-    quality_score: float = 0.85
-    quality_label: str = "high"
-
-    # Hotword correction
-    corrections: List[dict] = field(default_factory=list)
-
-    # Logic validation
-    logic_flags: List[dict] = field(default_factory=list)
-
-    # Uncertainty
-    uncertainty: dict = field(default_factory=dict)
-
-    # Term annotation
-    terms: List[str] = field(default_factory=list)
-    data_points: List[dict] = field(default_factory=list)
-    uncertain_spans: List[dict] = field(default_factory=list)
 
 
 # ===========================================================================
@@ -245,6 +206,9 @@ class XASREngine:
         model_type: str = "zipformer2",
         text_format: str = "none",
         speaker_id: str = "default",
+        recognizer_runtime: SherpaRecognizerRuntime | None = None,
+        asr_profile: str | None = None,
+        hotwords_score: float = 5.0,
     ):
         """
         Initialize X-ASR engine.
@@ -278,14 +242,18 @@ class XASREngine:
         self._decoding_method = decoding_method
         self._model_type = model_type
         self._text_format = text_format
+        self._hotwords = list(hotwords or [])
+        self._hotwords_score = hotwords_score
+        self._recognizer_runtime = recognizer_runtime
+        self.asr_profile, self.chunk_ms = resolve_asr_profile(asr_profile)
 
         # Model paths
         model_dir = model_dir or self.DEFAULT_MODEL_DIR
         self.model_dir = model_dir
         tokens = os.path.join(model_dir, "tokens.txt")
-        encoder = os.path.join(model_dir, "encoder-160ms.onnx")
-        decoder = os.path.join(model_dir, "decoder-160ms.onnx")
-        joiner = os.path.join(model_dir, "joiner-160ms.onnx")
+        encoder = os.path.join(model_dir, f"encoder-{self.chunk_ms}ms.onnx")
+        decoder = os.path.join(model_dir, f"decoder-{self.chunk_ms}ms.onnx")
+        joiner = os.path.join(model_dir, f"joiner-{self.chunk_ms}ms.onnx")
 
         # Check model availability
         self.model_available = all(os.path.exists(f) for f in [tokens, encoder, decoder, joiner])
@@ -304,7 +272,7 @@ class XASREngine:
             self.asr = None
 
         # Cognitive enhancement modules
-        self.hotword_corrector = HotwordCorrector(hotwords or []) if enable_hotword_correction else None
+        self.hotword_corrector = HotwordCorrector(self._hotwords) if enable_hotword_correction else None
         self.logic_validator = LogicValidator() if enable_logic_validation else None
         self.uncertainty_estimator = UncertaintyEstimator() if enable_uncertainty else None
 
@@ -319,23 +287,88 @@ class XASREngine:
     # ------------------------------------------------------------------
 
     def _create_asr(self) -> Optional[SherpaStreamingASR]:
-        """Create a fresh ASR instance (not thread-safe, use per-stream)."""
+        """Create a fresh stream session backed by the shared runtime."""
         if not self.model_available:
             return None
-        return SherpaStreamingASR(
-            tokens=self._tokens,
-            encoder=self._encoder,
-            decoder=self._decoder,
-            joiner=self._joiner,
-            provider=self._provider,
-            sample_rate=self._sample_rate,
-            feature_dim=80,
-            num_threads=self._num_threads,
-            decoding_method=self._decoding_method,
-            model_type=self._model_type,
-            enable_endpoint_detection=self.enable_endpoint_detection,
-            text_format=self._text_format,
-        )
+        return self._get_recognizer_runtime().create_session()
+
+    def _get_recognizer_runtime(self) -> SherpaRecognizerRuntime:
+        if self._recognizer_runtime is None:
+            hotword_assets = prepare_hotword_assets(
+                self.model_dir,
+                self._hotwords,
+                score=self._hotwords_score,
+            )
+            self._recognizer_runtime = SherpaRecognizerRuntime(
+                tokens=self._tokens,
+                encoder=self._encoder,
+                decoder=self._decoder,
+                joiner=self._joiner,
+                provider=self._provider,
+                sample_rate=self._sample_rate,
+                feature_dim=80,
+                num_threads=self._num_threads,
+                decoding_method=(
+                    hotword_assets.decoding_method
+                    if hotword_assets.enabled else self._decoding_method
+                ),
+                model_type=self._model_type,
+                enable_endpoint_detection=self.enable_endpoint_detection,
+                text_format=self._text_format,
+                hotwords_file=(
+                    str(hotword_assets.hotwords_file) if hotword_assets.hotwords_file else ""
+                ),
+                hotwords_score=self._hotwords_score,
+                modeling_unit=hotword_assets.modeling_unit,
+                bpe_vocab=str(hotword_assets.bpe_vocab) if hotword_assets.bpe_vocab else "",
+                max_active_paths=hotword_assets.max_active_paths,
+            )
+        return self._recognizer_runtime
+
+    def warmup(self) -> "XASREngine":
+        """Load the recognizer runtime once during application startup."""
+        if self.model_available:
+            self._get_recognizer_runtime()
+        return self
+
+    def fork_session(self, **overrides) -> "XASREngine":
+        """Create isolated enhancement/session state over the shared model runtime."""
+        options = {
+            "hotwords": list(self._hotwords),
+            "enable_logic_validation": self.enable_logic_validation,
+            "enable_hotword_correction": self.enable_hotword_correction,
+            "enable_uncertainty": self.enable_uncertainty,
+            "enable_endpoint_detection": self.enable_endpoint_detection,
+            "enable_text_postprocess": self.enable_text_postprocess,
+            "model_dir": self.model_dir,
+            "provider": self._provider,
+            "sample_rate": self._sample_rate,
+            "num_threads": self._num_threads,
+            "decoding_method": self._decoding_method,
+            "model_type": self._model_type,
+            "text_format": self._text_format,
+            "speaker_id": self.speaker_id,
+            "recognizer_runtime": self._get_recognizer_runtime(),
+            "asr_profile": self.asr_profile,
+            "hotwords_score": self._hotwords_score,
+        }
+        runtime_affecting = {
+            "hotwords",
+            "enable_endpoint_detection",
+            "model_dir",
+            "provider",
+            "sample_rate",
+            "num_threads",
+            "decoding_method",
+            "model_type",
+            "text_format",
+            "asr_profile",
+            "hotwords_score",
+        }
+        if runtime_affecting.intersection(overrides):
+            options["recognizer_runtime"] = None
+        options.update(overrides)
+        return XASREngine(**options)
 
     # ------------------------------------------------------------------
     # File processing (THE KEY FIX)
@@ -427,9 +460,10 @@ class XASREngine:
         # 4. Done
         self.end_session()
         elapsed = time.time() - t0
+        rtf = elapsed / duration if duration > 0 else 0.0
         logger.info(
             f"=== Processing complete: {len(results)} utterances "
-            f"in {elapsed:.1f}s (RTF: {elapsed/duration:.3f}) ==="
+            f"in {elapsed:.1f}s (RTF: {rtf:.3f}) ==="
         )
 
         if on_progress:
@@ -654,10 +688,22 @@ class XASREngine:
         """Backward-compatible finalization for the end of a live session."""
         return self.finalize_utterance(reset_stream=False)
 
-    def finalize_utterance(self, reset_stream: bool = True) -> Optional[ASRResult]:
+    def finalize_utterance(
+        self,
+        reset_stream: bool = True,
+        tail_pad_ms: int = 0,
+    ) -> Optional[ASRResult]:
         """Finalize one VAD utterance and optionally prepare the next stream."""
         if not self.asr:
             return None
+
+        if tail_pad_ms > 0:
+            tail = np.zeros(
+                round(self._sample_rate * tail_pad_ms / 1000),
+                dtype=np.float32,
+            )
+            self.asr.accept_waveform(tail, self._sample_rate)
+            self.asr.decode()
 
         raw_text = self.asr.get_final_result()
         result = None
@@ -669,6 +715,8 @@ class XASREngine:
             )
         if reset_stream:
             self.asr.reset()
+        else:
+            self._session_active = False
         return result
 
     # ------------------------------------------------------------------
@@ -799,10 +847,17 @@ class XASREngine:
         return np.interp(xq, xp, audio).astype(np.float32)
 
     def add_hotwords(self, words: List[str]):
-        """Dynamically add hotwords."""
-        if self.hotword_corrector:
-            for w in words:
-                self.hotword_corrector.hotwords.add(w)
+        """Add hotwords and rebuild the shared runtime for future sessions."""
+        changed = False
+        for word in words:
+            normalized = str(word).strip()
+            if normalized and normalized not in self._hotwords:
+                self._hotwords.append(normalized)
+                changed = True
+            if normalized and self.hotword_corrector:
+                self.hotword_corrector.hotwords.add(normalized)
+        if changed:
+            self._recognizer_runtime = None
 
     def set_speaker(self, speaker_id: str):
         """Switch speaker."""

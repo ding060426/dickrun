@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -62,7 +63,9 @@ class StreamingStats:
         self.first_non_empty_partial_time = None
 
 
-class SherpaStreamingASR:
+class SherpaRecognizerRuntime:
+    """Process-level recognizer runtime that can open independent streams."""
+
     def __init__(
         self,
         tokens: str,
@@ -77,6 +80,11 @@ class SherpaStreamingASR:
         model_type: str = "zipformer2",
         enable_endpoint_detection: bool = False,
         text_format: str = "none",   # none / lower / capitalize
+        hotwords_file: str = "",
+        hotwords_score: float = 1.5,
+        modeling_unit: str = "cjkchar",
+        bpe_vocab: str = "",
+        max_active_paths: int = 4,
     ):
         self.tokens = tokens
         self.encoder = encoder
@@ -90,6 +98,12 @@ class SherpaStreamingASR:
         self.model_type = model_type
         self.enable_endpoint_detection = enable_endpoint_detection
         self.text_format = text_format
+        self.hotwords_file = hotwords_file
+        self.hotwords_score = hotwords_score
+        self.modeling_unit = modeling_unit
+        self.bpe_vocab = bpe_vocab
+        self.max_active_paths = max_active_paths
+        self.lock = threading.RLock()
 
         self.recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
             tokens=self.tokens,
@@ -103,13 +117,32 @@ class SherpaStreamingASR:
             provider=self.provider,
             model_type=self.model_type,
             enable_endpoint_detection=self.enable_endpoint_detection,
+            hotwords_file=self.hotwords_file,
+            hotwords_score=self.hotwords_score,
+            modeling_unit=self.modeling_unit,
+            bpe_vocab=self.bpe_vocab,
+            max_active_paths=self.max_active_paths,
         )
+
+    def create_session(self) -> "SherpaStreamingASR":
+        return SherpaStreamingASR(runtime=self)
+
+
+class SherpaStreamingASR:
+    """One mutable recognition stream backed by a shared recognizer runtime."""
+
+    def __init__(self, *, runtime: SherpaRecognizerRuntime):
+        self.runtime = runtime
+        self.recognizer = runtime.recognizer
+        self.sample_rate = runtime.sample_rate
+        self.text_format = runtime.text_format
 
         self.stats = StreamingStats()
         self.reset()
 
     def reset(self):
-        self.stream = self.recognizer.create_stream()
+        with self.runtime.lock:
+            self.stream = self.recognizer.create_stream()
         self.last_result = ""
         self.partial_result = ""
         self.final_result = ""
@@ -133,7 +166,8 @@ class SherpaStreamingASR:
             samples = np.asarray(samples)
 
         samples = samples.astype(np.float32).reshape(-1)
-        self.stream.accept_waveform(sample_rate, samples)
+        with self.runtime.lock:
+            self.stream.accept_waveform(sample_rate, samples)
 
     def decode(self) -> int:
         """
@@ -143,21 +177,22 @@ class SherpaStreamingASR:
         """
         num_decodes = 0
 
-        while self.recognizer.is_ready(self.stream):
-            self.recognizer.decode_stream(self.stream)
-            result = self.recognizer.get_result(self.stream)
-            result = self._format(result)
+        with self.runtime.lock:
+            while self.recognizer.is_ready(self.stream):
+                self.recognizer.decode_stream(self.stream)
+                result = self.recognizer.get_result(self.stream)
+                result = self._format(result)
 
-            if result != self.last_result:
-                self.partial_result = result
-                self.last_result = result
+                if result != self.last_result:
+                    self.partial_result = result
+                    self.last_result = result
 
-                if result and self.stats.first_non_empty_partial_time is None:
-                    self.stats.first_non_empty_partial_time = (
-                        time.perf_counter() - self.stats.start_time
-                    )
+                    if result and self.stats.first_non_empty_partial_time is None:
+                        self.stats.first_non_empty_partial_time = (
+                            time.perf_counter() - self.stats.start_time
+                        )
 
-            num_decodes += 1
+                num_decodes += 1
 
         return num_decodes
 
@@ -166,16 +201,18 @@ class SherpaStreamingASR:
 
     def input_finished(self):
         self.finished = True
-        self.stream.input_finished()
+        with self.runtime.lock:
+            self.stream.input_finished()
 
     def get_final_result(self) -> str:
         if not self.finished:
             self.input_finished()
 
-        while self.recognizer.is_ready(self.stream):
-            self.recognizer.decode_stream(self.stream)
+        with self.runtime.lock:
+            while self.recognizer.is_ready(self.stream):
+                self.recognizer.decode_stream(self.stream)
 
-        result = self.recognizer.get_result(self.stream)
+            result = self.recognizer.get_result(self.stream)
         result = self._format(result)
         self.final_result = result
         self.partial_result = result
@@ -187,5 +224,6 @@ class SherpaStreamingASR:
 
     def is_endpoint(self) -> bool:
         if hasattr(self.recognizer, "is_endpoint"):
-            return self.recognizer.is_endpoint(self.stream)
+            with self.runtime.lock:
+                return self.recognizer.is_endpoint(self.stream)
         return False

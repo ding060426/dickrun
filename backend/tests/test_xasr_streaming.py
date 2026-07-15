@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -22,7 +24,71 @@ class _FakeStreamingAsr:
         return "实时识别结果"
 
 
+class _FakeRuntime:
+    def __init__(self):
+        self.sessions = []
+
+    def create_session(self):
+        session = _FakeStreamingAsr()
+        self.sessions.append(session)
+        return session
+
+
+def _write_model_files(model_dir: str, chunk_ms: int = 160) -> None:
+    root = Path(model_dir)
+    for name in (
+        "tokens.txt",
+        f"encoder-{chunk_ms}ms.onnx",
+        f"decoder-{chunk_ms}ms.onnx",
+        f"joiner-{chunk_ms}ms.onnx",
+    ):
+        (root / name).write_bytes(b"test")
+
+
 class XASRStreamingSessionTests(unittest.TestCase):
+    def test_empty_recording_finishes_without_dividing_by_zero(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            engine = XASREngine(model_dir=model_dir)
+            engine._load_audio = lambda _: (np.empty(0, dtype=np.float32), 16000)
+
+            results = engine.process_file("empty.wav")
+
+        self.assertEqual(results, [])
+
+    def test_meeting_profile_selects_960ms_model_files(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            _write_model_files(model_dir, chunk_ms=960)
+            engine = XASREngine(model_dir=model_dir, asr_profile="meeting")
+
+        self.assertTrue(engine.is_model_available)
+        self.assertEqual(engine.asr_profile, "meeting")
+        self.assertEqual(engine.chunk_ms, 960)
+
+    def test_forked_engines_share_runtime_but_open_independent_sessions(self):
+        runtime = _FakeRuntime()
+        with tempfile.TemporaryDirectory() as model_dir:
+            _write_model_files(model_dir)
+            engine = XASREngine(model_dir=model_dir, recognizer_runtime=runtime)
+            forked = engine.fork_session()
+
+        engine.start_session()
+        forked.start_session()
+
+        self.assertIsNot(engine.asr, forked.asr)
+        self.assertEqual(runtime.sessions, [engine.asr, forked.asr])
+        self.assertIsNot(engine.logic_validator, forked.logic_validator)
+
+    def test_runtime_affecting_fork_override_does_not_reuse_old_runtime(self):
+        runtime = _FakeRuntime()
+        with tempfile.TemporaryDirectory() as model_dir:
+            _write_model_files(model_dir)
+            _write_model_files(model_dir, chunk_ms=960)
+            engine = XASREngine(model_dir=model_dir, recognizer_runtime=runtime)
+            forked = engine.fork_session(asr_profile="meeting")
+
+        self.assertIsNone(forked._recognizer_runtime)
+        self.assertEqual(forked.chunk_ms, 960)
+
     def test_start_session_lazily_creates_streaming_recognizer(self):
         with tempfile.TemporaryDirectory() as model_dir:
             engine = XASREngine(model_dir=model_dir)

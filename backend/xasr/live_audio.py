@@ -8,27 +8,89 @@ behavior can be exercised without a browser or a network connection.
 from __future__ import annotations
 
 import os
+import struct
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
-from .asr_engine import ASRResult
+from .contracts import ASRResult
+from .recording import LiveRecording, RecordingResult
 
 
 DEFAULT_ENDPOINT_GRACE_MS = 800
 
 
+@dataclass(frozen=True)
+class LiveAudioProfile:
+    name: str
+    pre_roll_ms: int
+    endpoint_grace_ms: int
+    tail_pad_ms: int
+    vad_threshold: float
+    vad_min_silence: float
+    vad_min_speech: float
+
+
+_LIVE_AUDIO_PROFILES = {
+    "meeting": LiveAudioProfile("meeting", 700, 800, 1000, 0.5, 0.5, 0.2),
+    "dictation": LiveAudioProfile("dictation", 300, 200, 1000, 0.5, 0.35, 0.1),
+    "oncall": LiveAudioProfile("oncall", 700, 600, 1000, 0.5, 0.5, 0.2),
+}
+
+
+def get_live_audio_profile(name: str | None = None) -> LiveAudioProfile:
+    selected = (name or os.getenv("DITING_LIVE_PROFILE", "meeting")).strip().lower()
+    try:
+        base = _LIVE_AUDIO_PROFILES[selected]
+    except KeyError as error:
+        choices = ", ".join(_LIVE_AUDIO_PROFILES)
+        raise ValueError(f"unknown live profile {selected!r}; choose one of: {choices}") from error
+    return LiveAudioProfile(
+        name=base.name,
+        pre_roll_ms=_env_int("DITING_LIVE_PRE_ROLL_MS", base.pre_roll_ms),
+        endpoint_grace_ms=_env_int(
+            "DITING_LIVE_ENDPOINT_GRACE_MS",
+            base.endpoint_grace_ms,
+        ),
+        tail_pad_ms=_env_int("DITING_LIVE_TAIL_PAD_MS", base.tail_pad_ms),
+        vad_threshold=_env_float("DITING_LIVE_VAD_THRESHOLD", base.vad_threshold),
+        vad_min_silence=_env_float(
+            "DITING_LIVE_VAD_MIN_SILENCE",
+            base.vad_min_silence,
+        ),
+        vad_min_speech=_env_float(
+            "DITING_LIVE_VAD_MIN_SPEECH",
+            base.vad_min_speech,
+        ),
+    )
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return default
+
+
 def get_live_endpoint_grace_ms() -> int:
     """Return the configurable post-VAD silence grace period."""
-    raw_value = os.getenv("DITING_LIVE_ENDPOINT_GRACE_MS", "").strip()
-    if not raw_value:
-        return DEFAULT_ENDPOINT_GRACE_MS
-    try:
-        return max(0, int(raw_value))
-    except ValueError:
-        return DEFAULT_ENDPOINT_GRACE_MS
+    return get_live_audio_profile().endpoint_grace_ms
 
 
 class LiveAudioProtocolError(ValueError):
@@ -58,6 +120,52 @@ class AlwaysActiveVad:
         started = not self._started
         self._started = True
         return VadState(is_speech=True, speech_started=started)
+
+
+class EnergyVad:
+    """Dependency-free streaming VAD used when no neural VAD is deployed."""
+
+    provider_name = "energy-vad"
+
+    def __init__(
+        self,
+        *,
+        threshold: float = 0.012,
+        min_silence_duration: float = 0.5,
+        min_speech_duration: float = 0.2,
+        sample_rate: int = 16000,
+    ):
+        self._threshold = max(0.0001, float(threshold))
+        self._min_silence_samples = round(sample_rate * min_silence_duration)
+        self._min_speech_samples = round(sample_rate * min_speech_duration)
+        self._speech_samples = 0
+        self._silence_samples = 0
+        self._active = False
+
+    def push(self, samples: np.ndarray) -> VadState:
+        samples = np.asarray(samples, dtype=np.float32).reshape(-1)
+        rms = float(np.sqrt(np.mean(np.square(samples)))) if len(samples) else 0.0
+        voiced = rms >= self._threshold
+
+        if not self._active:
+            self._speech_samples = self._speech_samples + len(samples) if voiced else 0
+            if self._speech_samples >= self._min_speech_samples:
+                self._active = True
+                self._silence_samples = 0
+                return VadState(is_speech=True, speech_started=True)
+            return VadState(is_speech=False)
+
+        if voiced:
+            self._silence_samples = 0
+            return VadState(is_speech=True)
+
+        self._silence_samples += len(samples)
+        if self._silence_samples >= self._min_silence_samples:
+            self._active = False
+            self._speech_samples = 0
+            self._silence_samples = 0
+            return VadState(is_speech=False, speech_ended=True)
+        return VadState(is_speech=True)
 
 
 class SherpaSileroVad:
@@ -150,11 +258,26 @@ def find_silero_vad_model(model_dir: Path | None = None) -> Path | None:
     return next((path for path in candidates if path.is_file()), None)
 
 
-def create_live_vad(model_dir: Path | None = None) -> VoiceActivityDetector:
+def create_live_vad(
+    model_dir: Path | None = None,
+    *,
+    profile: LiveAudioProfile | None = None,
+) -> VoiceActivityDetector:
+    selected = profile or get_live_audio_profile()
+    requested = os.getenv("DITING_LIVE_VAD", "auto").strip().lower()
     model_path = find_silero_vad_model(model_dir)
-    if model_path is None:
-        return AlwaysActiveVad()
-    return SherpaSileroVad(model_path)
+    if requested != "energy" and model_path is not None:
+        return SherpaSileroVad(
+            model_path,
+            threshold=selected.vad_threshold,
+            min_silence_duration=selected.vad_min_silence,
+            min_speech_duration=selected.vad_min_speech,
+        )
+    return EnergyVad(
+        threshold=_env_float("DITING_LIVE_ENERGY_THRESHOLD", 0.012),
+        min_silence_duration=selected.vad_min_silence,
+        min_speech_duration=selected.vad_min_speech,
+    )
 
 
 class LiveAudioSession:
@@ -167,6 +290,8 @@ class LiveAudioSession:
 
     SAMPLE_RATE = 16000
     MAX_FRAME_BYTES = 512 * 1024
+    WIRE_MAGIC = b"DTP2"
+    WIRE_HEADER = struct.Struct("<4sI")
 
     def __init__(
         self,
@@ -175,17 +300,24 @@ class LiveAudioSession:
         vad: VoiceActivityDetector,
         pre_roll_ms: int = 200,
         endpoint_grace_ms: int = DEFAULT_ENDPOINT_GRACE_MS,
+        tail_pad_ms: int = 1000,
+        recording: LiveRecording | None = None,
     ):
         if pre_roll_ms < 0:
             raise ValueError("pre_roll_ms must be non-negative")
         if endpoint_grace_ms < 0:
             raise ValueError("endpoint_grace_ms must be non-negative")
+        if tail_pad_ms < 0:
+            raise ValueError("tail_pad_ms must be non-negative")
         self.engine = engine
         self.vad = vad
         self._pre_roll_limit = round(self.SAMPLE_RATE * pre_roll_ms / 1000)
         self._endpoint_grace_samples = round(
             self.SAMPLE_RATE * endpoint_grace_ms / 1000
         )
+        self._tail_pad_ms = tail_pad_ms
+        self._recording = recording
+        self.recording_result: RecordingResult | None = None
         self._pre_roll: list[np.ndarray] = []
         self._pre_roll_samples = 0
         self._speech_active = False
@@ -194,7 +326,28 @@ class LiveAudioSession:
         self._last_partial_text = ""
         self.received_samples = 0
         self.forwarded_samples = 0
+        self.received_frames = 0
+        self.partial_results = 0
+        self.final_results = 0
+        self._started_at = time.perf_counter()
+        self._first_partial_at: float | None = None
+        self.last_sequence = -1
+        self.dropped_frames = 0
         self.engine.start_session()
+
+    def push_binary_frame(self, payload: bytes) -> list[ASRResult]:
+        """Accept a versioned DTP2 frame or a legacy raw PCM frame."""
+        if payload.startswith(self.WIRE_MAGIC):
+            if len(payload) <= self.WIRE_HEADER.size:
+                raise LiveAudioProtocolError("DTP2 frame is missing PCM payload")
+            _, sequence = self.WIRE_HEADER.unpack_from(payload)
+            if sequence <= self.last_sequence:
+                raise LiveAudioProtocolError("DTP2 sequence must be strictly increasing")
+            if self.last_sequence >= 0 and sequence > self.last_sequence + 1:
+                self.dropped_frames += sequence - self.last_sequence - 1
+            self.last_sequence = sequence
+            payload = payload[self.WIRE_HEADER.size :]
+        return self.push_pcm_s16le(payload)
 
     def push_pcm_s16le(self, payload: bytes) -> list[ASRResult]:
         if self._closed:
@@ -204,7 +357,11 @@ class LiveAudioSession:
         if len(payload) > self.MAX_FRAME_BYTES:
             raise LiveAudioProtocolError("PCM frame is too large")
 
+        if self._recording is not None:
+            self._recording.append_pcm_s16le(payload)
+
         samples = np.frombuffer(payload, dtype="<i2").astype(np.float32) / 32768.0
+        self.received_frames += 1
         self.received_samples += len(samples)
         state = self.vad.push(samples)
 
@@ -225,6 +382,9 @@ class LiveAudioSession:
         self.forwarded_samples += len(samples)
         if result and result.text.strip() and result.text != self._last_partial_text:
             events.append(result)
+            self.partial_results += 1
+            if self._first_partial_at is None:
+                self._first_partial_at = time.perf_counter()
             self._last_partial_text = result.text
 
         if state.speech_ended:
@@ -236,9 +396,13 @@ class LiveAudioSession:
             self._pending_endpoint_samples is not None
             and self._pending_endpoint_samples >= self._endpoint_grace_samples
         ):
-            final = self.engine.finalize_utterance(reset_stream=True)
+            final = self.engine.finalize_utterance(
+                reset_stream=True,
+                tail_pad_ms=self._tail_pad_ms,
+            )
             if final and final.text.strip():
                 events.append(final)
+                self.final_results += 1
             self._speech_active = False
             self._pending_endpoint_samples = None
             self._last_partial_text = ""
@@ -249,11 +413,49 @@ class LiveAudioSession:
         if self._closed:
             return []
         self._closed = True
-        self.engine.end_session()
-        final = self.engine._finalize_results()
+        try:
+            final = self.engine.finalize_utterance(
+                reset_stream=False,
+                tail_pad_ms=self._tail_pad_ms,
+            )
+        finally:
+            if self._recording is not None:
+                self.recording_result = self._recording.finalize()
         if final and final.text.strip():
+            self.final_results += 1
             return [final]
         return []
+
+    def metrics(self) -> dict:
+        elapsed_ms = round((time.perf_counter() - self._started_at) * 1000, 1)
+        first_partial_ms = None
+        if self._first_partial_at is not None:
+            first_partial_ms = round(
+                (self._first_partial_at - self._started_at) * 1000,
+                1,
+            )
+        return {
+            "protocol_version": 2 if self.last_sequence >= 0 else 1,
+            "received_frames": self.received_frames,
+            "received_samples": self.received_samples,
+            "forwarded_samples": self.forwarded_samples,
+            "last_sequence": self.last_sequence,
+            "dropped_frames": self.dropped_frames,
+            "partial_results": self.partial_results,
+            "final_results": self.final_results,
+            "first_partial_ms": first_partial_ms,
+            "elapsed_ms": elapsed_ms,
+        }
+
+    def abort(self) -> Path | None:
+        """Stop without final ASR and preserve any partial recording for recovery."""
+        if self._closed:
+            if self.recording_result is not None:
+                return self.recording_result.path
+            return None
+        self._closed = True
+        self.engine.end_session()
+        return self._recording.abort() if self._recording is not None else None
 
     def _remember_pre_roll(self, samples: np.ndarray) -> None:
         if self._pre_roll_limit <= 0:

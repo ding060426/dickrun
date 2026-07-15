@@ -550,6 +550,7 @@ body {
 <!-- Scripts                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <script src="./mic-level.js"></script>
+<script src="./live-protocol.js"></script>
 <script type="module">
 // ============================================================
 // DiTing v3.0 - Frontend with wavesurfer.js
@@ -639,6 +640,9 @@ let micDisplayLevel = 0;
 let micLevelLastUpdate = 0;
 let micLevelAnimationFrame = null;
 let isRecording = false;
+let micSequence = 0;
+let micStreamId = null;
+let micSegmentStartIndex = 0;
 
 // Log stream
 let logWs = null;
@@ -1589,6 +1593,9 @@ async function toggleMic() {
     if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
       throw new Error('This browser does not support AudioWorklet microphone capture');
     }
+    micSequence = 0;
+    micStreamId = window.crypto?.randomUUID?.() || `mic-${Date.now()}`;
+    micSegmentStartIndex = allSegments.length;
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -1611,14 +1618,25 @@ async function toggleMic() {
           channels: 1,
           sample_format: 'pcm_s16le',
           browser_sample_rate: micAudioContext?.sampleRate,
+          protocol_version: 2,
+          profile: 'meeting',
+          stream_id: micStreamId,
         }));
       } else if (msg.type === 'configured') {
+        micStreamId = msg.data.stream_id || micStreamId;
         if (micStatusEl) {
           micStatusEl.textContent = `Recording · ${msg.data.vad}`;
           micStatusEl.style.color = 'var(--accent-red)';
         }
       } else if (msg.type === 'live_result' && msg.data.text) {
         updateMicResult(msg.data);
+      } else if (msg.type === 'finalizing') {
+        if (micStatusEl) {
+          micStatusEl.textContent = 'Finalizing canonical transcript...';
+          micStatusEl.style.color = 'var(--accent-yellow)';
+        }
+      } else if (msg.type === 'final_transcript') {
+        replaceMicTranscript(msg.data);
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
         if (micStatusEl) {
@@ -1645,7 +1663,10 @@ async function toggleMic() {
     silent.gain.value = 0;
     micWorklet.port.onmessage = (event) => {
       if (event.data?.type === 'audio.pcm' && micWs?.readyState === WebSocket.OPEN) {
-        micWs.send(event.data.payload);
+        const frame = window.DiTingLiveProtocol
+          ? window.DiTingLiveProtocol.encodePcmFrame(micSequence++, event.data.payload)
+          : event.data.payload;
+        micWs.send(frame);
       } else if (event.data?.type === 'audio.level') {
         updateMicLevel(event.data.rms, event.data.peak);
       }
@@ -1682,7 +1703,7 @@ function stopMicRecording() {
     }
   }, 100);
   clearTimeout(micStopTimer);
-  micStopTimer = setTimeout(() => cleanupMicRecording(), 15000);
+  micStopTimer = setTimeout(() => cleanupMicRecording(), 600000);
 }
 
 async function cleanupMicRecording() {
@@ -1735,6 +1756,27 @@ function updateMicResult(data) {
 // ═══════════════════════════════════════════════════════════
 // Debug Log Panel
 // ═══════════════════════════════════════════════════════════
+
+function replaceMicTranscript(data) {
+  const segments = Array.isArray(data?.segments) ? data.segments : [];
+  if (!segments.length || !transcriptBody) return;
+  document.getElementById('live-result')?.remove();
+  transcriptBody.querySelectorAll('.segment[data-seg-index]').forEach(card => {
+    const index = Number(card.getAttribute('data-seg-index'));
+    if (index >= micSegmentStartIndex) {
+      audioManager.destroy(index);
+      card.remove();
+    }
+  });
+  allSegments.splice(micSegmentStartIndex);
+  segments.forEach(segment => {
+    const index = allSegments.length;
+    allSegments.push(segment);
+    renderSegment(segment, index, false);
+  });
+  updateStats(allSegments.length);
+  showToast(`Canonical transcript ready: ${segments.length} segments`);
+}
 
 function toggleLogPanel() {
   const panel = $('logPanel');

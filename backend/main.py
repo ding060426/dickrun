@@ -17,11 +17,11 @@ import time
 import uuid
 import struct
 import base64
-import tempfile
 import threading
 import concurrent.futures
 import traceback
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -36,6 +36,7 @@ sys.path.insert(0, BACKEND_DIR)
 
 # ── Logging ─────────────────────────────────────────────────────
 from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
+from upload_storage import UploadTooLargeError, save_upload_to_temp
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -48,8 +49,9 @@ try:
         LiveAudioSession,
         create_live_vad,
         find_silero_vad_model,
-        get_live_endpoint_grace_ms,
+        get_live_audio_profile,
     )
+    from xasr.recording import LiveRecording
     HAS_XASR = True
     logger.info("X-ASR module loaded")
 except ImportError as e:
@@ -72,6 +74,13 @@ except ImportError as e:
 
 xasr_engine: Optional[XASREngine] = None
 xasr_loading: bool = False
+PROCESSING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=max(1, int(os.getenv("DITING_PROCESSING_WORKERS", "2"))),
+    thread_name_prefix="diting-asr",
+)
+RECORDINGS_DIR = Path(
+    os.getenv("DITING_RECORDINGS_DIR", os.path.join(BACKEND_DIR, "recordings"))
+)
 
 def _load_xasr_engine():
     """Load X-ASR engine in background thread (fire-and-forget)."""
@@ -87,10 +96,14 @@ def _load_xasr_engine():
             enable_logic_validation=True,
             enable_hotword_correction=True,
             enable_uncertainty=True,
-            enable_endpoint_detection=True,
+            # Live VAD owns utterance boundaries, avoiding two competing
+            # endpoint detectors in the same stream.
+            enable_endpoint_detection=False,
             provider="cpu",
             num_threads=2,
+            asr_profile=os.getenv("DITING_LIVE_ASR_PROFILE", "low-latency"),
         )
+        engine.warmup()
         xasr_engine = engine
         if engine.is_model_available:
             logger.info("X-ASR model loaded successfully!")
@@ -109,6 +122,7 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_load_xasr_engine, daemon=True).start()
     yield
     logger.info("Shutting down DiTing backend...")
+    PROCESSING_EXECUTOR.shutdown(wait=False, cancel_futures=True)
 
 app = FastAPI(
     title="DiTing - Smart Meeting Speech Cognitive System",
@@ -447,23 +461,29 @@ def _live_result_to_dict(result: ASRResult) -> dict:
 @app.post("/api/audio/upload")
 async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None)):
     """Upload audio file for X-ASR processing with real-time WebSocket progress."""
+    tmp_path = None
     try:
         if not file_id:
             file_id = str(uuid.uuid4())
 
-        # Save uploaded file
+        # Stream to disk in bounded chunks so long meetings do not require an
+        # equally large in-memory bytes object.
         suffix = os.path.splitext(file.filename or "audio.wav")[1] or ".wav"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
+        max_upload_mb = max(1, int(os.getenv("DITING_MAX_UPLOAD_MB", "2048")))
+        stored = await save_upload_to_temp(
+            file,
+            suffix=suffix,
+            max_bytes=max_upload_mb * 1024 * 1024,
+        )
+        tmp_path = stored.path
 
-        file_size_mb = len(content) / (1024 * 1024)
+        file_size_mb = stored.size_bytes / (1024 * 1024)
         logger.info(f"Upload: {file.filename} ({file_size_mb:.1f}MB) file_id={file_id[:8]}...")
 
         queue = upload_sessions.get(file_id)
 
         if xasr_engine and xasr_engine.is_model_available:
+            processing_engine = xasr_engine.fork_session()
             if queue:
                 # ── WebSocket streaming mode ──────────────────
                 await queue.put({
@@ -514,7 +534,7 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
 
                 def do_process():
                     try:
-                        results = xasr_engine.process_file(
+                        results = processing_engine.process_file(
                             tmp_path, on_segment=on_segment, on_progress=on_progress
                         )
                         # Build final segments list with audio
@@ -551,15 +571,14 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                             loop
                         )
                     finally:
-                        if xasr_engine.logic_validator:
-                            xasr_engine.logic_validator.reset()
+                        if processing_engine.logic_validator:
+                            processing_engine.logic_validator.reset()
                         try:
                             os.unlink(tmp_path)
                         except Exception:
                             pass
 
-                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                executor.submit(do_process)
+                PROCESSING_EXECUTOR.submit(do_process)
 
                 return {
                     "file_id": file_id,
@@ -571,7 +590,12 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
             else:
                 # ── Synchronous mode (no WebSocket) ────────────
                 logger.info(f"Processing synchronously: {file.filename}")
-                results = xasr_engine.process_file(tmp_path)
+                loop = asyncio.get_running_loop()
+                results = await loop.run_in_executor(
+                    PROCESSING_EXECUTOR,
+                    processing_engine.process_file,
+                    tmp_path,
+                )
                 segments = []
                 for i, r in enumerate(results):
                     seg = _result_to_dict(r, i + 1)
@@ -588,8 +612,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                     os.unlink(tmp_path)
                 except Exception:
                     pass
-                if xasr_engine.logic_validator:
-                    xasr_engine.logic_validator.reset()
+                if processing_engine.logic_validator:
+                    processing_engine.logic_validator.reset()
 
                 logger.info(f"Done: {len(segments)} segments from {file.filename}")
                 return {
@@ -629,7 +653,20 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                 "demo_data": DEMO_MEETING,
             }
 
+    except UploadTooLargeError as e:
+        logger.warning("Upload rejected: %s", e)
+        return {
+            "file_id": file_id or str(uuid.uuid4()),
+            "filename": file.filename if file else "unknown",
+            "status": "error",
+            "error": str(e),
+        }
     except Exception as e:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
         logger.error(f"Upload error: {e}")
         logger.error(traceback.format_exc())
         return {
@@ -694,39 +731,46 @@ async def ws_meeting(websocket: WebSocket):
 
 @app.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
-    """Real-time 16 kHz mono pcm_s16le streaming with Silero VAD + X-ASR."""
+    """Low-latency preview plus durable recording and canonical final ASR."""
     await manager.connect(websocket)
     logger.info("Live WebSocket connected")
 
-    engine = None
-    has_silero_vad = False
-    if xasr_engine and xasr_engine.is_model_available:
-        has_silero_vad = find_silero_vad_model(xasr_engine.model_dir) is not None
-        engine = XASREngine(
-            hotwords=DEMO_MEETING["hotwords"],
-            enable_logic_validation=True,
-            enable_hotword_correction=True,
-            enable_uncertainty=True,
-            # The live path must have one endpoint owner. Silero supplies the
-            # adaptive boundary; sherpa endpointing remains only as fallback.
-            enable_endpoint_detection=not has_silero_vad,
-            provider="cpu",
-            num_threads=1,
-        )
-
+    engine = (
+        xasr_engine.fork_session()
+        if xasr_engine and xasr_engine.is_model_available
+        else None
+    )
     session = None
     vad_provider = "unavailable"
-    endpoint_grace_ms = get_live_endpoint_grace_ms() if has_silero_vad else 0
-    endpoint_policy = (
-        "silero-vad-with-resume-grace"
-        if has_silero_vad else "sherpa-asr-endpoint-fallback"
-    )
+    live_profile = None
+    stream_id = None
+    normal_stop = False
+    recovery_path = None
+
+    def build_session(profile_name=None, requested_stream_id=None):
+        nonlocal vad_provider, live_profile, stream_id
+        live_profile = get_live_audio_profile(profile_name)
+        stream_id = requested_stream_id or str(uuid.uuid4())
+        vad = create_live_vad(engine.model_dir, profile=live_profile)
+        vad_provider = getattr(vad, "provider_name", type(vad).__name__)
+        recording = LiveRecording(RECORDINGS_DIR, stream_id)
+        return LiveAudioSession(
+            engine,
+            vad=vad,
+            pre_roll_ms=live_profile.pre_roll_ms,
+            endpoint_grace_ms=live_profile.endpoint_grace_ms,
+            tail_pad_ms=live_profile.tail_pad_ms,
+            recording=recording,
+        )
+
     try:
         backend_type = "X-ASR v2.0" if (engine and engine.is_model_available) else "Demo"
         await manager.send_json(websocket, {
             "type": "ready",
             "engine": backend_type,
             "protocol": "pcm_s16le/16000/mono",
+            "protocol_version": 2,
+            "binary_frame": "DTP2 + uint32-le sequence + pcm_s16le",
             "message": f"DiTing ready ({backend_type}); send configure then binary PCM",
         })
 
@@ -740,7 +784,7 @@ async def ws_live(websocket: WebSocket):
                 if pcm_payload is not None:
                     if session is None:
                         raise LiveAudioProtocolError("send configure before binary PCM")
-                    results = await asyncio.to_thread(session.push_pcm_s16le, pcm_payload)
+                    results = await asyncio.to_thread(session.push_binary_frame, pcm_payload)
                     for result in results:
                         await manager.send_json(websocket, {
                             "type": "live_result",
@@ -764,38 +808,33 @@ async def ws_live(websocket: WebSocket):
                         raise LiveAudioProtocolError(
                             "live stream requires 16000 Hz mono pcm_s16le"
                         )
-                    vad = create_live_vad(engine.model_dir)
-                    vad_provider = getattr(vad, "provider_name", type(vad).__name__)
                     session = await asyncio.to_thread(
-                        LiveAudioSession,
-                        engine,
-                        vad=vad,
-                        pre_roll_ms=200,
-                        endpoint_grace_ms=endpoint_grace_ms,
+                        build_session,
+                        msg.get("profile") or msg.get("mode"),
+                        msg.get("stream_id"),
                     )
                     await manager.send_json(websocket, {
                         "type": "configured",
                         "data": {
+                            "stream_id": stream_id,
+                            "protocol_version": 2,
                             "sample_rate": 16000,
                             "channels": 1,
                             "sample_format": "pcm_s16le",
                             "vad": vad_provider,
-                            "endpoint_policy": endpoint_policy,
-                            "endpoint_grace_ms": endpoint_grace_ms,
+                            "live_profile": live_profile.name,
+                            "asr_profile": engine.asr_profile,
+                            "asr_chunk_ms": engine.chunk_ms,
+                            "endpoint_policy": f"{vad_provider}-with-resume-grace",
+                            "pre_roll_ms": live_profile.pre_roll_ms,
+                            "endpoint_grace_ms": live_profile.endpoint_grace_ms,
+                            "tail_pad_ms": live_profile.tail_pad_ms,
                         },
                     })
                 elif action == "process_chunk":
                     # Compatibility with the former base64 Float32 JSON client.
                     if session is None:
-                        vad = create_live_vad(engine.model_dir)
-                        vad_provider = getattr(vad, "provider_name", type(vad).__name__)
-                        session = await asyncio.to_thread(
-                            LiveAudioSession,
-                            engine,
-                            vad=vad,
-                            pre_roll_ms=200,
-                            endpoint_grace_ms=endpoint_grace_ms,
-                        )
+                        session = await asyncio.to_thread(build_session)
                     audio_b64 = msg.get("audio", "")
                     if audio_b64:
                         audio_bytes = base64.b64decode(audio_b64)
@@ -816,14 +855,63 @@ async def ws_live(websocket: WebSocket):
                             "type": "live_result",
                             "data": _live_result_to_dict(result),
                         })
+
+                    canonical_error = None
+                    if session and session.recording_result:
+                        recording_result = session.recording_result
+                        await manager.send_json(websocket, {
+                            "type": "finalizing",
+                            "data": {
+                                "stream_id": stream_id,
+                                "duration_ms": recording_result.duration_ms,
+                                "stage": "canonical_transcription",
+                            },
+                        })
+                        try:
+                            final_engine = xasr_engine.fork_session()
+                            loop = asyncio.get_running_loop()
+                            canonical_results = await loop.run_in_executor(
+                                PROCESSING_EXECUTOR,
+                                final_engine.process_file,
+                                str(recording_result.path),
+                            )
+                            await manager.send_json(websocket, {
+                                "type": "final_transcript",
+                                "data": {
+                                    "stream_id": stream_id,
+                                    "segments": [
+                                        _result_to_dict(result, index + 1)
+                                        for index, result in enumerate(canonical_results)
+                                    ],
+                                    "segments_count": len(canonical_results),
+                                    "canonical": True,
+                                },
+                            })
+                        except Exception as final_error:
+                            canonical_error = str(final_error)
+                            logger.error(
+                                "Canonical live transcription failed for %s: %s",
+                                stream_id,
+                                final_error,
+                            )
+
+                    metrics = session.metrics() if session else {
+                        "received_samples": 0,
+                        "forwarded_samples": 0,
+                    }
+                    if session and session.recording_result:
+                        metrics["recording"] = {
+                            "stream_id": stream_id,
+                            "filename": session.recording_result.path.name,
+                            "duration_ms": session.recording_result.duration_ms,
+                        }
+                    if canonical_error:
+                        metrics["canonical_error"] = canonical_error
                     await manager.send_json(websocket, {
                         "type": "stopped",
-                        "data": {
-                            "received_samples": session.received_samples if session else 0,
-                            "forwarded_samples": session.forwarded_samples if session else 0,
-                            "vad": vad_provider,
-                        },
+                        "data": {**metrics, "vad": vad_provider},
                     })
+                    normal_stop = True
                     break
         else:
             # Demo fallback
@@ -851,9 +939,15 @@ async def ws_live(websocket: WebSocket):
             pass
     finally:
         manager.disconnect(websocket)
-        if session is not None:
+        if session is not None and not normal_stop:
             try:
-                await asyncio.to_thread(session.finish)
+                recovery_path = await asyncio.to_thread(session.abort)
+                if recovery_path:
+                    logger.warning(
+                        "Live stream %s disconnected; recoverable recording kept at %s",
+                        stream_id,
+                        recovery_path,
+                    )
             except Exception as close_error:
                 logger.warning(f"Live session cleanup failed: {close_error}")
         elif engine:

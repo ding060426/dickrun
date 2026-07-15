@@ -11,7 +11,7 @@ from typing import Optional
 import numpy as np
 import websockets
 
-from sherpa_streaming_infer import SherpaStreamingASR
+from sherpa_streaming_infer import SherpaRecognizerRuntime, SherpaStreamingASR
 
 
 logging.basicConfig(
@@ -47,8 +47,8 @@ class SessionState:
     sample_rate: int = 16000
 
 
-def build_asr(args) -> SherpaStreamingASR:
-    return SherpaStreamingASR(
+def build_runtime(args) -> SherpaRecognizerRuntime:
+    return SherpaRecognizerRuntime(
         tokens=args.tokens,
         encoder=args.encoder,
         decoder=args.decoder,
@@ -64,7 +64,7 @@ def build_asr(args) -> SherpaStreamingASR:
     )
 
 
-async def handle_connection(websocket, args):
+async def handle_connection(websocket, args, runtime):
     logging.info("client connected")
     session: Optional[SessionState] = None
 
@@ -96,7 +96,7 @@ async def handle_connection(websocket, args):
                 # 可选覆盖采样率
                 client_sr = int(payload.get("sample_rate", args.sample_rate))
                 session = SessionState(
-                    asr=build_asr(args),
+                    asr=runtime.create_session(),
                     sample_rate=client_sr,
                 )
                 await websocket.send(
@@ -127,7 +127,7 @@ async def handle_connection(websocket, args):
 
             elif msg_type == "reset":
                 session = SessionState(
-                    asr=build_asr(args),
+                    asr=runtime.create_session(),
                     sample_rate=args.sample_rate,
                 )
                 await websocket.send(
@@ -154,9 +154,10 @@ async def handle_connection(websocket, args):
 async def main():
     args = get_parser().parse_args()
     logging.info(vars(args))
+    runtime = build_runtime(args)
 
     async with websockets.serve(
-        lambda ws: handle_connection(ws, args),
+        lambda ws: handle_connection(ws, args, runtime),
         args.host,
         args.port,
         max_size=None,

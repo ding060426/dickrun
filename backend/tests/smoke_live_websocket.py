@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import struct
+import uuid
 from collections import Counter
 from pathlib import Path
 
@@ -26,6 +28,9 @@ async def run(url: str, audio_path: Path, pace: bool) -> dict:
             "channels": 1,
             "sample_format": "pcm_s16le",
             "browser_sample_rate": 48000,
+            "protocol_version": 2,
+            "profile": "meeting",
+            "stream_id": str(uuid.uuid4()),
         }))
         messages.append(json.loads(await socket.recv()))
 
@@ -37,8 +42,9 @@ async def run(url: str, audio_path: Path, pace: bool) -> dict:
                     return
 
         receiver = asyncio.create_task(receive_until_stopped())
-        for offset in range(0, len(pcm), 640):
-            await socket.send(pcm[offset:offset + 640].tobytes())
+        for sequence, offset in enumerate(range(0, len(pcm), 640)):
+            payload = pcm[offset:offset + 640].tobytes()
+            await socket.send(struct.pack("<4sI", b"DTP2", sequence) + payload)
             if pace:
                 await asyncio.sleep(0.04)
         await socket.send(json.dumps({"action": "stop"}))
@@ -47,12 +53,17 @@ async def run(url: str, audio_path: Path, pace: bool) -> dict:
     counts = Counter(message.get("type") for message in messages)
     results = [message["data"] for message in messages if message.get("type") == "live_result"]
     stopped = next(message["data"] for message in messages if message.get("type") == "stopped")
+    canonical = next(
+        (message["data"] for message in messages if message.get("type") == "final_transcript"),
+        None,
+    )
     return {
         "audio_seconds": round(len(pcm) / sample_rate, 2),
         "message_counts": dict(counts),
         "partial_results": sum(bool(item.get("is_partial")) for item in results),
         "final_results": sum(bool(item.get("is_final")) for item in results),
         "final_texts": [item.get("text", "") for item in results if item.get("is_final")],
+        "canonical_transcript": canonical,
         "server": stopped,
     }
 

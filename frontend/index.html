@@ -277,6 +277,7 @@ body {
   -webkit-text-fill-color: initial;
   text-shadow: none;
   filter: drop-shadow(0 12px 28px rgba(8,63,148,0.12));
+  transform: translateX(-12px);
 }
 .hero-logo-image img {
   display: block;
@@ -3504,13 +3505,13 @@ async function startVolumeMeter() {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const cx = 300, cy = 300;
-  const innerR = 140, outerR = 270;
+  const innerR = 250, outerR = 295;
 
   const pCanvas = $('particleCanvas');
   const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
   let particles = [];
   const MAX_PARTICLES = 80;
-  const orbR = 135;
+  const orbR = 280;
 
   function spawnParticle(level) {
     const angle = Math.random() * Math.PI * 2;

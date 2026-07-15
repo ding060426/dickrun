@@ -1,11 +1,12 @@
 const assert = require('node:assert/strict');
 
 const {
-  applyDomainPreset,
   buildPayload,
   getDomainPresets,
+  getSelectedDomainPresetIds,
   normalizeSettings,
   scoreForNewWord,
+  setDomainPresetSelection,
 } = require('../hotword-settings.js');
 
 
@@ -33,16 +34,38 @@ assert.deepEqual(
   domainPresets.map(preset => preset.id),
   ['technology', 'product', 'business', 'finance', 'medical'],
 );
-assert.ok(domainPresets.every(preset => preset.name && preset.description && preset.word_count >= 10));
+assert.ok(domainPresets.every(preset => preset.name && preset.description && preset.word_count === 28));
 
-const appliedPreset = applyDomainPreset([
+const selectedPreset = setDomainPresetSelection([
   { text: 'bert', score: 9, enabled: false },
   { text: '自定义词', score: 4, enabled: true },
-], 'technology', 8);
-assert.equal(appliedPreset.added_count, 11);
-assert.equal(appliedPreset.existing_count, 1);
-assert.deepEqual(appliedPreset.words[0], { text: 'bert', score: 9, enabled: false });
-assert.equal(appliedPreset.words.find(word => word.text === '人工智能').score, 8);
-assert.equal(appliedPreset.words.find(word => word.text === 'Transformer').score, 2.5);
+], 'technology', true, [], 8);
+assert.equal(selectedPreset.selected, true);
+assert.equal(selectedPreset.added_count, 27);
+assert.equal(selectedPreset.changed_count, 28);
+assert.deepEqual(selectedPreset.words[0], { text: 'bert', score: 9, enabled: true });
+assert.equal(selectedPreset.words.find(word => word.text === '人工智能').score, 8);
+assert.equal(selectedPreset.words.find(word => word.text === 'Transformer').score, 2.5);
+assert.deepEqual(getSelectedDomainPresetIds(selectedPreset.words), ['technology']);
+
+const selectedBusiness = setDomainPresetSelection([], 'business', true, [], 8);
+const selectedFinance = setDomainPresetSelection(
+  selectedBusiness.words,
+  'finance',
+  true,
+  ['business'],
+  8,
+);
+const deselectedFinance = setDomainPresetSelection(
+  selectedFinance.words,
+  'finance',
+  false,
+  ['business', 'finance'],
+  8,
+);
+assert.equal(deselectedFinance.words.find(word => word.text === '净利润').enabled, false);
+assert.equal(deselectedFinance.words.find(word => word.text === '预算').enabled, true);
+assert.equal(deselectedFinance.words.find(word => word.text === '合规').enabled, true);
+assert.deepEqual(getSelectedDomainPresetIds(deselectedFinance.words), ['business']);
 
 console.log('hotword-settings tests passed');

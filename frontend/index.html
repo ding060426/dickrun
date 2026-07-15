@@ -677,9 +677,40 @@ body {
   transition: 140ms ease;
 }
 .domain-preset-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
+.domain-preset-card.selected {
+  border-color: var(--accent-blue);
+  background: rgba(65, 137, 230, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(65, 137, 230, 0.18);
+}
+.domain-preset-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .domain-preset-card strong { display: block; color: var(--text-primary); font-size: 11px; }
 .domain-preset-card span { display: block; min-height: 28px; margin-top: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
 .domain-preset-card em { display: block; margin-top: 7px; color: var(--accent-blue); font-size: 9px; font-style: normal; }
+.domain-preset-check {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 10px;
+}
+.domain-preset-card.selected .domain-preset-check { border-color: var(--accent-blue); background: var(--accent-blue); color: white; }
+.domain-selection-notice {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(65, 137, 230, 0.35);
+  border-radius: 8px;
+  background: rgba(65, 137, 230, 0.09);
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.domain-selection-notice[hidden] { display: none; }
+.domain-selection-notice strong { color: var(--accent-blue); }
+.domain-selection-notice small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 9px; }
 .diarization-upload-options {
   display: flex;
   align-items: center;
@@ -955,13 +986,17 @@ body {
       <div class="settings-panel settings-section" id="settingsPanelHotwords" role="tabpanel" data-settings-panel="hotwords" aria-labelledby="settingsTabHotwords" aria-hidden="true">
         <div class="settings-page-heading">
           <h2>热词与领域预设</h2>
-          <p>载入常见领域词库或维护自定义词条。预设只追加缺失词，不覆盖已有权重。</p>
+          <p>可同时选择多个领域或维护自定义词条。领域预设不会覆盖已有热词的权重。</p>
         </div>
         <div class="domain-preset-section">
           <div class="domain-preset-heading">
-            <div><strong>领域预设</strong><span>一键载入后仍可逐词修改，点击保存后应用到新识别会话</span></div>
+            <div><strong>领域预设（可多选）</strong><span>点击选中，再次点击取消；建议只启用当前会议相关的 1–2 个领域</span></div>
           </div>
           <div class="domain-preset-grid" id="domainPresetGrid"></div>
+          <div class="domain-selection-notice" id="domainSelectionNotice" role="status" hidden>
+            <div><strong>已选领域：</strong><span id="domainSelectionNames"></span></div>
+            <small>对应热词已在下方自动勾选；取消领域后，词条会保留但取消勾选。点击保存后应用到新识别会话。</small>
+          </div>
         </div>
         <div class="settings-section-title">热词与模糊拼音</div>
       <div class="hotword-setting-grid">
@@ -1120,6 +1155,8 @@ const settingsPageDescription = $('settingsPageDescription');
 const settingsNavButtons = Array.from(document.querySelectorAll('[data-settings-tab]'));
 const settingsPanels = Array.from(document.querySelectorAll('[data-settings-panel]'));
 const domainPresetGrid = $('domainPresetGrid');
+const domainSelectionNotice = $('domainSelectionNotice');
+const domainSelectionNames = $('domainSelectionNames');
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1127,6 +1164,7 @@ let currentSegmentIndex = -1;
 let isPlaying = false;
 let playbackTimer = null;
 let demoData = null;
+let selectedDomainPresetIds = new Set();
 
 // Upload
 let uploadWs = null;
@@ -2179,37 +2217,79 @@ function renderDomainPresetButtons() {
     button.type = 'button';
     button.className = 'domain-preset-card';
     button.dataset.presetId = preset.id;
+    button.dataset.wordCount = String(preset.word_count);
+    button.setAttribute('aria-pressed', 'false');
 
+    const heading = document.createElement('div');
+    heading.className = 'domain-preset-card-head';
     const title = document.createElement('strong');
     title.textContent = preset.name;
+    const check = document.createElement('b');
+    check.className = 'domain-preset-check';
+    check.setAttribute('aria-hidden', 'true');
+    check.textContent = '✓';
+    heading.append(title, check);
     const description = document.createElement('span');
     description.textContent = preset.description;
     const action = document.createElement('em');
-    action.textContent = `${preset.word_count} 个词 · 一键载入`;
-    button.append(title, description, action);
-    button.addEventListener('click', () => applyHotwordDomainPreset(preset.id));
+    action.dataset.presetAction = 'true';
+    button.append(heading, description, action);
+    button.addEventListener('click', () => toggleHotwordDomainPreset(preset.id));
     domainPresetGrid.appendChild(button);
   });
+  updateDomainPresetSelectionUi();
 }
 
-function applyHotwordDomainPreset(presetId) {
+function updateDomainPresetSelectionUi() {
+  const presets = window.DiTingHotwordSettings?.getDomainPresets() || [];
+  const presetNames = new Map(presets.map(preset => [preset.id, preset.name]));
+  domainPresetGrid?.querySelectorAll('[data-preset-id]').forEach(button => {
+    const selected = selectedDomainPresetIds.has(button.dataset.presetId);
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    const action = button.querySelector('[data-preset-action]');
+    if (action) {
+      action.textContent = selected
+        ? `已选中 · 点击取消`
+        : `${button.dataset.wordCount} 个词 · 点击启用`;
+    }
+  });
+  const selectedNames = Array.from(selectedDomainPresetIds)
+    .map(id => presetNames.get(id))
+    .filter(Boolean);
+  if (domainSelectionNames) domainSelectionNames.textContent = selectedNames.join('、');
+  if (domainSelectionNotice) domainSelectionNotice.hidden = selectedNames.length === 0;
+}
+
+function syncDomainPresetSelection() {
+  if (!window.DiTingHotwordSettings) return;
+  selectedDomainPresetIds = new Set(
+    window.DiTingHotwordSettings.getSelectedDomainPresetIds(collectHotwordRows()),
+  );
+  updateDomainPresetSelectionUi();
+}
+
+function toggleHotwordDomainPreset(presetId) {
   if (!hotwordSettingsState || !window.DiTingHotwordSettings) {
     setHotwordStatus('设置仍在加载，请稍后再试', true);
     return;
   }
-  const result = window.DiTingHotwordSettings.applyDomainPreset(
+  const selected = !selectedDomainPresetIds.has(presetId);
+  const result = window.DiTingHotwordSettings.setDomainPresetSelection(
     collectHotwordRows(),
     presetId,
+    selected,
+    Array.from(selectedDomainPresetIds),
     defaultHotwordScoreNumber?.value,
   );
   if (!result.preset) return;
   hotwordSettingsState = { ...hotwordSettingsState, words: result.words };
-  if (hotwordsEnabled) hotwordsEnabled.checked = true;
+  if (selected && hotwordsEnabled) hotwordsEnabled.checked = true;
   renderHotwordRows();
   setHotwordStatus(
-    result.added_count > 0
-      ? `已载入“${result.preset.name}”：新增 ${result.added_count} 个，跳过 ${result.existing_count} 个已有词；保存后生效`
-      : `“${result.preset.name}”的热词已全部存在，无需重复添加`,
+    selected
+      ? `已选中“${result.preset.name}”：新增 ${result.added_count} 个热词，相关词条已勾选；保存后生效`
+      : `已取消“${result.preset.name}”：相关词条已取消勾选，共享热词仍保持启用；保存后生效`,
   );
 }
 
@@ -2386,7 +2466,10 @@ function createHotwordRow(item) {
   enabled.checked = item.enabled !== false;
   enabled.dataset.field = 'enabled';
   enabled.setAttribute('aria-label', `启用 ${item.text}`);
-  enabled.addEventListener('change', () => row.classList.toggle('disabled', !enabled.checked));
+  enabled.addEventListener('change', () => {
+    row.classList.toggle('disabled', !enabled.checked);
+    syncDomainPresetSelection();
+  });
 
   const textInput = document.createElement('input');
   textInput.className = 'hotword-input';
@@ -2394,6 +2477,7 @@ function createHotwordRow(item) {
   textInput.maxLength = 80;
   textInput.dataset.field = 'text';
   textInput.setAttribute('aria-label', '热词标准写法');
+  textInput.addEventListener('input', syncDomainPresetSelection);
 
   const scoreInput = document.createElement('input');
   scoreInput.className = 'hotword-input';
@@ -2410,7 +2494,10 @@ function createHotwordRow(item) {
   remove.type = 'button';
   remove.textContent = '×';
   remove.setAttribute('aria-label', `删除 ${item.text}`);
-  remove.addEventListener('click', () => row.remove());
+  remove.addEventListener('click', () => {
+    row.remove();
+    syncDomainPresetSelection();
+  });
 
   row.append(enabled, textInput, scoreInput, remove);
   return row;
@@ -2420,6 +2507,7 @@ function renderHotwordRows() {
   if (!hotwordList || !hotwordSettingsState) return;
   hotwordList.innerHTML = '';
   hotwordSettingsState.words.forEach(item => hotwordList.appendChild(createHotwordRow(item)));
+  syncDomainPresetSelection();
   setHotwordStatus(`${hotwordSettingsState.words.length} 个热词`);
 }
 
@@ -2473,6 +2561,7 @@ function addHotwordToEditor() {
   );
   hotwordList.appendChild(createHotwordRow({ text, score, enabled: true }));
   input.value = '';
+  syncDomainPresetSelection();
   setHotwordStatus('已加入编辑列表，保存后生效');
 }
 

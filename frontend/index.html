@@ -290,14 +290,131 @@ body {
   color: var(--text-secondary); min-width: 60px; text-align: center;
 }
 
-/* ── Bottom Summary ── */
-.summary-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 16px;
+/* ── Results Panel (v3.1 — ChatGPT minimalist) ── */
+.results-panel {
   grid-column: 1 / -1;
-  max-height: 160px; overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 2fr;
+  gap: 10px;
+  max-height: 210px; overflow: hidden;
+}
+.results-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color 0.2s;
+}
+.results-card:hover { border-color: rgba(255,255,255,0.12); }
+.results-card-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+  letter-spacing: 0.3px;
+}
+.results-card-body {
+  padding: 12px 14px;
+  flex: 1; overflow-y: auto;
+  font-size: 12px; line-height: 1.6;
+}
+.results-card-body::-webkit-scrollbar { width: 3px; }
+.results-card-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+/* Domain card */
+.domain-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px; font-weight: 600;
+  background: rgba(74,144,217,0.12);
+  color: #6db3f2;
+  margin-bottom: 8px;
+}
+.domain-meta {
+  font-size: 11px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.domain-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); }
+.domain-sub { margin-top: 6px; }
+.domain-sub-tag {
+  display: inline-block;
+  padding: 2px 8px; margin: 2px 4px 2px 0;
+  border-radius: 10px; font-size: 10px;
+  background: rgba(255,255,255,0.04); color: var(--text-secondary);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.domain-matched {
+  margin-top: 6px; font-size: 10px; color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Hotword card */
+.hotword-tag {
+  display: inline-block;
+  padding: 3px 9px; margin: 2px 4px 2px 0;
+  border-radius: 10px; font-size: 11px;
+  background: rgba(255,255,255,0.03);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  cursor: default;
+}
+.hotword-tag.top {
+  background: rgba(80,184,108,0.08); color: #6cc98a;
+}
+
+/* Speaker card */
+.speaker-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0;
+}
+.speaker-row + .speaker-row { border-top: 1px solid rgba(255,255,255,0.04); }
+.speaker-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.speaker-name {
+  font-size: 11px; font-weight: 500; min-width: 50px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-primary);
+}
+.speaker-bars { flex: 1; }
+.speaker-bar-bg {
+  height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;
+}
+.speaker-bar-fill {
+  height: 100%; border-radius: 2px; transition: width 0.6s ease;
+}
+.speaker-count {
+  font-size: 10px; color: var(--text-muted); min-width: 50px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Summary card */
+.summary-text {
+  line-height: 1.7; color: var(--text-secondary);
+  font-size: 12px; margin-bottom: 8px;
+}
+.summary-section { margin-bottom: 8px; }
+.summary-section-title {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  letter-spacing: 0.5px; margin-bottom: 4px;
+  text-transform: uppercase; opacity: 0.7;
+}
+.summary-topic-tag {
+  display: inline-block;
+  padding: 2px 7px; margin: 1px 3px 3px 0;
+  border-radius: 8px; font-size: 10px;
+  background: rgba(74,144,217,0.08); color: #6db3f2;
+}
+.summary-action-item {
+  font-size: 11px; padding: 4px 0; line-height: 1.5;
+}
+.summary-action-item + .summary-action-item { border-top: 1px solid rgba(255,255,255,0.04); }
+.summary-empty {
+  color: var(--text-muted); opacity: 0.5;
+  text-align: center; padding: 18px 0; font-size: 11px;
 }
 
 /* ── Toast ── */
@@ -356,7 +473,7 @@ body {
     </div>
   </div>
   <div class="header-info">
-    <span class="header-meeting-title" id="meetingTitleDisplay">No meeting loaded</span>
+    <span class="header-meeting-title" id="meetingTitleDisplay">未载入会议</span>
   </div>
   <div class="header-status">
     <span id="xasrStatus" style="font-size:11px;color:var(--text-muted);">Checking...</span>
@@ -371,7 +488,7 @@ body {
   <!-- Transcript Panel -->
   <div class="transcript-panel">
     <div class="transcript-header">
-      <h3>Transcript &amp; Waveform</h3>
+      <h3>转写记录</h3>
       <span style="font-size:11px;color:var(--text-muted);" id="segmentCounter">0/0</span>
     </div>
     <!-- Global Audio Status -->
@@ -385,9 +502,9 @@ body {
     </div>
     <div class="transcript-body" id="transcriptBody">
       <div class="empty-state" id="emptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:150px;color:var(--text-muted);gap:8px;">
-        <div style="font-size:40px;opacity:0.3;">Mic</div>
-        <div>Waiting for meeting...</div>
-        <div style="font-size:11px;">Click [Demo] or upload an audio file</div>
+        <div style="font-size:40px;opacity:0.3;">🎙</div>
+        <div>等待会议数据…</div>
+        <div style="font-size:11px;">点击 [演示] 或上传音频文件开始</div>
       </div>
     </div>
   </div>
@@ -395,24 +512,24 @@ body {
   <!-- Right Sidebar -->
   <div class="sidebar">
     <div class="sidebar-card">
-      <div class="sidebar-card-header">Stats</div>
+      <div class="sidebar-card-header">统计</div>
       <div class="sidebar-card-body">
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-blue);" id="statSegments">0</div>
-            <div class="stat-label">Segments</div>
+            <div class="stat-label">片段数</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-orange);" id="statLogicFlags">0</div>
-            <div class="stat-label">Logic Flags</div>
+            <div class="stat-label">逻辑标记</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-red);" id="statLowConf">0</div>
-            <div class="stat-label">Low Conf</div>
+            <div class="stat-label">低置信</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-green);" id="statCorrections">0</div>
-            <div class="stat-label">Corrections</div>
+            <div class="stat-label">纠偏数</div>
           </div>
         </div>
         <div style="margin-top:8px;">
@@ -425,24 +542,52 @@ body {
     </div>
 
     <div class="sidebar-card">
-      <div class="sidebar-card-header">Processing</div>
+      <div class="sidebar-card-header">处理状态</div>
       <div class="sidebar-card-body" id="processingPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">Waiting for input...</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入…</div>
       </div>
     </div>
 
     <div class="sidebar-card">
-      <div class="sidebar-card-header">Logic Validation</div>
+      <div class="sidebar-card-header">逻辑校验</div>
       <div class="sidebar-card-body" id="logicPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No data yet</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>
       </div>
     </div>
   </div>
 
-  <!-- Summary Panel -->
-  <div class="summary-panel" id="summaryPanel">
-    <div style="font-size:12px;color:var(--text-muted);text-align:center;">
-      Summary will be generated after meeting processing...
+  <!-- 分析结果面板 -->
+  <div class="results-panel" id="resultsPanel">
+    <!-- 领域卡片 -->
+    <div class="results-card">
+      <div class="results-card-header">会议领域</div>
+      <div class="results-card-body" id="domainCard">
+        <div class="summary-empty">分析中…</div>
+      </div>
+    </div>
+
+    <!-- 热词卡片 -->
+    <div class="results-card">
+      <div class="results-card-header">关键术语</div>
+      <div class="results-card-body" id="hotwordCard">
+        <div class="summary-empty">提取中…</div>
+      </div>
+    </div>
+
+    <!-- 说话人卡片 -->
+    <div class="results-card">
+      <div class="results-card-header">说话人分布</div>
+      <div class="results-card-body" id="speakerCard">
+        <div class="summary-empty">识别中…</div>
+      </div>
+    </div>
+
+    <!-- 摘要卡片 -->
+    <div class="results-card">
+      <div class="results-card-header">会议摘要</div>
+      <div class="results-card-body" id="summaryCard">
+        <div class="summary-empty">会议处理完成后将自动生成摘要…</div>
+      </div>
     </div>
   </div>
 </div>
@@ -451,16 +596,16 @@ body {
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
-  <button class="btn btn-primary" id="btnStart">Demo</button>
-  <button class="btn btn-secondary" id="btnReset">Reset</button>
+  <button class="btn btn-primary" id="btnStart">演示</button>
+  <button class="btn btn-secondary" id="btnReset">重置</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
-  <button class="btn btn-secondary" id="btnMic">Mic</button>
-  <button class="btn btn-secondary" id="btnUpload">Upload</button>
+  <button class="btn btn-secondary" id="btnMic">录音</button>
+  <button class="btn btn-secondary" id="btnUpload">上传</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
-  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">Log</button>
+  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">日志</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -531,7 +676,10 @@ const overallConfBar = $('overallConfBar');
 const overallConfText = $('overallConfText');
 const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
-const summaryPanel = $('summaryPanel');
+const domainCard = $('domainCard');
+const hotwordCard = $('hotwordCard');
+const speakerCard = $('speakerCard');
+const summaryCard = $('summaryCard');
 const micStatus = $('micStatus');
 
 // ── State ────────────────────────────────────────────────────
@@ -903,11 +1051,17 @@ function renderSegment(seg, index, autoPlay = false) {
 
   const qLabel = seg.quality_label || seg.quality || 'high';
   const displayText = seg.display_text || seg.text || '';
+  const speakerId = seg.speaker_id || seg.speaker || 'Speaker';
   const snrDb = seg.snr_db != null ? seg.snr_db.toFixed(0) : '--';
   const startSec = seg.start_sec != null ? seg.start_sec : (seg.start || 0);
   const endSec = seg.end_sec != null ? seg.end_sec : (seg.end || 0);
   const dur = (endSec - startSec) || 0;
   const hasAudio = !!(seg.audio_wav_base64);
+
+  // Speaker color (consistent per speaker)
+  const spkIdx = Array.from(new Set(allSegments.filter(Boolean).map(s => s.speaker_id || '')))
+    .indexOf(speakerId);
+  const spkColor = SPEAKER_COLORS[Math.max(0, spkIdx) % SPEAKER_COLORS.length];
 
   // Build logic flags HTML
   let flagsHTML = '';
@@ -928,7 +1082,7 @@ function renderSegment(seg, index, autoPlay = false) {
   card.innerHTML = `
     <div class="segment-top">
       <span class="segment-index">#${index + 1}</span>
-      <span class="segment-speaker" style="color:var(--accent-blue);">Seg ${index + 1}</span>
+      <span class="segment-speaker" style="color:${spkColor};" title="${escapeHTML(speakerId)}">${escapeHTML(speakerId)}</span>
       <span class="segment-time">${formatTime(startSec)}</span>
       <span class="segment-dur">(${dur.toFixed(1)}s)</span>
       <span class="segment-snr ${qLabel}">SNR ${snrDb}dB</span>
@@ -1010,6 +1164,180 @@ function escapeHTML(str) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 分析结果面板渲染 (v3.1)
+// ═══════════════════════════════════════════════════════════
+
+const SPEAKER_COLORS = ['#4A90D9', '#E8743C', '#50B86C', '#e8b83c', '#8b6ce8', '#e0556a'];
+
+function resetResultsPanel() {
+  if (domainCard) domainCard.innerHTML = '<div class="summary-empty">分析中…</div>';
+  if (hotwordCard) hotwordCard.innerHTML = '<div class="summary-empty">提取中…</div>';
+  if (speakerCard) speakerCard.innerHTML = '<div class="summary-empty">识别中…</div>';
+  if (summaryCard) summaryCard.innerHTML = '<div class="summary-empty">会议处理完成后将自动生成摘要…</div>';
+}
+
+function renderResultsPanel(data) {
+  if (!data) return;
+
+  // 1. 领域 —— 总是渲染（至少显示规则推断结果或空态）
+  if (data.domain) {
+    renderDomainCard(data.domain);
+  } else if (!data.domain) {
+    if (domainCard) domainCard.innerHTML = '<div class="summary-empty">尚未识别</div>';
+  }
+
+  // 2. 热词 —— 总是渲染（传入空数组也显示空态）
+  renderHotwordCard(data.hotwords || []);
+
+  // 3. 说话人分布 —— 总是渲染
+  renderSpeakerCard(data.speaker_stats || {});
+
+  // 4. 摘要
+  if (data.summary) {
+    renderSummaryCard(data.summary);
+  }
+}
+
+function renderDomainCard(domain) {
+  const card = document.getElementById('domainCard');
+  if (!card) return;
+
+  if (!domain || !domain.domain) {
+    card.innerHTML = '<div class="summary-empty">未检测到领域</div>';
+    return;
+  }
+
+  const pct = domain.confidence ? Math.round(domain.confidence * 100) : '--';
+  const methodLabel = domain.method === 'llm' ? 'LLM 推理' : (domain.method === 'demo' ? '演示' : '规则匹配');
+
+  let h = `<div class="domain-badge">${escapeHTML(domain.domain)}</div>`;
+  h += `<div class="domain-meta">`;
+  h += `<span>置信度 ${pct}%</span>`;
+  h += `<span class="dot"></span>`;
+  h += `<span>${methodLabel}</span>`;
+  h += `</div>`;
+
+  if (domain.sub_domains && domain.sub_domains.length > 0) {
+    h += '<div class="domain-sub">';
+    domain.sub_domains.forEach(sd => { h += `<span class="domain-sub-tag">${escapeHTML(sd)}</span>`; });
+    h += '</div>';
+  }
+
+  if (domain.matched_terms && domain.matched_terms.length > 0) {
+    h += '<div class="domain-matched">匹配词：' + domain.matched_terms.slice(0, 6).map(t => escapeHTML(t)).join(' · ') + '</div>';
+  }
+
+  if (domain.reason) {
+    h += `<div class="domain-matched" style="margin-top:2px;">${escapeHTML(domain.reason)}</div>`;
+  }
+
+  card.innerHTML = h;
+}
+
+function renderHotwordCard(hotwords) {
+  const card = document.getElementById('hotwordCard');
+  if (!card) return;
+
+  if (!hotwords || hotwords.length === 0) {
+    card.innerHTML = '<div class="summary-empty">暂未提取到关键术语</div>';
+    return;
+  }
+
+  const top = hotwords.slice(0, 20);
+  let h = '';
+  top.forEach((hw, i) => {
+    const cls = i < 5 ? 'hotword-tag top' : 'hotword-tag';
+    const label = typeof hw === 'string' ? hw : (hw.word || hw);
+    h += `<span class="${cls}">${escapeHTML(label)}</span>`;
+  });
+  if (hotwords.length > 20) {
+    h += `<span class="hotword-tag" style="opacity:0.4;">+${hotwords.length - 20}</span>`;
+  }
+
+  card.innerHTML = h;
+}
+
+function renderSpeakerCard(stats) {
+  const card = document.getElementById('speakerCard');
+  if (!card) return;
+
+  if (!stats || Object.keys(stats).length === 0) {
+    card.innerHTML = '<div class="summary-empty">暂未识别说话人</div>';
+    return;
+  }
+
+  const entries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((s, e) => s + e[1], 0);
+
+  let h = '';
+  entries.forEach(([name, count], i) => {
+    const pct = Math.round(count / total * 100);
+    const color = SPEAKER_COLORS[i % SPEAKER_COLORS.length];
+    h += `<div class="speaker-row">
+      <div class="speaker-dot" style="background:${color};"></div>
+      <div class="speaker-name" title="${escapeHTML(name)}">${escapeHTML(name)}</div>
+      <div class="speaker-bars"><div class="speaker-bar-bg"><div class="speaker-bar-fill" style="width:${pct}%;background:${color};"></div></div></div>
+      <div class="speaker-count">${count} 段 (${pct}%)</div>
+    </div>`;
+  });
+
+  card.innerHTML = h;
+}
+
+function renderSummaryCard(summary) {
+  const card = document.getElementById('summaryCard');
+  if (!card) return;
+
+  const hasContent = (summary.summary && summary.summary.trim()) ||
+    (summary.topics && summary.topics.length > 0) ||
+    (summary.action_items && summary.action_items.length > 0);
+
+  if (!hasContent) {
+    card.innerHTML = '<div class="summary-empty">暂未生成摘要</div>';
+    return;
+  }
+
+  let h = '';
+
+  if (summary.summary && summary.summary.trim()) {
+    h += `<div class="summary-text">${escapeHTML(summary.summary)}</div>`;
+  }
+
+  if (summary.topics && summary.topics.length > 0) {
+    h += '<div class="summary-section"><div class="summary-section-title">讨论主题</div>';
+    summary.topics.forEach(t => {
+      const text = typeof t === 'string' ? t : (t.topic || t);
+      h += `<span class="summary-topic-tag">${escapeHTML(text)}</span>`;
+    });
+    h += '</div>';
+  }
+
+  if (summary.decisions && summary.decisions.length > 0) {
+    h += '<div class="summary-section"><div class="summary-section-title">会议决策</div>';
+    summary.decisions.forEach(d => {
+      const text = typeof d === 'string' ? d : (d.decision || '');
+      h += `<div class="summary-action-item" style="border-left:2px solid var(--accent-yellow);padding-left:8px;">${escapeHTML(text)}</div>`;
+    });
+    h += '</div>';
+  }
+
+  if (summary.action_items && summary.action_items.length > 0) {
+    h += '<div class="summary-section"><div class="summary-section-title">待办事项</div>';
+    summary.action_items.forEach(a => {
+      const task = typeof a === 'string' ? a : (a.task || '');
+      const assignee = typeof a === 'object' ? (a.assignee || '') : '';
+      const deadline = typeof a === 'object' ? (a.deadline || '') : '';
+      const detail = assignee ? `${task} — ${assignee}` : task;
+      const suffix = deadline ? ` (${deadline})` : '';
+      h += `<div class="summary-action-item">${escapeHTML(detail)}${escapeHTML(suffix)}</div>`;
+    });
+    h += '</div>';
+  }
+
+  card.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════════
 // Sidebar Updates
 // ═══════════════════════════════════════════════════════════
 
@@ -1038,7 +1366,7 @@ function updateLogicPanel() {
     }
   }
   if (flags.length === 0) {
-    logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No logic flags</div>';
+    logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">无逻辑标记</div>';
     return;
   }
   logicPanel.innerHTML = flags.map(f => {
@@ -1067,7 +1395,7 @@ async function startDemo() {
   }
 
   if (meetingTitleDisplay) {
-    meetingTitleDisplay.textContent = demoData.title || 'Demo Meeting';
+    meetingTitleDisplay.textContent = demoData.title || '演示会议';
   }
   allSegments = demoData.segments || [];
 
@@ -1106,9 +1434,38 @@ function playNextDemoSegment() {
 function finishDemo() {
   isPlaying = false;
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = 'Demo'; btnStart.disabled = false; }
+  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
   updateConnectionStatus('completed');
-  showToast('Demo complete');
+  showToast('演示完成');
+
+  // 始终渲染全部四张卡片
+  if (demoData && demoData.hotwords) {
+    renderHotwordCard(demoData.hotwords);
+  } else {
+    if (hotwordCard) hotwordCard.innerHTML = '<div class="summary-empty">演示数据中无热词</div>';
+  }
+  if (demoData && demoData.participants) {
+    const stats = {};
+    (demoData.segments || []).forEach(s => {
+      const spk = s.speaker || '未命名';
+      stats[spk] = (stats[spk] || 0) + 1;
+    });
+    renderSpeakerCard(stats);
+  } else {
+    if (speakerCard) speakerCard.innerHTML = '<div class="summary-empty">演示数据中无说话人信息</div>';
+  }
+  renderDomainCard({
+    domain: '产品复盘会议',
+    confidence: 1.0,
+    method: 'demo',
+    sub_domains: ['产品评审'],
+    matched_terms: (demoData && demoData.hotwords || []).slice(0, 5),
+  });
+  if (demoData && demoData.summary) {
+    renderSummaryCard(demoData.summary);
+  } else {
+    if (summaryCard) summaryCard.innerHTML = '<div class="summary-empty">演示模式 — 上传真实会议音频可获得 AI 生成的摘要</div>';
+  }
 }
 
 function updateProgress(segIndex) {
@@ -1154,7 +1511,14 @@ function handleUploadHTTPResponse(result) {
     if (segmentCounter) segmentCounter.textContent = `${result.segments.length}/${result.segments.length}`;
     if (statSegments) statSegments.textContent = result.segments_count || result.segments.length;
     updateLogicPanel();
-    showToast(`Done: ${result.segments_count || result.segments.length} segments`);
+    // Render results panel (v3.1)
+    renderResultsPanel({
+      domain: result.domain,
+      hotwords: result.hotwords,
+      speaker_stats: result.speaker_stats,
+      summary: result.summary,
+    });
+    showToast('处理完成：' + result.segments_count + ' 个片段');
     finishUploadUI('complete');
   } else if (result.status === 'demo_mode') {
     uploadWsDelivered = true;  // prevent double processing
@@ -1179,11 +1543,11 @@ async function handleFileUpload(event) {
   uploadHttpResult = null;
   uploadWsDelivered = false;
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = 'Connecting...'; btnUpload.disabled = true; }
+  if (btnUpload) { btnUpload.textContent = '连接中…'; btnUpload.disabled = true; }
 
   if (uploadWs) { try { uploadWs.close(); } catch(e) {} uploadWs = null; }
 
-  showToast(`Uploading: ${file.name}`);
+  showToast('上传中：' + file.name);
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
 
   // Clear previous state
@@ -1210,7 +1574,7 @@ async function handleFileUpload(event) {
       console.log('[Upload] WS timeout — rendering from HTTP fallback');
       handleUploadHTTPResponse(uploadHttpResult);
     } else if (!uploadWsDelivered && !uploadHttpResult) {
-      showToast('Processing timeout — check backend logs');
+      showToast('处理超时 — 请检查后端日志');
       finishUploadUI('timeout');
     }
   }, 30000);
@@ -1220,7 +1584,7 @@ async function handleFileUpload(event) {
 
     uploadWs.onopen = async () => {
       console.log('[Upload] WS connected');
-      if (btnUpload) btnUpload.textContent = 'Uploading...';
+      if (btnUpload) btnUpload.textContent = '上传中…';
 
       // Now upload the file via HTTP
       try {
@@ -1310,14 +1674,18 @@ async function uploadFallback(file) {
     handleUploadHTTPResponse(result);
   } catch (e) {
     console.error('[Upload] Fallback failed:', e);
-    showToast('Upload failed — check if backend is running');
+    showToast('上传失败 — 请检查后端是否运行');
     finishUploadUI('error');
   }
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = 'Upload'; btnUpload.disabled = false; }
+  if (btnUpload) { btnUpload.textContent = '上传'; btnUpload.disabled = false; }
   const fileInput = $('fileUpload');
   if (fileInput) fileInput.value = '';
 }
+
+// ═══════════════════════════════════════════════════════════
+// 处理中面板渲染
+// ═══════════════════════════════════════════════════════════
 
 function handleUploadWSMessage(msg) {
   const panel = processingPanel;
@@ -1373,7 +1741,7 @@ function handleUploadWSMessage(msg) {
     }
 
     case 'complete':
-      showToast(`Complete: ${msg.data.segments_count || allSegments.filter(Boolean).length} segments`);
+      showToast('处理完成：' + (msg.data.segments_count || allSegments.filter(Boolean).length) + ' 个片段');
       // If WS delivered segments but 'complete' has the final full list with audio, use those
       if (msg.data.segments && msg.data.segments.length > 0) {
         const wsCount = allSegments.filter(Boolean).length;
@@ -1390,11 +1758,13 @@ function handleUploadWSMessage(msg) {
           });
         }
       }
+      // Render the results panel (v3.1)
+      renderResultsPanel(msg.data);
       finishUploadUI('complete');
       break;
 
     case 'error':
-      showToast('Error: ' + (msg.data?.message || 'unknown'));
+      showToast('错误：' + (msg.data?.message || '未知'));
       // Try HTTP fallback if WS delivered nothing
       if (!uploadWsDelivered && uploadHttpResult) {
         handleUploadHTTPResponse(uploadHttpResult);
@@ -1442,7 +1812,7 @@ async function toggleMic() {
 
   if (isRecording) {
     stopMicRecording();
-    if (btnMic) { btnMic.textContent = 'Mic'; btnMic.classList.remove('active'); }
+    if (btnMic) { btnMic.textContent = '录音'; btnMic.classList.remove('active'); }
     if (micStatusEl) micStatusEl.textContent = '';
     return;
   }
@@ -1584,7 +1954,7 @@ function resetAll() {
   audioManager.reset();
 
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = 'Demo'; btnStart.disabled = false; }
+  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
 
   if (transcriptBody) {
     transcriptBody.innerHTML = '';
@@ -1592,12 +1962,12 @@ function resetAll() {
   if (emptyState) {
     emptyState.style.display = 'flex';
     const msgEl = emptyState.querySelector('div:nth-child(2)');
-    if (msgEl) msgEl.textContent = 'Waiting for meeting...';
+    if (msgEl) msgEl.textContent = '等待会议数据…';
   }
 
-  if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No data yet</div>';
-  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">Waiting for input...</div>';
-  if (summaryPanel) summaryPanel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;">Summary will be generated after meeting processing...</div>';
+  if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>';
+  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入…</div>';
+  resetResultsPanel();
 
   if (progressFill) progressFill.style.width = '0%';
   if (timeDisplay) timeDisplay.textContent = '--:--';
@@ -1608,7 +1978,7 @@ function resetAll() {
   if (statCorrections) statCorrections.textContent = '0';
   if (overallConfBar) overallConfBar.style.width = '0%';
   if (overallConfText) overallConfText.textContent = '--';
-  if (meetingTitleDisplay) meetingTitleDisplay.textContent = 'No meeting loaded';
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = '未载入会议';
   if (connectionStatus) connectionStatus.textContent = 'Offline';
 }
 

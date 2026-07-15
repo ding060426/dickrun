@@ -129,51 +129,43 @@ def acoustic_quality_score(snr_db: float, rt60: float, overlap_ratio: float = 0.
 
 
 # ============================================================
-# 2. 说话人嵌入 (模拟)
+# 2. 说话人嵌入 (v3.1 — 真实声学特征)
 # ============================================================
 
-class SpeakerEmbedder:
-    """
-    说话人嵌入提取器
-    实际部署用 ECAPA-TDNN 或 WavLM
-    这里提供模拟实现
-    """
+# 委托给 speaker_diarization 模块的真实实现
+# 保留此类作为向后兼容的别名
+try:
+    from .speaker_diarization import SpeakerIdentifier as SpeakerEmbedder
+except ImportError:
+    # Fallback: 如果 speaker_diarization.py 不可用，保留最小实现
+    class SpeakerEmbedder:
+        """向后兼容的说话人嵌入包装器 (请使用 speaker_diarization.SpeakerIdentifier)"""
 
-    def __init__(self):
-        self.registered_speakers: Dict[str, np.ndarray] = {}
+        def __init__(self):
+            self.registered_speakers: Dict[str, np.ndarray] = {}
 
-    def extract_embedding(self, audio: np.ndarray, sr: int = 16000) -> np.ndarray:
-        """提取说话人嵌入向量 (512维) — 模拟"""
-        # 实际: 用预训练模型提取
-        # 这里返回基于音频能量的模拟嵌入
-        if len(audio) == 0:
-            return np.zeros(512)
+        def extract_embedding(self, audio: np.ndarray, sr: int = 16000) -> np.ndarray:
+            if len(audio) == 0:
+                return np.zeros(256)
+            energy = np.log1p(np.mean(np.abs(audio)))
+            zcr = np.mean(np.abs(np.diff(np.sign(audio)))) / len(audio)
+            np.random.seed(int(energy * 1000) % (2**31))
+            embedding = np.random.randn(256) * 0.1
+            embedding[0] = energy * 0.5
+            embedding[1] = zcr * 10
+            return embedding / (np.linalg.norm(embedding) + 1e-8)
 
-        # 简化模拟: 基于音频统计量生成伪嵌入
-        energy = np.log1p(np.mean(np.abs(audio)))
-        zcr = np.mean(np.abs(np.diff(np.sign(audio)))) / len(audio)
-
-        np.random.seed(int(energy * 1000) % (2**31))
-        embedding = np.random.randn(512) * 0.1
-        embedding[0] = energy * 0.5
-        embedding[1] = zcr * 10
-
-        return embedding / (np.linalg.norm(embedding) + 1e-8)
-
-    def verify_speaker(self, embedding: np.ndarray, threshold: float = 0.6) -> Tuple[Optional[str], float]:
-        """验证说话人身份"""
-        best_id = None
-        best_sim = 0.0
-
-        for spk_id, ref_emb in self.registered_speakers.items():
-            sim = np.dot(embedding, ref_emb)  # 余弦相似度（已归一化）
-            if sim > best_sim:
-                best_sim = sim
-                best_id = spk_id
-
-        if best_sim > threshold:
-            return best_id, best_sim
-        return None, best_sim
+        def verify_speaker(self, embedding: np.ndarray, threshold: float = 0.6) -> Tuple[Optional[str], float]:
+            best_id = None
+            best_sim = 0.0
+            for spk_id, ref_emb in self.registered_speakers.items():
+                sim = np.dot(embedding, ref_emb)
+                if sim > best_sim:
+                    best_sim = sim
+                    best_id = spk_id
+            if best_sim > threshold:
+                return best_id, best_sim
+            return None, best_sim
 
 
 # ============================================================

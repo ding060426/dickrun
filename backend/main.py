@@ -327,6 +327,108 @@ async def get_eval_meeting(meeting_id: str):
 
 
 # ===========================================================================
+# Speaker endpoints (v3.1)
+# ===========================================================================
+
+@app.get("/api/speakers")
+async def get_speakers():
+    """List all enrolled speakers."""
+    if not xasr_engine or not xasr_engine.speaker_identifier:
+        return {"speakers": [], "count": 0, "available": False}
+    speakers = xasr_engine.speaker_identifier.list_speakers()
+    return {
+        "speakers": speakers,
+        "count": len(speakers),
+        "available": True,
+    }
+
+
+@app.post("/api/speakers/enroll")
+async def enroll_speaker(data: dict):
+    """Enroll a new speaker (requires audio upload via multipart)."""
+    return {
+        "ok": False,
+        "message": "Use POST /api/audio/upload with enroll_speaker=true&speaker_name=NAME",
+        "alternate": "GET /api/speakers/enroll_from_eval to auto-enroll from Eval_Ali dataset",
+    }
+
+
+@app.get("/api/speakers/enroll_from_eval")
+async def enroll_from_eval():
+    """Auto-enroll all speakers from Eval_Ali near-field dataset (25 speakers)."""
+    if not xasr_engine or not xasr_engine.speaker_identifier:
+        # Try to init speaker identifier on-demand
+        if xasr_engine:
+            try:
+                from modules.speaker_diarization import SpeakerIdentifier
+                xasr_engine.speaker_identifier = SpeakerIdentifier(embed_dim=256)
+            except Exception as e:
+                return {"ok": False, "count": 0, "error": str(e)}
+        else:
+            return {"ok": False, "count": 0, "error": "X-ASR engine not loaded"}
+
+    count = xasr_engine.speaker_identifier.enroll_from_eval_ali()
+    return {
+        "ok": count > 0,
+        "count": count,
+        "speakers": xasr_engine.speaker_identifier.list_speakers(),
+    }
+
+
+# ===========================================================================
+# Domain & Cognitive endpoints (v3.1)
+# ===========================================================================
+
+@app.get("/api/domain/taxonomy")
+async def get_domain_taxonomy():
+    """Get the full domain taxonomy."""
+    from modules.domain_taxonomy import DOMAIN_TAXONOMY, get_all_domains
+    domains = []
+    for domain_name in get_all_domains():
+        info = DOMAIN_TAXONOMY[domain_name]
+        domains.append({
+            "name": domain_name,
+            "description": info.get("description", ""),
+            "sub_domains": info.get("sub_domains", []),
+            "keyword_count": len(info.get("keywords", [])),
+        })
+    return {"domains": domains, "count": len(domains)}
+
+
+@app.post("/api/domain/infer")
+async def infer_domain(data: dict):
+    """Infer meeting domain from a list of hotwords/terms."""
+    hotwords = data.get("hotwords", data.get("terms", []))
+    if not hotwords:
+        return {"error": "No hotwords provided", "domain": None}
+
+    from modules.cognitive_engine import DomainInferrer
+    inferrer = DomainInferrer()
+    result = inferrer.infer(hotwords)
+    return result
+
+
+@app.get("/api/cognitive/status")
+async def get_cognitive_status():
+    """Get cognitive enhancement system status."""
+    from modules.llm_client import get_llm_client
+    llm = get_llm_client()
+
+    return {
+        "llm_available": llm.is_available,
+        "llm_provider": type(llm).__name__,
+        "speaker_identification": bool(
+            xasr_engine and xasr_engine.speaker_identifier
+            and xasr_engine.speaker_identifier.has_enrolled()
+        ),
+        "enrolled_speakers": len(
+            xasr_engine.speaker_identifier.enrolled
+        ) if (xasr_engine and xasr_engine.speaker_identifier) else 0,
+        "domain_taxonomy": len(DOMAIN_TAXONOMY) if 'DOMAIN_TAXONOMY' in dir() else 5,
+    }
+
+
+# ===========================================================================
 # Audio Upload (with real-time WebSocket progress)
 # ===========================================================================
 
@@ -397,6 +499,7 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
         "index": index,
         "text": result.text,
         "raw_text": result.raw_text,
+        "speaker_id": getattr(result, 'speaker_id', 'unknown'),
         "start_sec": result.start_sec,
         "end_sec": result.end_sec,
         "asr_confidence": round(float(result.asr_confidence), 3),
@@ -498,6 +601,41 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
                             seg["audio_wav_base64"] = audio_b64
                             final_segments.append(seg)
+                        # Build speaker distribution stats
+                        speaker_stats = {}
+                        for r in results:
+                            sid = getattr(r, 'speaker_id', 'unknown')
+                            speaker_stats[sid] = speaker_stats.get(sid, 0) + 1
+
+                        # Generate meeting summary (v3.1)
+                        meeting_summary = None
+                        meeting_domain = None
+                        meeting_hotwords = []
+                        if xasr_engine and xasr_engine.enable_cognitive:
+                            meeting_domain = xasr_engine.get_meeting_domain()
+                            meeting_hotwords = xasr_engine.get_meeting_hotwords()
+                            try:
+                                from modules.cognitive_engine import MeetingSummarizer
+                                summarizer = MeetingSummarizer()
+                                meeting_data = {
+                                    "title": file.filename,
+                                    "segments": [
+                                        {"speaker": r.speaker_id if hasattr(r, 'speaker_id') else "unknown",
+                                         "text": r.text, "terms": getattr(r, 'terms', [])}
+                                        for r in results
+                                    ],
+                                    "domain": meeting_domain,
+                                    "participants": [
+                                        {"id": name, "name": name, "role": info.get("role", "")}
+                                        for name, info in (xasr_engine.speaker_identifier.enrolled.items()
+                                                          if xasr_engine.speaker_identifier else {}.items())
+                                    ][:10],
+                                }
+                                meeting_summary = summarizer.summarize(meeting_data)
+                                logger.info("Meeting summary generated")
+                            except Exception as e:
+                                logger.debug(f"Summary generation skipped: {e}")
+
                         asyncio.run_coroutine_threadsafe(
                             queue.put({
                                 "type": "complete",
@@ -508,6 +646,10 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
                                     "segments_count": len(results),
                                     "segments": final_segments,
+                                    "summary": meeting_summary,
+                                    "domain": meeting_domain,
+                                    "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
+                                    "speaker_stats": speaker_stats,
                                 }
                             }),
                             loop

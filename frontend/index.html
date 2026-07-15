@@ -1844,6 +1844,7 @@ body {
 <script src="./management-transcription.js"></script>
 <script src="./app-settings.js"></script>
 <script src="./hotword-settings.js"></script>
+<script src="./i18n.js"></script>
 <script type="module">
 // ============================================================
 // 会悟 v3.0 - Frontend with wavesurfer.js
@@ -1943,6 +1944,16 @@ const accountMenuButton = $('accountMenuButton');
 const accountDropdown = $('accountDropdown');
 const profileOverlay = $('profileOverlay');
 const profileForm = $('profileForm');
+const languageSelect = $('languageSelect');
+
+// ── i18n ─────────────────────────────────────────────────────
+const i18n = window.DiTingI18n.createI18n({
+  storage: window.localStorage,
+  document,
+  navigatorLanguage: window.navigator.language,
+});
+const t = (key, values = {}, fallback = key) => i18n.t(key, values, fallback);
+i18n.apply();
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1966,6 +1977,8 @@ let micStopTimer = null;
 let micSegmentStartIndex = 0;
 let hotwordSettingsState = null;
 let appSettingsState = null;
+let selectedDomainPresetIds = new Set();
+let currentConnectionState = 'disconnected';
 let micTestStream = null;
 let micTestAudioContext = null;
 let micTestAnimationFrame = null;
@@ -4857,6 +4870,10 @@ initApp();
     if (event.target === hotwordModal) closeHotwordSettings();
   });
   if (profileForm) profileForm.addEventListener('submit', saveCurrentProfile);
+  if (languageSelect) languageSelect.addEventListener('change', event => {
+    i18n.setLanguage(event.target.value);
+    refreshLocalizedInterface();
+  });
   if ($('btnCloseProfile')) $('btnCloseProfile').addEventListener('click', closeProfileEditor);
   if ($('btnCancelProfile')) $('btnCancelProfile').addEventListener('click', closeProfileEditor);
   if ($('btnChooseAvatar')) $('btnChooseAvatar').addEventListener('click', () => $('profileAvatarInput')?.click());

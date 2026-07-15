@@ -93,6 +93,7 @@ body {
   margin-right: 16px;
   font-weight: 800;
   letter-spacing: 0.2px;
+  cursor: pointer; user-select: none;
 }
 .topbar-brand-mark {
   width: 28px; height: 28px;
@@ -153,14 +154,14 @@ body {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 200px; height: 200px;
+  width: 280px; height: 280px;
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 50%, rgba(255,255,255,0.95) 0%, rgba(245,248,255,0.9) 50%, rgba(220,230,250,0.7) 100%);
   opacity: 1;
   box-shadow:
-    0 0 40px rgba(59,130,246,0.15),
-    0 0 80px rgba(139,92,246,0.10);
+    0 0 56px rgba(59,130,246,0.18),
+    0 0 112px rgba(139,92,246,0.12);
   z-index: 0;
   pointer-events: none;
 }
@@ -169,8 +170,16 @@ body {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 520px; height: 520px;
+  width: 620px; height: 620px;
   z-index: 0;
+  pointer-events: none;
+}
+.particle-canvas {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 620px; height: 620px;
+  z-index: 1;
   pointer-events: none;
 }
 .home-hero h1 {
@@ -186,10 +195,26 @@ body {
   position: relative;
   z-index: 2;
 }
+.home-hero h1.hero-logo-image {
+  margin: 0;
+  padding: 0;
+  width: min(1260px, 96vw);
+  max-width: 100%;
+  line-height: 0;
+  background: transparent;
+  -webkit-text-fill-color: initial;
+  text-shadow: none;
+  filter: drop-shadow(0 12px 28px rgba(8,63,148,0.12));
+}
+.hero-logo-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 .home-hero p {
   margin-top: 20px;
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: 13px;
   letter-spacing: 0.08em;
 }
 .legacy-meeting-header { display: none !important; }
@@ -609,6 +634,19 @@ body {
 .schedule-panel .sp-item .sp-name { font-weight: 600; }
 .schedule-panel .sp-item .sp-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 .schedule-panel .sp-empty { color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 11px; }
+.participant-section { margin-top: 10px; }
+.participant-section label { font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 6px; }
+.participant-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.participant-chip {
+  font-size: 10px; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted);
+  transition: all 0.15s; user-select: none;
+}
+.participant-chip:hover { border-color: var(--accent-blue); }
+.participant-chip.selected {
+  background: rgba(59,130,246,0.1); border-color: var(--accent-blue);
+  color: var(--accent-blue); font-weight: 600;
+}
 .calendar-day .dot {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   width: 6px; height: 6px;
@@ -772,7 +810,7 @@ body {
 
 <header class="topbar">
   <div class="topbar-left">
-    <div class="topbar-brand">
+    <div class="topbar-brand" id="topbarBrand" title="返回主页">
       <div class="topbar-brand-mark">D</div>
       <span>DiTing</span>
     </div>
@@ -792,11 +830,14 @@ body {
 
 <section class="home-hero" id="homeHero">
   <div class="hero-visual">
-    <canvas class="freq-ring" id="freqRing" width="520" height="520"></canvas>
+    <canvas class="freq-ring" id="freqRing" width="620" height="620"></canvas>
+    <canvas class="particle-canvas" id="particleCanvas" width="620" height="620"></canvas>
     <div class="volume-orb" id="volumeOrb"></div>
-    <h1>DiTing</h1>
+    <h1 class="hero-logo-image" aria-label="会悟">
+      <img src="assets/huiwu-covor.png" alt="会悟">
+    </h1>
   </div>
-  <p>智能会议语音认知系统 · 转写 · 分析 · 协作</p>
+  <p>Deep · Dialogue · Speech · Governance</p>
 </section>
 
 <div class="login-overlay" id="loginOverlay">
@@ -1040,6 +1081,10 @@ body {
           <div class="form-row"><label>开始时间</label><input id="reservationStart" type="datetime-local"></div>
           <div class="form-row"><label>结束时间</label><input id="reservationEnd" type="datetime-local"></div>
           <div class="form-row"><label>地点</label><input id="reservationLocation" placeholder="会议室A / 线上"></div>
+          <div class="participant-section">
+            <label>参会人员</label>
+            <div class="participant-chips" id="participantChips"></div>
+          </div>
           <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
           <div class="entity-list" id="reservationsList"></div>
         </div>
@@ -1326,6 +1371,7 @@ function showReservationView() {
   }
   switchManagementSection('reserveSection');
   refreshManagementData();
+  loadParticipantChips();
 }
 
 function showAnalysisView() {
@@ -1705,6 +1751,37 @@ function formatDateTime(isoStr) {
   }
 }
 
+let _selectedParticipantIds = [];
+
+async function loadParticipantChips() {
+  const container = $('participantChips');
+  if (!container) return;
+  try {
+    const data = await apiFetch('/api/friends');
+    const friends = data.friends || [];
+    if (friends.length === 0) {
+      container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">暂无同事，请先在用户管理添加</div>';
+      return;
+    }
+    _selectedParticipantIds = [];
+    container.innerHTML = friends.map(f => `<div class="participant-chip" data-uid="${f.friend_id}">${escapeHTML(f.display_name || f.username)}</div>`).join('');
+    container.onclick = (e) => {
+      const chip = e.target.closest('.participant-chip');
+      if (!chip) return;
+      const uid = chip.dataset.uid;
+      if (_selectedParticipantIds.includes(uid)) {
+        _selectedParticipantIds = _selectedParticipantIds.filter(id => id !== uid);
+        chip.classList.remove('selected');
+      } else {
+        _selectedParticipantIds.push(uid);
+        chip.classList.add('selected');
+      }
+    };
+  } catch (e) {
+    container.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
 async function createReservation() {
   try {
     await apiFetch('/api/meetings/reservations', {
@@ -1714,10 +1791,13 @@ async function createReservation() {
         start_time: $('reservationStart').value,
         end_time: $('reservationEnd').value,
         location: $('reservationLocation').value.trim(),
+        participant_user_ids: _selectedParticipantIds,
       }),
     });
     showToast('会议已预约');
+    _selectedParticipantIds = [];
     await loadReservations();
+    await loadParticipantChips();
   } catch (e) {
     showToast('预约失败: ' + e.message);
   }
@@ -2849,9 +2929,34 @@ async function startVolumeMeter() {
   const canvas = $('freqRing');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const cx = 260, cy = 260;
-  const innerR = 110, outerR = 300;
-  const N = 180;
+  const cx = 310, cy = 310;
+  const innerR = 145, outerR = 280;
+
+  const pCanvas = $('particleCanvas');
+  const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
+  let particles = [];
+  const MAX_PARTICLES = 60;
+  const orbR = 140;
+
+  function spawnParticle(level) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = orbR + Math.random() * 30 + level * 80;
+    return {
+      x: cx + Math.cos(angle) * dist,
+      y: cy + Math.sin(angle) * dist,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: (Math.random() - 0.5) * 0.6 - level * 0.5,
+      life: 1,
+      decay: 0.003 + Math.random() * 0.008,
+      size: 1.5 + Math.random() * 3,
+      color: Math.random() < 0.5 ? '59,130,246' : '139,92,246',
+    };
+  }
+
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    particles.push(spawnParticle(0));
+    particles[i].life = Math.random();
+  }
 
   try {
     volumeStream = await navigator.mediaDevices.getUserMedia({
@@ -2871,7 +2976,7 @@ async function startVolumeMeter() {
     function tick() {
       if (!volumeAnalyser) return;
       volumeAnalyser.getByteFrequencyData(dataArray);
-      ctx.clearRect(0, 0, 520, 520);
+      ctx.clearRect(0, 0, 620, 620);
 
       let sum = 0;
       for (let j = 0; j < binCount; j++) sum += dataArray[j];
@@ -2893,6 +2998,25 @@ async function startVolumeMeter() {
       ctx.strokeStyle = 'rgba(139,92,246,0.15)';
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      if (pCtx) {
+        pCtx.clearRect(0, 0, 620, 620);
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= p.decay;
+          if (p.life <= 0) {
+            particles[i] = spawnParticle(level);
+            continue;
+          }
+          const alpha = p.life * 0.6;
+          pCtx.beginPath();
+          pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          pCtx.fillStyle = `rgba(${p.color},${alpha})`;
+          pCtx.fill();
+        }
+      }
 
       volumeAnimId = requestAnimationFrame(tick);
     }
@@ -3066,6 +3190,9 @@ function initApp() {
   if (showLoginLink) showLoginLink.addEventListener('click', showLoginForm);
   if (topbarLogin) topbarLogin.addEventListener('click', showLogin);
   if (topbarLogout) topbarLogout.addEventListener('click', logout);
+
+  const topbarBrand = $('topbarBrand');
+  if (topbarBrand) topbarBrand.addEventListener('click', showHome);
 
   document.querySelectorAll('.topbar-nav-item').forEach(item => {
     item.addEventListener('click', () => switchModule(item.dataset.module));

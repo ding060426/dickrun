@@ -110,6 +110,15 @@ def init_db():
         created_by TEXT REFERENCES users(id),
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS friends (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        friend_id TEXT NOT NULL REFERENCES users(id),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (user_id, friend_id),
+        CHECK (user_id <> friend_id)
+    );
     """
     print("[Supabase] Please run this SQL in your Supabase SQL Editor to create tables.")
     print("[Supabase] Alternatively, tables will be auto-created on first insert.")
@@ -342,4 +351,56 @@ def list_analyses(user_id=None, meeting_id=None, limit=50):
 def delete_analysis(analysis_id):
     client = _get_client()
     client.table("meeting_analyses").delete().eq("id", analysis_id).execute()
+    return True
+
+
+# ── Friends ───────────────────────────────────────────────────
+
+def search_users(keyword, exclude_user_id=None, limit=20):
+    client = _get_client()
+    query = client.table("users").select("id,username,display_name,role,status").ilike("username", f"%{keyword}%").neq("status", "deleted").limit(limit)
+    if exclude_user_id:
+        query = query.neq("id", exclude_user_id)
+    result = query.execute()
+    return result.data or []
+
+
+def list_friends(user_id):
+    client = _get_client()
+    result = client.table("friends").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    friends = []
+    seen = set()
+    for r in (result.data or []):
+        fid = r["friend_id"]
+        if fid in seen:
+            continue
+        seen.add(fid)
+        u = client.table("users").select("username,display_name,role").eq("id", fid).execute()
+        info = u.data[0] if u.data else {}
+        friends.append({
+            "id": r["id"],
+            "friend_id": fid,
+            "username": info.get("username", ""),
+            "display_name": info.get("display_name", ""),
+            "role": info.get("role", ""),
+            "created_at": r["created_at"],
+        })
+    return friends
+
+
+def add_friend(user_id, friend_id):
+    client = _get_client()
+    if user_id == friend_id:
+        return None
+    try:
+        client.table("friends").insert({"user_id": user_id, "friend_id": friend_id}).execute()
+        return {"user_id": user_id, "friend_id": friend_id}
+    except Exception as exc:
+        print(f"[Supabase] add_friend failed: {exc}")
+        return None
+
+
+def remove_friend(user_id, friend_id):
+    client = _get_client()
+    client.table("friends").delete().eq("user_id", user_id).eq("friend_id", friend_id).execute()
     return True

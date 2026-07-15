@@ -9,23 +9,23 @@
    DiTing v3.0 - Global Styles (with wavesurfer.js integration)
    ============================================================ */
 :root {
-  --bg-primary: #0f1117;
-  --bg-secondary: #181b24;
-  --bg-tertiary: #1e2130;
-  --bg-card: #1a1d28;
-  --border: #2a2d3a;
-  --border-active: #3a3f55;
-  --text-primary: #e8eaed;
-  --text-secondary: #9aa0b0;
-  --text-muted: #5f6577;
-  --accent-blue: #4A90D9;
-  --accent-orange: #E8743C;
-  --accent-green: #50B86C;
-  --accent-red: #e0556a;
-  --accent-yellow: #e8b83c;
-  --accent-purple: #8b6ce8;
-  --gradient-brand: linear-gradient(135deg, #4A90D9 0%, #8b6ce8 100%);
-  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --bg-primary: #f0f4fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8edf5;
+  --bg-card: #ffffff;
+  --border: #d8dfe8;
+  --border-active: #b0bdd0;
+  --text-primary: #1a1f36;
+  --text-secondary: #4a5578;
+  --text-muted: #8b96b0;
+  --accent-blue: #3b82f6;
+  --accent-orange: #f59e0b;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-yellow: #eab308;
+  --accent-purple: #8b5cf6;
+  --gradient-brand: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -80,12 +80,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(15,17,23,0.88);
+  background: rgba(240,244,250,0.92);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 900;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
 }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
 .topbar-brand {
@@ -138,20 +138,53 @@ body {
   justify-content: center;
   text-align: center;
   background-image:
-    radial-gradient(circle at 50% 35%, rgba(74,144,217,0.12), transparent 36%),
-    radial-gradient(circle at 70% 70%, rgba(139,108,232,0.08), transparent 35%);
+    radial-gradient(circle at 50% 35%, rgba(59,130,246,0.06), transparent 36%),
+    radial-gradient(circle at 70% 70%, rgba(139,92,246,0.04), transparent 35%);
 }
 .home-hero.hidden { display: none; }
+.hero-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.volume-orb {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.95) 0%, rgba(245,248,255,0.9) 50%, rgba(220,230,250,0.7) 100%);
+  opacity: 1;
+  box-shadow:
+    0 0 40px rgba(59,130,246,0.15),
+    0 0 80px rgba(139,92,246,0.10);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.freq-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 520px; height: 520px;
+  z-index: 0;
+  pointer-events: none;
+}
 .home-hero h1 {
   font-size: clamp(64px, 12vw, 140px);
   line-height: 1.15;
   font-weight: 900;
   letter-spacing: -0.06em;
   padding-bottom: 0.08em;
-  background: var(--gradient-brand);
+  background: linear-gradient(135deg, #2a3f8f 0%, #6b3fa0 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  position: relative;
+  z-index: 2;
 }
 .home-hero p {
   margin-top: 20px;
@@ -247,7 +280,7 @@ body {
   height: 44px;
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(0,0,0,0.25);
+  background: rgba(0,0,0,0.04);
   position: relative;
 }
 .segment-waveform canvas { display: block; }
@@ -433,17 +466,27 @@ body {
 .login-overlay {
   position: fixed; inset: 0; z-index: 1000;
   display: none; align-items: center; justify-content: center;
-  background: rgba(15,17,23,0.78);
+  background: rgba(15,17,23,0.35);
   backdrop-filter: blur(6px);
 }
 .login-overlay.visible { display: flex; }
 .login-card {
   width: min(400px, calc(100vw - 32px)); padding: 32px 28px;
   background: var(--bg-secondary); border: 1px solid var(--border-active);
-  border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.12);
 }
 .login-card h2 { font-size: 20px; margin-bottom: 6px; }
 .login-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+.login-card .switch-link {
+  text-align: center; margin-top: 12px; font-size: 12px; color: var(--text-muted);
+}
+.login-card .switch-link a {
+  color: var(--accent-blue); cursor: pointer; text-decoration: none;
+}
+.login-card .switch-link a:hover { text-decoration: underline; }
+#registerForm { display: none; }
+#registerForm.active { display: block; }
+#loginFormWrap.hidden { display: none; }
 .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .form-row label { font-size: 11px; color: var(--text-secondary); }
 .form-row input, .form-row select, .form-row textarea {
@@ -451,11 +494,11 @@ body {
   background: var(--bg-primary); color: var(--text-primary); padding: 8px 10px; font-size: 12px; outline: none;
 }
 .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent-blue); }
-.login-error { min-height: 18px; color: var(--accent-red); font-size: 11px; margin-top: 8px; }
+.login-error { min-height: 5px; color: var(--accent-red); font-size: 11px; margin-top: 8px; }
 .user-pill { font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; }
 .management-panel {
-  position: fixed; right: 18px; bottom: 58px; z-index: 200;
-  width: min(520px, calc(100vw - 36px)); max-height: min(680px, calc(100vh - 110px));
+  position: fixed; right: 5px; bottom: 58px; z-index: 200;
+  width: min(1680px, calc(100vw - 24px)); max-height: min(800px, calc(100vh - 90px));
   display: none; flex-direction: column; background: var(--bg-secondary);
   border: 1px solid var(--border-active); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
 }
@@ -468,9 +511,132 @@ body {
 .management-section { display: none; }
 .management-section.active { display: block; }
 .entity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.entity-card { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); padding: 8px; font-size: 11px; }
-.entity-card .title { font-weight: 700; color: var(--text-primary); }
-.entity-card .meta { color: var(--text-muted); margin-top: 3px; word-break: break-all; }
+.entity-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 5px 8px; font-size: 10px; }
+.entity-card .title { font-weight: 600; color: var(--text-primary); font-size: 11px; }
+.entity-card .meta { color: var(--text-muted); margin-top: 1px; font-size: 10px; word-break: break-all; }
+
+.users-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  height: 100%;
+}
+.users-left, .users-right {
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.users-section-title {
+  font-size: 13px; font-weight: 700; margin-bottom: 10px;
+  color: var(--text-secondary);
+}
+.search-box {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.search-box input {
+  flex: 1;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-primary); color: var(--text-primary);
+  padding: 8px 10px; font-size: 12px; outline: none;
+}
+.search-box input:focus { border-color: var(--accent-blue); }
+.friend-card {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-card); padding: 8px 10px; font-size: 12px;
+  margin-bottom: 6px;
+}
+.friend-card .info { display: flex; flex-direction: column; gap: 2px; }
+.friend-card .name { font-weight: 600; }
+.friend-card .role { font-size: 10px; color: var(--text-muted); }
+.friend-card .btn-sm {
+  font-size: 10px; padding: 3px 10px;
+  border-radius: 6px; border: none; cursor: pointer;
+  font-family: inherit;
+}
+.btn-add { background: var(--accent-blue); color: white; }
+.btn-remove { background: rgba(239,68,68,0.12); color: var(--accent-red); }
+.reserve-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1100px) 300px;
+  gap: 10px;
+  align-items: start;
+}
+.reservation-calendar {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: rgba(59,130,246,0.07); padding: 8px 10px; font-size: 10px; user-select: none;
+}
+.calendar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.calendar-header .month-label { font-weight: 700; font-size: 12px; color: var(--accent-blue); }
+.calendar-header button {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-secondary); cursor: pointer; padding: 1px 7px; font-size: 11px;
+  font-family: inherit; line-height: 1.2;
+}
+.calendar-header button:hover { background: var(--bg-tertiary); }
+.calendar-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; color: var(--text-muted); margin-bottom: 3px; font-size: 10px;
+}
+.calendar-days {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+}
+.calendar-day {
+  padding: 40px 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; border-radius: 5px;
+  cursor: pointer; position: relative; font-size: 13px; color: var(--text-primary);
+  line-height: 1;
+}
+.calendar-day:hover { background: var(--bg-tertiary); }
+.calendar-day.other-month { color: var(--text-muted); }
+.calendar-day.today { background: var(--accent-blue); color: white; font-weight: 700; }
+.calendar-day { color: var(--text-muted); }
+.calendar-day.has-meeting { color: var(--text-primary); font-weight: 600; }
+.calendar-day.has-meeting { color: var(--text-primary); font-weight: 600; cursor: pointer; background: rgba(59,130,246,0.14); }
+.schedule-panel {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-card); padding: 10px; font-size: 11px;
+  min-height: 120px;
+}
+.schedule-panel .sp-title { font-weight: 700; font-size: 12px; margin-bottom: 8px; color: var(--text-primary); }
+.schedule-panel .sp-item {
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+  margin-bottom: 6px; cursor: pointer; transition: background 0.15s;
+}
+.schedule-panel .sp-item:hover { background: var(--bg-tertiary); }
+.schedule-panel .sp-item .sp-name { font-weight: 600; }
+.schedule-panel .sp-item .sp-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.schedule-panel .sp-empty { color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 11px; }
+.calendar-day .dot {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  width: 6px; height: 6px;
+  border-radius: 2px; background: var(--accent-blue);
+}
+.calendar-day .tooltip {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); z-index: 300; white-space: nowrap;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 8px; padding: 8px 10px; font-size: 11px; color: var(--text-primary);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15); pointer-events: none; text-align: left;
+}
+.calendar-day .tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
+.calendar-day .tooltip .tt-meta { font-size: 10px; color: var(--text-muted); }
+.calendar-day:hover .tooltip { display: block; }
+.time-status {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.time-status.upcoming { background: rgba(74,144,217,0.15); color: var(--accent-blue); }
+.time-status.active { background: rgba(80,184,108,0.15); color: var(--accent-green); }
+.time-status.ended { background: rgba(95,101,119,0.15); color: var(--text-muted); }
+.time-status.unknown { background: rgba(232,184,60,0.15); color: var(--accent-yellow); }
 
 /* Module selector - Codex style */
 .module-overlay {
@@ -478,8 +644,8 @@ body {
   display: none; align-items: center; justify-content: center;
   background: var(--bg-primary);
   background-image:
-    radial-gradient(circle at 50% 0%, rgba(74,144,217,0.08) 0%, transparent 60%),
-    radial-gradient(circle at 80% 100%, rgba(139,108,232,0.06) 0%, transparent 50%);
+    radial-gradient(circle at 50% 0%, rgba(59,130,246,0.04) 0%, transparent 60%),
+    radial-gradient(circle at 80% 100%, rgba(139,92,246,0.03) 0%, transparent 50%);
 }
 .module-overlay.visible { display: flex; }
 .module-container {
@@ -541,7 +707,7 @@ body {
 .module-card:hover {
   border-color: var(--accent-blue);
   transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(74,144,217,0.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.08), 0 0 0 1px rgba(59,130,246,0.15);
 }
 .module-card:hover .card-arrow {
   opacity: 1;
@@ -625,25 +791,50 @@ body {
 </header>
 
 <section class="home-hero" id="homeHero">
-  <h1>DiTing</h1>
+  <div class="hero-visual">
+    <canvas class="freq-ring" id="freqRing" width="520" height="520"></canvas>
+    <div class="volume-orb" id="volumeOrb"></div>
+    <h1>DiTing</h1>
+  </div>
   <p>智能会议语音认知系统 · 转写 · 分析 · 协作</p>
 </section>
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
-    <h2>会议控制台登录</h2>
+    <h2 id="loginTitle">会议控制台登录</h2>
     <p>基于 Supabase 的用户认证系统</p>
-    <form id="loginForm">
+    <div id="loginFormWrap">
+      <form id="loginForm">
+        <div class="form-row">
+          <label for="loginUsername">用户名</label>
+          <input id="loginUsername" autocomplete="username" value="admin">
+        </div>
+        <div class="form-row">
+          <label for="loginPassword">密码</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" value="admin123">
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%;">登录</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+      <div class="switch-link">还没有账号？<a id="showRegister">立即注册</a></div>
+    </div>
+
+    <form id="registerForm">
       <div class="form-row">
-        <label for="loginUsername">用户名</label>
-        <input id="loginUsername" autocomplete="username" value="admin">
+        <label for="regUsername">用户名</label>
+        <input id="regUsername" autocomplete="off" placeholder="请输入用户名">
       </div>
       <div class="form-row">
-        <label for="loginPassword">密码</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" value="admin123">
+        <label for="regPassword">密码</label>
+        <input id="regPassword" type="password" autocomplete="new-password" placeholder="至少6位">
       </div>
-      <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;">登录</button>
-      <div class="login-error" id="loginError"></div>
+      <div class="form-row">
+        <label for="regPassword2">确认密码</label>
+        <input id="regPassword2" type="password" autocomplete="new-password" placeholder="再次输入密码">
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">注册</button>
+      <div class="login-error" id="registerError"></div>
+      <div class="switch-link">已有账号？<a id="showLogin">返回登录</a></div>
     </form>
   </div>
 </div>
@@ -825,28 +1016,49 @@ body {
     <button class="btn btn-secondary" id="btnCloseManagement">关闭</button>
   </div>
   <div class="management-body">
-    <div class="management-tabs">
-      <button class="btn btn-secondary management-tab" data-section="usersSection">用户</button>
-      <button class="btn btn-secondary management-tab" data-section="reserveSection">预约</button>
-      <button class="btn btn-secondary management-tab" data-section="joinSection">加入</button>
-      <button class="btn btn-secondary management-tab" data-section="analysisSection">分析</button>
-    </div>
 
     <div class="management-section active" id="usersSection">
-      <div class="form-row"><label>用户名</label><input id="newUsername" placeholder="zhangsan"></div>
-      <div class="form-row"><label>显示名</label><input id="newDisplayName" placeholder="张三"></div>
-      <div class="form-row"><label>密码</label><input id="newPassword" type="password" value="123456"></div>
-      <button class="btn btn-primary" id="btnCreateUser">创建用户</button>
-      <div class="entity-list" id="usersList"></div>
+      <div class="users-layout">
+        <div class="users-left">
+          <div class="users-section-title">同事列表</div>
+          <div class="entity-list" id="friendsList"></div>
+        </div>
+        <div class="users-right">
+          <div class="search-box">
+            <input id="friendSearch" placeholder="搜索同事...">
+            <button class="btn btn-primary" id="btnSearchUsers">搜索</button>
+          </div>
+          <div class="entity-list" id="searchResults"></div>
+        </div>
+      </div>
     </div>
 
     <div class="management-section" id="reserveSection">
-      <div class="form-row"><label>标题</label><input id="reservationTitle" placeholder="周例会"></div>
-      <div class="form-row"><label>开始时间</label><input id="reservationStart" type="datetime-local"></div>
-      <div class="form-row"><label>结束时间</label><input id="reservationEnd" type="datetime-local"></div>
-      <div class="form-row"><label>地点</label><input id="reservationLocation" placeholder="会议室A / 线上"></div>
-      <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
-      <div class="entity-list" id="reservationsList"></div>
+      <div class="reserve-layout">
+        <div class="reserve-left">
+          <div class="form-row"><label>标题</label><input id="reservationTitle" placeholder="周例会"></div>
+          <div class="form-row"><label>开始时间</label><input id="reservationStart" type="datetime-local"></div>
+          <div class="form-row"><label>结束时间</label><input id="reservationEnd" type="datetime-local"></div>
+          <div class="form-row"><label>地点</label><input id="reservationLocation" placeholder="会议室A / 线上"></div>
+          <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
+          <div class="entity-list" id="reservationsList"></div>
+        </div>
+        <div class="reservation-calendar" id="reservationCalendar">
+          <div class="calendar-header">
+            <button id="calPrev">◀</button>
+            <span class="month-label" id="calMonthLabel"></span>
+            <button id="calNext">▶</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div class="calendar-days" id="calDays"></div>
+        </div>
+        <div class="schedule-panel" id="schedulePanel">
+          <div class="sp-title">会议安排</div>
+          <div class="sp-empty">点击日期查看详情</div>
+        </div>
+      </div>
     </div>
 
     <div class="management-section" id="joinSection">
@@ -857,14 +1069,19 @@ body {
     </div>
 
     <div class="management-section" id="analysisSection">
-      <div class="form-row"><label>关联会议</label><select id="analysisMeetingId"><option value="">-- 选择 --</option></select></div>
-      <button class="btn btn-primary" id="btnSaveAnalysis">保存当前分析</button>
-      <button class="btn btn-secondary" id="btnRefreshAnalyses">刷新</button>
-      <div class="entity-list" id="analysesList"></div>
+      <div class="reserve-layout">
+        <div class="reserve-left">
+          <div class="form-row"><label>关联会议</label><select id="analysisMeetingId"><option value="">-- 选择 --</option></select></div>
+          <button class="btn btn-primary" id="btnSaveAnalysis">保存当前分析</button>
+          <button class="btn btn-secondary" id="btnRefreshAnalyses">刷新</button>
+        </div>
+        <div class="entity-list" id="analysesList"></div>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Debug Log Panel                                             -->
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -987,6 +1204,7 @@ async function apiFetch(path, options = {}) {
 }
 
 function setLoggedIn(user, token) {
+  const wasAlreadyLoggedIn = !!currentUser;
   currentUser = user;
   if (token) {
     authToken = token;
@@ -997,16 +1215,19 @@ function setLoggedIn(user, token) {
   const joinName = $('joinDisplayName');
   if (joinName && user.display_name) joinName.value = user.display_name;
   updateTopbar();
-  if (pendingModule) {
-    switchModule(pendingModule);
-  } else {
-    showHome();
+  if (!wasAlreadyLoggedIn) {
+    if (pendingModule) {
+      switchModule(pendingModule);
+    } else {
+      showHome();
+    }
+    pendingModule = null;
   }
-  pendingModule = null;
 }
 
 function showLogin() {
   if (loginOverlay) loginOverlay.classList.add('visible');
+  showLoginForm();
   updateTopbar();
 }
 
@@ -1020,6 +1241,7 @@ function showHome() {
   if (nav) nav.classList.remove('visible');
   currentModule = null;
   updateTopbar();
+  if (!volumeAnalyser) startVolumeMeter();
 }
 
 let currentModule = null;
@@ -1082,7 +1304,6 @@ function selectModule(name) {
 }
 
 function ensureMeetingViewVisible() {
-  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
   if (managementPanel) {
     managementPanel.classList.remove('visible');
     managementPanel.removeAttribute('style');
@@ -1091,7 +1312,6 @@ function ensureMeetingViewVisible() {
   const controlsBar = document.querySelector('.controls-bar');
   if (mainContainer) mainContainer.style.display = 'grid';
   if (controlsBar) controlsBar.style.display = 'flex';
-  if (mainApp) mainApp.style.marginTop = '0';
 }
 
 function showReservationView() {
@@ -1101,9 +1321,8 @@ function showReservationView() {
   if (mainContainer) mainContainer.style.display = 'none';
   if (controlsBar) controlsBar.style.display = 'none';
   if (managementPanel) {
+    managementPanel.classList.add('visible');
     managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
-    const mb = managementPanel.querySelector('.management-body');
-    if (mb) mb.style.maxHeight = 'none';
   }
   switchManagementSection('reserveSection');
   refreshManagementData();
@@ -1116,9 +1335,8 @@ function showAnalysisView() {
   if (mainContainer) mainContainer.style.display = 'none';
   if (controlsBar) controlsBar.style.display = 'none';
   if (managementPanel) {
+    managementPanel.classList.add('visible');
     managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
-    const mb = managementPanel.querySelector('.management-body');
-    if (mb) mb.style.maxHeight = 'none';
   }
   switchManagementSection('analysisSection');
   refreshManagementData();
@@ -1131,9 +1349,8 @@ function showUsersView() {
   if (mainContainer) mainContainer.style.display = 'none';
   if (controlsBar) controlsBar.style.display = 'none';
   if (managementPanel) {
+    managementPanel.classList.add('visible');
     managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
-    const mb = managementPanel.querySelector('.management-body');
-    if (mb) mb.style.maxHeight = 'none';
   }
   switchManagementSection('usersSection');
   refreshManagementData();
@@ -1145,7 +1362,7 @@ function showMeeting() {
 
 async function restoreLogin() {
   if (!authToken) {
-    showHome();
+    showLogin();
     return;
   }
   try {
@@ -1154,7 +1371,7 @@ async function restoreLogin() {
   } catch (e) {
     localStorage.removeItem('diting_auth_token');
     authToken = '';
-    showHome();
+    showLogin();
   }
 }
 
@@ -1177,6 +1394,50 @@ async function handleLoginSubmit(e) {
   }
 }
 
+async function handleRegisterSubmit(e) {
+  e.preventDefault();
+  const errEl = $('registerError');
+  if (errEl) errEl.textContent = '';
+  const username = $('regUsername').value.trim();
+  const password = $('regPassword').value;
+  const password2 = $('regPassword2').value;
+  if (!username) { if (errEl) errEl.textContent = '请输入用户名'; return; }
+  if (password.length < 6) { if (errEl) errEl.textContent = '密码至少6位'; return; }
+  if (password !== password2) { if (errEl) errEl.textContent = '两次密码不一致'; return; }
+  try {
+    const data = await apiFetch('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    showToast('注册成功，请登录');
+    showLoginForm();
+  } catch (err) {
+    if (errEl) errEl.textContent = err.message;
+  }
+}
+
+function showLoginForm() {
+  const wrap = $('loginFormWrap');
+  const reg = $('registerForm');
+  const title = $('loginTitle');
+  if (wrap) wrap.classList.remove('hidden');
+  if (reg) reg.classList.remove('active');
+  if (title) title.textContent = '会议控制台登录';
+  if ($('loginError')) $('loginError').textContent = '';
+  if ($('registerError')) $('registerError').textContent = '';
+  if ($('regPassword')) $('regPassword').value = '';
+  if ($('regPassword2')) $('regPassword2').value = '';
+}
+
+function showRegisterForm() {
+  const wrap = $('loginFormWrap');
+  const reg = $('registerForm');
+  const title = $('loginTitle');
+  if (wrap) wrap.classList.add('hidden');
+  if (reg) reg.classList.add('active');
+  if (title) title.textContent = '创建账号';
+}
+
 async function logout() {
   try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
   authToken = '';
@@ -1187,8 +1448,9 @@ async function logout() {
 
 function toggleManagementPanel() {
   if (!managementPanel) return;
-  managementPanel.classList.toggle('visible');
-  if (managementPanel.classList.contains('visible')) refreshManagementData();
+  managementPanel.classList.remove('visible');
+  managementPanel.removeAttribute('style');
+  showHome();
 }
 
 function switchManagementSection(sectionId) {
@@ -1199,22 +1461,77 @@ function switchManagementSection(sectionId) {
 
 async function refreshManagementData() {
   if (!authToken) return;
-  await Promise.allSettled([loadUsers(), loadReservations(), loadAnalyses(), loadReservationOptions()]);
+  await Promise.allSettled([loadFriendList(), loadReservations(), loadAnalyses(), loadReservationOptions()]);
 }
 
 async function loadUsers() {
-  const list = $('usersList');
+  await loadFriendList();
+}
+
+async function loadFriendList() {
+  const list = $('friendsList');
   if (!list) return;
   try {
-    const data = await apiFetch('/api/users');
-    list.innerHTML = data.users.map(u => `<div class="entity-card">
-      <div class="title">${escapeHTML(u.display_name || u.username)} <span style="color:var(--text-muted);">@${escapeHTML(u.username)}</span></div>
-      <div class="meta">${escapeHTML(u.role)} · ${escapeHTML(u.status)} · ${escapeHTML(u.id)}</div>
-    </div>`).join('') || '<div class="entity-card">暂无用户</div>';
+    const data = await apiFetch('/api/friends');
+    if (!data.friends || data.friends.length === 0) {
+      list.innerHTML = '<div class="entity-card" style="text-align:center;color:var(--text-muted);">暂无同事</div>';
+      return;
+    }
+    list.innerHTML = data.friends.map(f => `<div class="friend-card">
+      <div class="info">
+        <div class="name">${escapeHTML(f.display_name || f.username)}</div>
+        <div class="role">@${escapeHTML(f.username)} · ${escapeHTML(f.role)}</div>
+      </div>
+      <button class="btn-sm btn-remove" onclick="window.removeFriendById('${f.friend_id}')">移除</button>
+    </div>`).join('');
   } catch (e) {
     list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
   }
 }
+
+async function searchFriends() {
+  const q = $('friendSearch')?.value.trim();
+  if (!q) return;
+  const list = $('searchResults');
+  if (!list) return;
+  try {
+    const data = await apiFetch(`/api/friends/search?q=${encodeURIComponent(q)}`);
+    if (!data.users || data.users.length === 0) {
+      list.innerHTML = '<div class="entity-card" style="text-align:center;color:var(--text-muted);">未找到用户</div>';
+      return;
+    }
+    list.innerHTML = data.users.map(u => `<div class="friend-card">
+      <div class="info">
+        <div class="name">${escapeHTML(u.display_name || u.username)}</div>
+        <div class="role">@${escapeHTML(u.username)} · ${escapeHTML(u.role)}</div>
+      </div>
+      <button class="btn-sm btn-add" onclick="window.addFriendById('${u.id}')">添加</button>
+    </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+window.addFriendById = async function(friendId) {
+  try {
+    await apiFetch('/api/friends', { method: 'POST', body: JSON.stringify({ friend_id: friendId }) });
+    showToast('已添加为同事');
+    await loadFriendList();
+    await searchFriends();
+  } catch (e) {
+    showToast(e.message);
+  }
+};
+
+window.removeFriendById = async function(friendId) {
+  try {
+    await apiFetch(`/api/friends/${friendId}`, { method: 'DELETE' });
+    showToast('已移除');
+    await loadFriendList();
+  } catch (e) {
+    showToast(e.message);
+  }
+};
 
 async function createUser() {
   try {
@@ -1238,13 +1555,153 @@ async function loadReservations() {
   if (!list) return;
   try {
     const data = await apiFetch('/api/meetings/reservations');
-    list.innerHTML = data.reservations.map(r => `<div class="entity-card">
-      <div class="title">${escapeHTML(r.title)}</div>
-      <div class="meta">${escapeHTML(r.start_time)} - ${escapeHTML(r.end_time)}</div>
-      <div class="meta">Join code: ${escapeHTML(r.join_code)} · ${escapeHTML(r.status)}</div>
-    </div>`).join('') || '<div class="entity-card">暂无预约</div>';
+    list.innerHTML = data.reservations.map(r => {
+      const ts = getMeetingTimeStatus(r.start_time, r.end_time);
+      const statusBadge = `<span class="time-status ${ts.cls}">${ts.label}</span>`;
+      const dbStatus = r.status && r.status !== 'scheduled' ? ` · ${r.status}` : '';
+      return `<div class="entity-card">
+        <div class="title">${escapeHTML(r.title)} ${statusBadge}</div>
+        <div class="meta">${formatDateTime(r.start_time)} - ${formatDateTime(r.end_time)}</div>
+        <div class="meta">参会码: ${escapeHTML(r.join_code)}${dbStatus}</div>
+      </div>`;
+    }).join('') || '<div class="entity-card">暂无预约</div>';
+    renderCalendar(data.reservations || []);
   } catch (e) {
     list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+// ── Reservation Calendar ────────────────────────────────────
+let calYear, calMonth;
+
+function initCalendar() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  if ($('calPrev')) $('calPrev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); });
+  if ($('calNext')) $('calNext').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); });
+}
+
+function getReservationMap(reservations) {
+  const map = {};
+  reservations.forEach(r => {
+    if (!r.start_time) return;
+    const d = new Date(r.start_time);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (!map[key]) map[key] = {};
+    const day = d.getDate();
+    if (!map[key][day]) map[key][day] = [];
+    map[key][day].push(r);
+  });
+  return map;
+}
+
+let _lastReservationData = [];
+let _lastReservationMap = {};
+
+function renderCalendar(reservations) {
+  if (reservations !== undefined) _lastReservationData = reservations;
+  const data = _lastReservationData;
+  const rmap = getReservationMap(data);
+  _lastReservationMap = rmap;
+  const key = `${calYear}-${calMonth}`;
+  const monthData = rmap[key] || {};
+
+  if ($('calMonthLabel')) $('calMonthLabel').textContent = `${calYear}年 ${calMonth + 1}月`;
+
+  const daysEl = $('calDays');
+  if (!daysEl) return;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const prevDays = new Date(calYear, calMonth, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  const isThisMonth = today.getFullYear() === calYear && today.getMonth() === calMonth;
+
+  let html = '';
+
+  for (let i = firstDay - 1; i >= 0; i--) {
+    html += `<div class="calendar-day other-month">${prevDays - i}</div>`;
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const hasMeeting = monthData[d] !== undefined;
+    const isToday = isThisMonth && d === today.getDate();
+    const baseCls = 'calendar-day';
+    const cls = [baseCls, isToday ? 'today' : '', hasMeeting ? 'has-meeting' : ''].filter(Boolean).join(' ');
+    let tooltip = '';
+    if (hasMeeting) {
+      const meetings = monthData[d];
+      tooltip = '<div class="tooltip">' + meetings.map(m => {
+        const start = m.start_time ? formatDateTime(m.start_time) : '';
+        const end = m.end_time ? formatDateTime(m.end_time) : '';
+        const loc = m.location || '';
+        return `<div class="tt-title">${escapeHTML(m.title)}</div>
+          <div class="tt-meta">${start} - ${end}</div>
+          ${loc ? `<div class="tt-meta">${escapeHTML(loc)}</div>` : ''}`;
+      }).join('<div style="border-top:1px solid var(--border);margin:4px 0"></div>') + '</div>';
+    }
+    html += `<div class="${cls}" data-day="${d}">${d}${hasMeeting ? '<span class="dot"></span>' + tooltip : ''}</div>`;
+  }
+
+  const remaining = 7 - ((firstDay + daysInMonth) % 7);
+  if (remaining < 7) {
+    for (let d = 1; d <= remaining; d++) {
+      html += `<div class="calendar-day other-month">${d}</div>`;
+    }
+  }
+
+  daysEl.innerHTML = html;
+  daysEl.onclick = (e) => {
+    const dayEl = e.target.closest('.calendar-day');
+    if (!dayEl) return;
+    const d = parseInt(dayEl.dataset.day);
+    if (!d) return;
+    const key = `${calYear}-${calMonth}`;
+    const monthData = (_lastReservationMap[key] || {});
+    showDaySchedule(d, monthData[d] || []);
+  };
+}
+
+function showDaySchedule(day, meetings) {
+  const panel = $('schedulePanel');
+  if (!panel) return;
+  const dateStr = `${calYear}年${calMonth + 1}月${day}日`;
+  if (meetings.length === 0) {
+    panel.innerHTML = `<div class="sp-title">${dateStr}</div><div class="sp-empty">当天无会议</div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="sp-title">${dateStr}</div>` + meetings.map(m => {
+    const start = m.start_time ? formatDateTime(m.start_time) : '';
+    const end = m.end_time ? formatDateTime(m.end_time) : '';
+    const loc = m.location || '';
+    return `<div class="sp-item">
+      <div class="sp-name">${escapeHTML(m.title)}</div>
+      <div class="sp-time">${start} - ${end}</div>
+      ${loc ? `<div class="sp-time">${escapeHTML(loc)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function getMeetingTimeStatus(startTime, endTime) {
+  if (!startTime || !endTime) return { label: '未知', cls: 'unknown' };
+  const now = new Date();
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (now < start) return { label: '未开始', cls: 'upcoming' };
+  if (now > end) return { label: '已结束', cls: 'ended' };
+  return { label: '进行中', cls: 'active' };
+}
+
+function formatDateTime(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return isoStr.substring(0, 16);
   }
 }
 
@@ -2380,8 +2837,90 @@ function updateMicResult(data) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Debug Log Panel
+// Volume Sphere (mic-based on homepage)
 // ═══════════════════════════════════════════════════════════
+
+let volumeAudioCtx = null;
+let volumeAnalyser = null;
+let volumeAnimId = null;
+let volumeStream = null;
+
+async function startVolumeMeter() {
+  const canvas = $('freqRing');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 260, cy = 260;
+  const innerR = 110, outerR = 300;
+  const N = 180;
+
+  try {
+    volumeStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    volumeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = volumeAudioCtx.createMediaStreamSource(volumeStream);
+    volumeAnalyser = volumeAudioCtx.createAnalyser();
+    volumeAnalyser.fftSize = 512;
+    volumeAnalyser.smoothingTimeConstant = 0.82;
+    source.connect(volumeAnalyser);
+
+    const dataArray = new Uint8Array(volumeAnalyser.frequencyBinCount);
+    const binCount = dataArray.length;
+    let level = 0;
+
+    function tick() {
+      if (!volumeAnalyser) return;
+      volumeAnalyser.getByteFrequencyData(dataArray);
+      ctx.clearRect(0, 0, 520, 520);
+
+      let sum = 0;
+      for (let j = 0; j < binCount; j++) sum += dataArray[j];
+      const raw = Math.min(1, (sum / binCount) / 60);
+      level = level * 0.7 + raw * 0.3;
+
+      const r = innerR + level * (outerR - innerR);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(139,92,246,0.6)';
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(139,92,246,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      volumeAnimId = requestAnimationFrame(tick);
+    }
+    tick();
+  } catch (e) {
+    console.log('[Volume] Mic not available, drawing static ring');
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR + 10, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(139,92,246,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    canvas.style.cursor = 'pointer';
+    canvas.title = '点击启用麦克风';
+    canvas.addEventListener('click', () => {
+      canvas.style.cursor = '';
+      canvas.title = '';
+      startVolumeMeter();
+    }, { once: true });
+  }
+}
+
+function stopVolumeMeter() {
+  if (volumeAnimId) { cancelAnimationFrame(volumeAnimId); volumeAnimId = null; }
+  if (volumeStream) { volumeStream.getTracks().forEach(t => t.stop()); volumeStream = null; }
+  if (volumeAudioCtx) { volumeAudioCtx.close(); volumeAudioCtx = null; }
+  volumeAnalyser = null;
+}
 
 function toggleLogPanel() {
   const panel = $('logPanel');
@@ -2497,6 +3036,7 @@ function initApp() {
   checkBackendStatus();
   connectLogStream();
   restoreLogin();
+  startVolumeMeter();
 
   // Button wiring
   const btnStart = $('btnStart');
@@ -2517,6 +3057,13 @@ function initApp() {
 
   // Login form
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  const registerForm = $('registerForm');
+  if (registerForm) registerForm.addEventListener('submit', handleRegisterSubmit);
+
+  const showRegister = $('showRegister');
+  const showLoginLink = $('showLogin');
+  if (showRegister) showRegister.addEventListener('click', showRegisterForm);
+  if (showLoginLink) showLoginLink.addEventListener('click', showLoginForm);
   if (topbarLogin) topbarLogin.addEventListener('click', showLogin);
   if (topbarLogout) topbarLogout.addEventListener('click', logout);
 
@@ -2533,34 +3080,13 @@ function initApp() {
     card.addEventListener('click', () => switchModule(card.dataset.module));
   });
 
-  // Module nav items (hidden by default)
-  document.querySelectorAll('.module-nav-item').forEach(item => {
-    item.addEventListener('click', () => switchModule(item.dataset.module));
-  });
-
-  // Back button (hidden by default)
-  const btnBackEl = $('btnBack');
-  if (btnBackEl) btnBackEl.addEventListener('click', showHome);
-
-  // Module logout (in moduleOverlay)
-  const btnModuleLogout = $('btnModuleLogout');
-  if (btnModuleLogout) btnModuleLogout.addEventListener('click', logout);
-
-  // Browser back button → return to module selector
-  window.addEventListener('popstate', () => {
-    showHome();
-  });
-
-  // Management tabs
-  document.querySelectorAll('.management-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchManagementSection(btn.dataset.section));
-  });
-
   // Management CRUD
-  const btnCreateUser = $('btnCreateUser');
+  const btnSearchUsers = $('btnSearchUsers');
+  if (btnSearchUsers) btnSearchUsers.addEventListener('click', searchFriends);
+  const friendSearch = $('friendSearch');
+  if (friendSearch) friendSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchFriends(); });
   const btnCreateReservation = $('btnCreateReservation');
   const btnJoinMeeting = $('btnJoinMeeting');
-  if (btnCreateUser) btnCreateUser.addEventListener('click', createUser);
   if (btnCreateReservation) btnCreateReservation.addEventListener('click', createReservation);
   if (btnJoinMeeting) btnJoinMeeting.addEventListener('click', joinMeeting);
 
@@ -2573,6 +3099,13 @@ function initApp() {
   // Expose analysis functions to global scope for onclick handlers
   window.viewAnalysis = viewAnalysis;
   window.deleteAnalysis = deleteAnalysis;
+
+  initCalendar();
+
+  // Browser back button → return to module selector
+  window.addEventListener('popstate', () => {
+    showHome();
+  });
 
   console.log('[DiTing] App initialized — all event listeners registered');
 }

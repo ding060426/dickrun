@@ -52,7 +52,7 @@ else:
     print(f"admin user created: admin / admin123")
 
 # Verify all tables
-for t in ["users", "auth_sessions", "meeting_reservations", "meeting_joins", "meeting_analyses"]:
+for t in ["users", "auth_sessions", "meeting_reservations", "meeting_joins", "meeting_analyses", "friends"]:
     try:
         c.table(t).select("*").limit(1).execute()
         print(f"  {t}: OK")

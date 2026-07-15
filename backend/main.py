@@ -101,6 +101,11 @@ async def lifespan(app: FastAPI):
     """Startup: fire-and-forget model loading."""
     logger.info("Starting DiTing backend server...")
     logger.info("Connected to Supabase: %s", os.environ.get("SUPABASE_URL", "not configured"))
+    try:
+        db._get_client().table("friends").select("*").limit(1).execute()
+        logger.info("Supabase friends table: OK")
+    except Exception as e:
+        logger.error("Supabase friends table MISSING: %s", e)
     threading.Thread(target=_load_xasr_engine, daemon=True).start()
     yield
     logger.info("Shutting down DiTing backend...")
@@ -236,6 +241,26 @@ async def auth_login(data: dict):
     return result
 
 
+@app.post("/api/auth/register")
+async def auth_register(data: dict):
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username:
+        raise HTTPException(status_code=400, detail="用户名不能为空")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="密码至少6位")
+    try:
+        user = db.create_user({
+            "username": username,
+            "display_name": data.get("display_name") or username,
+            "password": password,
+            "role": "user",
+        })
+        return {"user": user, "message": "注册成功"}
+    except Exception as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
 @app.get("/api/auth/me")
 async def auth_me(authorization: str | None = Header(None)):
     return {"user": _require_user(authorization)}
@@ -281,7 +306,22 @@ async def api_list_reservations(
     authorization: str | None = Header(None),
 ):
     _require_user(authorization)
-    return {"reservations": db.list_reservations(user_id=user_id, status=status)}
+    reservations = db.list_reservations(user_id=user_id, status=status)
+    now = __import__("datetime").datetime.now(tz=__import__("datetime").timezone.utc)
+    from datetime import datetime as _dt
+    for r in reservations:
+        try:
+            st = _dt.fromisoformat(r["start_time"].replace("Z", "+00:00"))
+            et = _dt.fromisoformat(r["end_time"].replace("Z", "+00:00"))
+            if now < st:
+                r["time_status"] = "未开始"
+            elif now > et:
+                r["time_status"] = "已结束"
+            else:
+                r["time_status"] = "进行中"
+        except Exception:
+            r["time_status"] = "未知"
+    return {"reservations": reservations}
 
 
 @app.post("/api/meetings/reservations")
@@ -310,6 +350,42 @@ async def api_join_meeting(data: dict, authorization: str | None = Header(None))
         return db.join_meeting(data)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ===========================================================================
+# Friends endpoints
+# ===========================================================================
+
+@app.get("/api/friends/search")
+async def api_search_users(q: str = Query(...), authorization: str | None = Header(None)):
+    user = db.get_user_by_token(_token_from_header(authorization))
+    exclude = user["id"] if user else None
+    return {"users": db.search_users(q, exclude_user_id=exclude)}
+
+
+@app.get("/api/friends")
+async def api_list_friends(authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    return {"friends": db.list_friends(user["id"])}
+
+
+@app.post("/api/friends")
+async def api_add_friend(data: dict, authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    friend_id = data.get("friend_id")
+    if not friend_id:
+        raise HTTPException(status_code=400, detail="friend_id required")
+    result = db.add_friend(user["id"], friend_id)
+    if not result:
+        raise HTTPException(status_code=409, detail="已经是好友或添加失败")
+    return {"friend": result}
+
+
+@app.delete("/api/friends/{friend_id}")
+async def api_remove_friend(friend_id: str, authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    db.remove_friend(user["id"], friend_id)
+    return {"ok": True}
 
 
 # ===========================================================================

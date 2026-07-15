@@ -5,6 +5,7 @@ Eval_Ali/
 backend/xasr/models/*.onnx
 backend/xasr/models/**/*.onnx
 backend/xasr/models/punct/
+backend/diarization/models/*.onnx
 
 # ── Audio/video files (large) ──
 *.mp3
@@ -52,3 +53,6 @@ _test_*
 
 # ── Model downloads (incomplete/partial) ──
 backend/xasr/model_downloads/
+
+# PDF inspection and other local scratch artifacts
+tmp/

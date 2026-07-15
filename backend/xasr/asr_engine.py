@@ -18,6 +18,7 @@ import logging
 from typing import Optional, List, Dict, Callable
 import numpy as np
 
+from audio_buffer import AudioBuffer, load_audio_buffer
 from .contracts import ASRResult
 from .config import resolve_asr_profile
 from .file_vad import SileroFileVad
@@ -288,6 +289,7 @@ class XASREngine:
         file_path: str,
         on_segment: Callable[[ASRResult, int, int], None] = None,
         on_progress: Callable[[str, float], None] = None,
+        audio_buffer: AudioBuffer | None = None,
     ) -> List[ASRResult]:
         """
         Process an entire audio file.
@@ -317,7 +319,10 @@ class XASREngine:
         # 1. Load audio
         if on_progress:
             on_progress("loading", 0.0)
-        data, sr = self._load_audio(file_path)
+        if audio_buffer is None:
+            data, sr = self._load_audio(file_path)
+        else:
+            data, sr = audio_buffer.samples, audio_buffer.sample_rate
         duration = len(data) / sr
         logger.info(f"Audio loaded: {duration:.1f}s @ {sr}Hz, {len(data)} samples")
 
@@ -422,7 +427,7 @@ class XASREngine:
             final_texts = []
 
             # A short trailing silence helps streaming models flush the final tokens.
-            tail_silence = np.zeros(int(0.5 * sr), dtype=np.float32)
+            tail_silence = np.zeros(int(1.0 * sr), dtype=np.float32)
             audio_for_asr = np.concatenate([audio.astype(np.float32, copy=False), tail_silence])
 
             for i in range(0, len(audio_for_asr), chunk_size):
@@ -471,52 +476,47 @@ class XASREngine:
     # Audio loading
     # ------------------------------------------------------------------
 
+    def recognize_interval(
+        self,
+        audio_buffer: AudioBuffer,
+        start_sec: float,
+        end_sec: float,
+        *,
+        pre_padding_ms: int = 250,
+        post_padding_ms: int = 400,
+    ) -> Optional[ASRResult]:
+        """Re-decode one speaker-change interval with protected boundaries."""
+
+        start_sec = max(0.0, float(start_sec))
+        end_sec = min(audio_buffer.duration, float(end_sec))
+        if end_sec <= start_sec:
+            return None
+        decode_start = max(0.0, start_sec - max(0, pre_padding_ms) / 1000)
+        decode_end = min(
+            audio_buffer.duration,
+            end_sec + max(0, post_padding_ms) / 1000,
+        )
+        result = self._process_speech_segment(
+            audio_buffer.slice(decode_start, decode_end),
+            audio_buffer.sample_rate,
+            start_sec,
+            end_sec,
+        )
+        if result is not None:
+            result.audio_data = audio_buffer.slice(start_sec, end_sec)
+        return result
+
     def _load_audio(self, file_path: str):
-        """Load audio file, supporting multiple formats."""
-        ext = os.path.splitext(file_path)[1].lower()
+        """Compatibility wrapper around the canonical shared audio loader."""
 
-        # Native formats via soundfile
-        if ext in ('.wav', '.flac', '.ogg'):
-            import soundfile as sf
-            data, sr = sf.read(file_path, dtype="float32", always_2d=True)
-            data = data.mean(axis=1)
-            logger.info(f"Loaded via soundfile: {file_path} -> {len(data)/sr:.1f}s @ {sr}Hz")
-            if sr != self._sample_rate:
-                data = self._resample(data, sr, self._sample_rate)
-                sr = self._sample_rate
-            return data, sr
-
-        # MP3 / MP4 via pydub
-        try:
-            from pydub import AudioSegment
-            audio = AudioSegment.from_file(file_path)
-            sr = audio.frame_rate
-            data = np.array(audio.get_array_of_samples(), dtype=np.float32)
-            if audio.channels > 1:
-                data = data.reshape(-1, audio.channels).mean(axis=1)
-            else:
-                data = data.reshape(-1)
-            max_val = np.abs(data).max()
-            if max_val > 0:
-                data = data / max_val
-            if sr != self._sample_rate:
-                data = self._resample(data, sr, self._sample_rate)
-                sr = self._sample_rate
-            logger.info(f"Loaded via pydub: {file_path} -> {len(data)/sr:.1f}s @ {sr}Hz")
-            return data, sr
-        except Exception as e1:
-            logger.debug(f"pydub failed: {e1}")
-
-        # Fallback: librosa
-        try:
-            import librosa
-            data, sr = librosa.load(file_path, sr=self._sample_rate, mono=True)
-            logger.info(f"Loaded via librosa: {file_path} -> {len(data)/sr:.1f}s @ {sr}Hz")
-            return data, sr
-        except Exception as e2:
-            raise RuntimeError(
-                f"Cannot decode audio file {file_path}: pydub={e1}, librosa={e2}"
-            )
+        audio = load_audio_buffer(file_path, target_sample_rate=self._sample_rate)
+        logger.info(
+            "Loaded canonical audio: %s -> %.1fs @ %dHz mono float32",
+            file_path,
+            audio.duration,
+            audio.sample_rate,
+        )
+        return audio.samples, audio.sample_rate
 
     # ------------------------------------------------------------------
     # Streaming (for real-time mic input)

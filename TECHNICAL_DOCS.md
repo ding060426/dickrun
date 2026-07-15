@@ -344,6 +344,24 @@ float32 numpy 数组 ([-1, 1])
 前端: atob() → Uint8Array → Blob → wavesurfer.loadBlob()
 ```
 
+### 6.4 离线说话人日志双轨流程
+
+```text
+上传文件 → AudioBuffer(16 kHz / mono / float32)
+               ├─→ Silero VAD → X-ASR 长段转写 ──────────┐
+               └─→ pyannote segmentation                 │
+                    → 3D-Speaker embedding               │
+                    → 全局聚类/时间平滑 → speaker timeline│
+                                                        ↓
+                              时间重叠对齐 → 换人边界局部重识别
+                                                        ↓
+                      speaker_id / confidence / overlap / text
+```
+
+VAD 段只表达“有人说话”，不会直接当成说话人段。两个分支严格复用同一个 `AudioBuffer`，
+避免分别重采样造成时间戳漂移。X-ASR 暂无稳定词级时间戳时，仅对确实跨越多个说话人的长段做
+二次局部识别；边界保留左 250 ms、右 400 ms，回放音频仍使用未加 padding 的真实区间。
+
 ---
 
 ## 7. API 接口文档
@@ -360,7 +378,9 @@ float32 numpy 数组 ([-1, 1])
 | `GET` | `/api/hotwords` | 获取热词、逐词权重和模糊拼音设置 |
 | `POST` | `/api/hotwords` | 兼容接口：向现有配置追加热词 (`{"words": [...]}`) |
 | `PUT` | `/api/hotwords` | 替换并持久化完整热词设置；新识别会话生效 |
-| `POST` | `/api/audio/upload` | **上传音频** (multipart, `?file_id=UUID`) |
+| `POST` | `/api/audio/upload` | **上传音频** (`file_id`、`enable_diarization`、`num_speakers`) |
+| `GET` | `/api/meetings/{id}` | 获取当前进程保留的说话人和转写元数据 |
+| `PATCH` | `/api/meetings/{id}/speakers/{speaker_id}` | 重命名说话人并同步历史段 |
 | `GET` | `/api/logs/recent` | 获取最近 N 条日志 (`?n=50`) |
 | `GET` | `/api/logs/download` | 下载完整日志文件 |
 | `GET` | `/api/eval/status` | Eval_Ali 数据集状态 |
@@ -373,7 +393,7 @@ float32 numpy 数组 ([-1, 1])
 **POST /api/audio/upload**
 
 ```http
-POST /api/audio/upload?file_id=550e8400-e29b-41d4-a716-446655440000
+POST /api/audio/upload?file_id=550e8400-e29b-41d4-a716-446655440000&enable_diarization=true&num_speakers=4
 Content-Type: multipart/form-data
 
 file: meeting.mp3
@@ -405,6 +425,11 @@ file: meeting.mp3
       "raw_text": "今天我们来讨论一下产品的转化率问题",
       "start_sec": 0.0,
       "end_sec": 5.2,
+      "speaker_id": "SPEAKER_00",
+      "speaker_name": null,
+      "speaker_confidence": 0.88,
+      "overlap": false,
+      "overlap_speakers": [],
       "asr_confidence": 0.85,
       "snr_db": 28.0,
       "rt60": 0.3,
@@ -418,7 +443,16 @@ file: meeting.mp3
       "uncertainty": {},
       "audio_wav_base64": "UklGRiR/BQBXQVZFZm10..."
     }
-  ]
+  ],
+  "speakers": [
+    {"id": "SPEAKER_00", "name": null, "duration": 324.5, "confidence": 0.89}
+  ],
+  "diarization": {
+    "enabled": true,
+    "applied": true,
+    "provider": "sherpa-pyannote-3dspeaker",
+    "speaker_count": 4
+  }
 }
 ```
 
@@ -679,7 +713,9 @@ engine = XASREngine(decoding_method="modified_beam_search")
 | 限制 | 影响 | 临时方案 |
 |------|------|----------|
 | ASR 模型不含标点 | 需后处理恢复 | CT-Transformer (已集成) |
-| 无说话人分离 | 多人会议混为一段 | 规划中 (Embedding + AHC) |
+| 重叠语音未做双路分离 | 同时发言仍是混合 ASR 文本 | 已标记 `overlap`；后续只对重叠区局部分离 |
+| 实时预览无在线 diarization | 录音中先显示临时纯 ASR | 停止后用全局离线 diarization 替换最终稿 |
+| 说话人姓名只保存在当前进程 | 服务重启后需重新命名 | 后续接入持久化会议存储 |
 | WAV 编码为 int16 | 量化噪声 -96dB | 可接受 |
 | 前端为单文件 | >2000行难以维护 | 可拆分为模块 |
 | ffmpeg 未安装 | pydub 使用 librosa 回退 | 安装 ffmpeg 可提速 |
@@ -689,13 +725,14 @@ engine = XASREngine(decoding_method="modified_beam_search")
 
 | 优先级 | 功能 | 预估工时 |
 |--------|------|----------|
-| P0 | 说话人分离 (Embedding + AHC 聚类) | 5h |
+| 已完成 | 离线说话人日志、全局聚类、时间对齐与标签重命名 | — |
 | P1 | 说话人身份识别 (Eval_Ali 注册库) | 3h |
 | P1 | 安装 ffmpeg、优化 pydub 性能 | 0.5h |
 | P2 | 替换带标点 ASR 模型 (原生标点输出) | 2h |
 | P2 | 前端拆分为 ES 模块 | 4h |
 | P3 | GPU 推理支持 (CUDA ONNX) | 3h |
-| P3 | 重叠语音检测 (pyannote) | 4h |
+| P2 | 重叠语音局部分离与轨道回绑 | 4h |
+| P3 | 在线 embedding、临时标签与会后重聚类 | 6h |
 
 ---
 

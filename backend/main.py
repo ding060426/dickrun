@@ -20,12 +20,21 @@ import base64
 import threading
 import concurrent.futures
 import traceback
+from functools import partial
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Query
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +48,8 @@ from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
 from upload_storage import UploadTooLargeError, save_upload_to_temp
 from xasr.hotword_config import HotwordConfigStore
 from xasr.runtime_config import RuntimeConfigStore
+from diarization import OfflineMeetingPipeline, SherpaDiarizationBackend
+from diarization.registry import MeetingRegistry
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -99,6 +110,22 @@ RUNTIME_CONFIG_PATH = Path(
 )
 hotword_config_store = None
 runtime_config_store = RuntimeConfigStore(RUNTIME_CONFIG_PATH)
+DIARIZATION_MODEL_DIR = Path(BACKEND_DIR) / "diarization" / "models"
+diarization_backend = SherpaDiarizationBackend(
+    os.getenv(
+        "DITING_DIARIZATION_SEGMENTATION_MODEL",
+        str(DIARIZATION_MODEL_DIR / "pyannote-segmentation-3.0.int8.onnx"),
+    ),
+    os.getenv(
+        "DITING_SPEAKER_EMBEDDING_MODEL",
+        str(DIARIZATION_MODEL_DIR / "3dspeaker-eres2net.onnx"),
+    ),
+    threshold=float(os.getenv("DITING_DIARIZATION_THRESHOLD", "0.8")),
+    num_threads=int(os.getenv("DITING_DIARIZATION_THREADS", "4")),
+    min_turn_sec=float(os.getenv("DITING_DIARIZATION_MIN_TURN_SEC", "0.5")),
+)
+meeting_pipeline = OfflineMeetingPipeline(diarization_backend)
+meeting_registry = MeetingRegistry()
 
 def _load_xasr_engine():
     """Build and atomically publish the configured live/final ASR runtimes."""
@@ -269,12 +296,14 @@ upload_sessions: dict = {}
 @app.get("/api/health")
 async def health():
     vad_model = find_silero_vad_model() if HAS_XASR else None
+    diarization_status = meeting_pipeline.status()
     return {
         "status": "ok",
         "service": "DiTing v2.0",
         "xasr_available": HAS_XASR and xasr_engine is not None and xasr_engine.is_model_available,
         "xasr_loading": xasr_loading,
         "live_vad_available": vad_model is not None,
+        "diarization_available": diarization_status["available"],
         "eval_available": HAS_EVAL,
         "timestamp": time.time(),
     }
@@ -316,12 +345,14 @@ async def get_xasr_status():
             "provider": pool_status.get("file_vad_provider", "unavailable"),
             "threshold": runtime_settings["recognition"]["file_vad_threshold"],
         },
+        "diarization": meeting_pipeline.status(),
         "hotwords_count": hotword_config_store.load()["active_count"],
         "features": {
             "logic_validation": xasr_engine.enable_logic_validation,
             "hotword_correction": xasr_engine.enable_hotword_correction,
             "fuzzy_pinyin": xasr_engine.enable_fuzzy_pinyin,
             "uncertainty_estimation": xasr_engine.enable_uncertainty,
+            "speaker_diarization": meeting_pipeline.status()["available"],
         },
         "loading": xasr_loading,
     }
@@ -550,6 +581,21 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
         "raw_text": result.raw_text,
         "start_sec": result.start_sec,
         "end_sec": result.end_sec,
+        "speaker_id": result.speaker_id,
+        "speaker_name": result.speaker_name,
+        "speaker_confidence": round(float(result.speaker_confidence), 3),
+        "overlap": bool(result.overlap),
+        "overlap_speakers": result.overlap_speakers,
+        "words": [
+            {
+                "text": word.text,
+                "start_sec": word.start_sec,
+                "end_sec": word.end_sec,
+                "speaker_id": word.speaker_id,
+                "confidence": word.confidence,
+            }
+            for word in result.words
+        ],
         "asr_confidence": round(float(result.asr_confidence), 3),
         "snr_db": round(float(result.snr_db), 1),
         "rt60": round(float(result.rt60), 3),
@@ -580,7 +626,12 @@ def _live_result_to_dict(result: ASRResult) -> dict:
 
 
 @app.post("/api/audio/upload")
-async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None)):
+async def upload_audio(
+    file: UploadFile = File(...),
+    file_id: str = Query(None),
+    enable_diarization: bool = Query(True),
+    num_speakers: int | None = Query(None, ge=1, le=20),
+):
     """Upload audio file for X-ASR processing with real-time WebSocket progress."""
     tmp_path = None
     try:
@@ -655,9 +706,15 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
 
                 def do_process():
                     try:
-                        results = processing_engine.process_file(
-                            tmp_path, on_segment=on_segment, on_progress=on_progress
+                        run = meeting_pipeline.process_file(
+                            tmp_path,
+                            processing_engine,
+                            enable_diarization=enable_diarization,
+                            num_speakers=num_speakers,
+                            on_segment=on_segment,
+                            on_progress=on_progress,
                         )
+                        results = run.results
                         # Build final segments list with audio
                         final_segments = []
                         for i, r in enumerate(results):
@@ -670,6 +727,12 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
                             seg["audio_wav_base64"] = audio_b64
                             final_segments.append(seg)
+                        meeting_registry.register(
+                            file_id,
+                            filename=file.filename,
+                            segments=final_segments,
+                            speakers=run.speakers,
+                        )
                         asyncio.run_coroutine_threadsafe(
                             queue.put({
                                 "type": "complete",
@@ -680,6 +743,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
                                     "segments_count": len(results),
                                     "segments": final_segments,
+                                    "speakers": run.speakers,
+                                    "diarization": run.metadata(),
                                 }
                             }),
                             loop
@@ -707,16 +772,24 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                     "status": "processing",
                     "size_mb": round(file_size_mb, 2),
                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                    "diarization_requested": enable_diarization,
+                    "num_speakers": num_speakers,
                 }
             else:
                 # ── Synchronous mode (no WebSocket) ────────────
                 logger.info(f"Processing synchronously: {file.filename}")
                 loop = asyncio.get_running_loop()
-                results = await loop.run_in_executor(
+                run = await loop.run_in_executor(
                     PROCESSING_EXECUTOR,
-                    processing_engine.process_file,
-                    tmp_path,
+                    partial(
+                        meeting_pipeline.process_file,
+                        tmp_path,
+                        processing_engine,
+                        enable_diarization=enable_diarization,
+                        num_speakers=num_speakers,
+                    ),
                 )
+                results = run.results
                 segments = []
                 for i, r in enumerate(results):
                     seg = _result_to_dict(r, i + 1)
@@ -729,6 +802,12 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                             logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
                     seg["audio_wav_base64"] = audio_b64
                     segments.append(seg)
+                meeting_registry.register(
+                    file_id,
+                    filename=file.filename,
+                    segments=segments,
+                    speakers=run.speakers,
+                )
                 try:
                     os.unlink(tmp_path)
                 except Exception:
@@ -744,6 +823,8 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                     "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
                     "segments_count": len(segments),
                     "segments": segments,
+                    "speakers": run.speakers,
+                    "diarization": run.metadata(),
                 }
         else:
             # ── X-ASR unavailable ──────────────────────────────
@@ -796,6 +877,29 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
             "status": "error",
             "error": str(e),
         }
+
+
+@app.get("/api/meetings/{meeting_id}")
+async def get_processed_meeting(meeting_id: str):
+    """Return the lightweight transcript metadata retained for speaker edits."""
+
+    meeting = meeting_registry.get(meeting_id)
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="meeting not found")
+    return meeting
+
+
+@app.patch("/api/meetings/{meeting_id}/speakers/{speaker_id}")
+async def rename_meeting_speaker(meeting_id: str, speaker_id: str, data: dict):
+    """Rename a diarized speaker and update every retained transcript segment."""
+
+    try:
+        meeting = meeting_registry.rename(meeting_id, speaker_id, data.get("name", ""))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="meeting or speaker not found")
+    return meeting
 
 
 # ===========================================================================
@@ -1007,21 +1111,35 @@ async def ws_live(websocket: WebSocket):
                         try:
                             final_engine = xasr_pool.create_final_session()
                             loop = asyncio.get_running_loop()
-                            canonical_results = await loop.run_in_executor(
+                            canonical_run = await loop.run_in_executor(
                                 PROCESSING_EXECUTOR,
-                                final_engine.process_file,
-                                str(recording_result.path),
+                                partial(
+                                    meeting_pipeline.process_file,
+                                    str(recording_result.path),
+                                    final_engine,
+                                    enable_diarization=True,
+                                ),
+                            )
+                            canonical_results = canonical_run.results
+                            canonical_segments = [
+                                _result_to_dict(result, index + 1)
+                                for index, result in enumerate(canonical_results)
+                            ]
+                            meeting_registry.register(
+                                stream_id,
+                                filename=recording_result.path.name,
+                                segments=canonical_segments,
+                                speakers=canonical_run.speakers,
                             )
                             await manager.send_json(websocket, {
                                 "type": "final_transcript",
                                 "data": {
                                     "stream_id": stream_id,
-                                    "segments": [
-                                        _result_to_dict(result, index + 1)
-                                        for index, result in enumerate(canonical_results)
-                                    ],
+                                    "segments": canonical_segments,
                                     "segments_count": len(canonical_results),
                                     "canonical": True,
+                                    "speakers": canonical_run.speakers,
+                                    "diarization": canonical_run.metadata(),
                                 },
                             })
                         except Exception as final_error:

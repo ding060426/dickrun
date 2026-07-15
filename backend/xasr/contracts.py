@@ -9,6 +9,17 @@ import numpy as np
 
 
 @dataclass
+class WordTimestamp:
+    """Word/token timing used when an ASR backend exposes stable timestamps."""
+
+    text: str
+    start_sec: float
+    end_sec: float
+    speaker_id: str = "UNKNOWN"
+    confidence: float = 0.0
+
+
+@dataclass
 class ASRResult:
     """Recognition result exposed to transports, tests, and enhancement modules."""
 
@@ -19,6 +30,12 @@ class ASRResult:
     timestamp: float = 0.0
     start_sec: float = 0.0
     end_sec: float = 0.0
+    speaker_id: str = "UNKNOWN"
+    speaker_name: Optional[str] = None
+    speaker_confidence: float = 0.0
+    overlap: bool = False
+    overlap_speakers: list[str] = field(default_factory=list)
+    words: list[WordTimestamp] = field(default_factory=list)
     audio_data: Optional[np.ndarray] = field(default=None, repr=False)
     asr_confidence: float = 0.8
     snr_db: float = 25.0

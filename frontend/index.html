@@ -122,6 +122,15 @@ body {
 .segment.has-audio { cursor: pointer; }
 .segment.has-audio:hover { border-left-color: var(--accent-blue); }
 .segment.no-audio { cursor: default; }
+.segment.overlap {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(224, 85, 106, 0.04) 0,
+    rgba(224, 85, 106, 0.04) 7px,
+    transparent 7px,
+    transparent 14px
+  );
+}
 
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-10px); }
@@ -133,7 +142,18 @@ body {
   padding: 6px 10px 2px 10px;
 }
 .segment-index { font-size: 10px; color: var(--text-muted); font-weight: 600; min-width: 28px; }
-.segment-speaker { font-size: 11px; font-weight: 600; }
+.segment-speaker {
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-blue);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.segment-speaker:hover { background: rgba(88,166,255,0.12); }
 .segment-time { font-size: 10px; color: var(--text-muted); font-family: 'SF Mono', 'Cascadia Code', monospace; }
 .segment-dur { font-size: 10px; color: var(--text-muted); }
 .segment-snr {
@@ -547,6 +567,21 @@ body {
 .hotword-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
 .hotword-note { margin-top: 10px; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
 .hotword-save-status { min-height: 16px; font-size: 10px; color: var(--text-muted); }
+.diarization-upload-options {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.diarization-upload-options select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 10px;
+}
 @media (max-width: 620px) {
   .hotword-setting-grid, .settings-grid { grid-template-columns: 1fr; }
   .hotword-list-header,
@@ -668,6 +703,20 @@ body {
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">Mic</button>
   <button class="btn btn-secondary" id="btnUpload">Upload</button>
+  <label class="diarization-upload-options" title="离线上传时自动区分说话人">
+    <input type="checkbox" id="enableDiarization" checked>
+    说话人
+    <select id="knownSpeakerCount" title="已知人数通常更稳定">
+      <option value="">人数自动</option>
+      <option value="2">2 人</option>
+      <option value="3">3 人</option>
+      <option value="4">4 人</option>
+      <option value="5">5 人</option>
+      <option value="6">6 人</option>
+      <option value="7">7 人</option>
+      <option value="8">8 人</option>
+    </select>
+  </label>
   <button class="btn btn-secondary" id="btnHotwords">Settings</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
@@ -911,6 +960,7 @@ let uploadWs = null;
 let uploadFileId = null;
 let uploadHttpResult = null;   // fallback: HTTP response when WS doesn't deliver
 let uploadWsDelivered = false; // whether WS delivered any segments
+let currentMeetingId = null;
 
 // Live mic
 let micStream = null;
@@ -1258,6 +1308,51 @@ function generateUUID() {
   });
 }
 
+function speakerColor(speakerId) {
+  if (!speakerId || speakerId === 'UNKNOWN') return 'var(--text-muted)';
+  let hash = 0;
+  for (const char of speakerId) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return `hsl(${hash % 360} 68% 62%)`;
+}
+
+function uploadApiUrl(fileId) {
+  const params = new URLSearchParams({
+    file_id: fileId,
+    enable_diarization: $('enableDiarization')?.checked === false ? 'false' : 'true',
+  });
+  const knownCount = $('knownSpeakerCount')?.value;
+  if (knownCount) params.set('num_speakers', knownCount);
+  return `${API_BASE}/api/audio/upload?${params.toString()}`;
+}
+
+async function renameSpeaker(speakerId) {
+  if (!currentMeetingId || !speakerId || speakerId === 'UNKNOWN') return;
+  const existing = allSegments.find(seg => seg?.speaker_id === speakerId)?.speaker_name || '';
+  const name = window.prompt(`将 ${speakerId} 重命名为：`, existing);
+  if (name === null || !name.trim()) return;
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/meetings/${encodeURIComponent(currentMeetingId)}/speakers/${encodeURIComponent(speakerId)}`,
+      {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name.trim()}),
+      },
+    );
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'rename failed');
+    allSegments.forEach(seg => {
+      if (seg?.speaker_id === speakerId) seg.speaker_name = name.trim();
+    });
+    document.querySelectorAll('.segment-speaker').forEach(label => {
+      if (label.dataset.speakerId === speakerId) label.textContent = name.trim();
+    });
+    showToast(`${speakerId} → ${name.trim()}`);
+  } catch (error) {
+    showToast(`重命名失败: ${error.message}`);
+  }
+}
+
 function updateConnectionStatus(status) {
   if (!connectionStatus) return;
   const map = {
@@ -1287,6 +1382,13 @@ function renderSegment(seg, index, autoPlay = false) {
   const endSec = seg.end_sec != null ? seg.end_sec : (seg.end || 0);
   const dur = (endSec - startSec) || 0;
   const hasAudio = !!(seg.audio_wav_base64);
+  const speakerId = seg.speaker_id || seg.speaker || 'UNKNOWN';
+  const speakerLabel = seg.speaker_name || (
+    seg.overlap && seg.overlap_speakers?.length
+      ? seg.overlap_speakers.join(' / ')
+      : speakerId
+  );
+  const color = speakerColor(speakerId);
 
   // Build logic flags HTML
   let flagsHTML = '';
@@ -1315,13 +1417,14 @@ function renderSegment(seg, index, autoPlay = false) {
 
   // Build the card
   const card = document.createElement('div');
-  card.className = 'segment' + (hasAudio ? ' has-audio' : ' no-audio');
+  card.className = 'segment' + (hasAudio ? ' has-audio' : ' no-audio') + (seg.overlap ? ' overlap' : '');
   card.setAttribute('data-seg-index', index);
+  card.style.borderLeftColor = color;
 
   card.innerHTML = `
     <div class="segment-top">
       <span class="segment-index">#${index + 1}</span>
-      <span class="segment-speaker" style="color:var(--accent-blue);">Seg ${index + 1}</span>
+      <button class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" style="color:${color};" title="点击重命名；置信度 ${((seg.speaker_confidence || 0) * 100).toFixed(0)}%">${escapeHTML(speakerLabel)}</button>
       <span class="segment-time">${formatTime(startSec)}</span>
       <span class="segment-dur">(${dur.toFixed(1)}s)</span>
       <span class="segment-snr ${qLabel}">SNR ${snrDb}dB</span>
@@ -1351,6 +1454,14 @@ function renderSegment(seg, index, autoPlay = false) {
   `;
 
   transcriptBody.appendChild(card);
+
+  const speakerButton = card.querySelector('.segment-speaker');
+  if (speakerButton) {
+    speakerButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      renameSpeaker(speakerId);
+    });
+  }
 
   // Initialize wavesurfer if audio is available
   if (hasAudio && HAS_WAVESURFER) {
@@ -1384,7 +1495,7 @@ function renderSegment(seg, index, autoPlay = false) {
     // Click on card body (not button) also toggles play
     card.addEventListener('click', (e) => {
       // Don't trigger if clicking the button (handled above)
-      if (e.target.closest('.segment-play-btn')) return;
+      if (e.target.closest('button')) return;
       if (audioManager.activeIndex === index) {
         audioManager.pause();
       } else {
@@ -1538,6 +1649,7 @@ function getEmbeddedDemoData() {
  */
 function handleUploadHTTPResponse(result) {
   if (!result || uploadWsDelivered) return;
+  currentMeetingId = result.file_id || result.meeting_id || currentMeetingId;
 
   if (result.status === 'completed' && result.segments && result.segments.length > 0) {
     console.log('[Upload] Rendering from HTTP response:', result.segments.length, 'segments');
@@ -1583,6 +1695,7 @@ async function handleFileUpload(event) {
   // Clear previous state
   resetAll();
   allSegments = [];
+  currentMeetingId = fileId;
 
   // Show uploading state
   if (transcriptBody) transcriptBody.innerHTML = '';
@@ -1620,7 +1733,7 @@ async function handleFileUpload(event) {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const resp = await fetch(`${API_BASE}/api/audio/upload?file_id=${fileId}`, {
+        const resp = await fetch(uploadApiUrl(fileId), {
           method: 'POST', body: formData,
         });
         const result = await resp.json();
@@ -1696,7 +1809,7 @@ async function uploadFallback(file) {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    const resp = await fetch(`${API_BASE}/api/audio/upload?file_id=${fileId}`, {
+    const resp = await fetch(uploadApiUrl(fileId), {
       method: 'POST', body: formData,
     });
     const result = await resp.json();
@@ -1767,6 +1880,7 @@ function handleUploadWSMessage(msg) {
     }
 
     case 'complete':
+      currentMeetingId = msg.data.file_id || currentMeetingId;
       showToast(`Complete: ${msg.data.segments_count || allSegments.filter(Boolean).length} segments`);
       // If WS delivered segments but 'complete' has the final full list with audio, use those
       if (msg.data.segments && msg.data.segments.length > 0) {
@@ -2418,6 +2532,7 @@ function updateMicResult(data) {
 function replaceMicTranscript(data) {
   const segments = Array.isArray(data?.segments) ? data.segments : [];
   if (!segments.length || !transcriptBody) return;
+  currentMeetingId = data.stream_id || currentMeetingId;
   document.getElementById('live-result')?.remove();
   transcriptBody.querySelectorAll('.segment[data-seg-index]').forEach(card => {
     const index = Number(card.getAttribute('data-seg-index'));
@@ -2478,6 +2593,7 @@ function resetAll() {
   clearTimeout(playbackTimer);
   allSegments = [];
   demoData = null;
+  currentMeetingId = null;
   audioManager.reset();
 
   const btnStart = $('btnStart');
@@ -2520,7 +2636,8 @@ async function checkBackendStatus() {
     const data = await resp.json();
     if (data.model_available) {
       const chunk = data.models?.live?.chunk_ms;
-      xasrStatus.innerHTML = `X-ASR ${chunk ? `${chunk}ms` : 'Ready'}${data.loading ? ' · Reloading' : ''}`;
+      const speakerStatus = data.diarization?.available ? ' · Speakers Ready' : ' · Speakers Off';
+      xasrStatus.innerHTML = `X-ASR ${chunk ? `${chunk}ms` : 'Ready'}${speakerStatus}${data.loading ? ' · Reloading' : ''}`;
       xasrStatus.style.color = data.loading ? 'var(--accent-yellow)' : 'var(--accent-green)';
     } else if (data.loading) {
       xasrStatus.innerHTML = 'X-ASR Loading...';

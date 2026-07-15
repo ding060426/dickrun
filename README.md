@@ -8,7 +8,11 @@
 frontend/          ← 前端 (wavesurfer.js + AudioWorklet + WebSocket)
   audio-worklet.js ← 浏览器采集、真实采样率到 16 kHz 的连续降采样
 backend/
-  main.py          ← FastAPI 后端 (15 个路由, 4 个 WebSocket)
+  audio_buffer.py  ← ASR/VAD/diarization 共用的 16 kHz 单声道时间轴
+  main.py          ← FastAPI 后端 (HTTP + WebSocket API)
+  diarization/
+    pipeline.py    ← 双轨分析、换人边界重识别与时间轴对齐
+    sherpa_backend.py ← pyannote segmentation + 3D-Speaker 本地推理
   xasr/
     asr_engine.py  ← X-ASR 引擎 (VAD + 端点检测 + 转写)
     live_audio.py  ← 实时 PCM 校验 + Silero VAD + ASR 会话边界
@@ -51,10 +55,20 @@ backend/xasr/models/
   └── silero_vad.onnx       (麦克风与文件切分共用的本地 Silero VAD)
 ```
 
-> **可选**：如需说话人分离功能，还需下载声纹模型（~35MB）：
-> ```bash
-> wget https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_16k.onnx
-> ```
+离线说话人日志还需要两个 sherpa-onnx 兼容模型（当前本地工作区已放置好）：
+
+```text
+backend/diarization/models/
+  pyannote-segmentation-3.0.int8.onnx
+  3dspeaker-eres2net.onnx
+```
+
+也可以不复制模型，直接通过环境变量指向已有文件：
+
+```powershell
+$env:DITING_DIARIZATION_SEGMENTATION_MODEL = "D:\models\pyannote\model.int8.onnx"
+$env:DITING_SPEAKER_EMBEDDING_MODEL = "D:\models\3dspeaker.onnx"
+```
 
 ### 3. 获取 Eval_Ali 数据集
 
@@ -88,7 +102,24 @@ python start.py
 
 如果模型未就绪，系统自动进入 Demo 模式，使用预置的模拟会议数据。
 
-### 5. 实时麦克风转写
+### 5. 离线多说话人会议
+
+上传前勾选底部“说话人”，人数已知时选择 `2～8 人`；已知人数会直接约束聚类，通常比自动估计稳定。
+后端会让 diarization 与 X-ASR 共享同一份标准音频并独立分析，在换人点对跨说话人的 ASR 长段做带边界留白的
+局部重识别，最后返回 `speaker_id`、`speaker_confidence`、`overlap` 和时间戳。点击彩色说话人标签可重命名，
+当前任务中的同一标签会同步更新。
+
+HTTP 上传参数：
+
+```text
+POST /api/audio/upload?enable_diarization=true&num_speakers=4
+PATCH /api/meetings/{meeting_id}/speakers/SPEAKER_00  {"name":"张三"}
+```
+
+模型缺失或显式关闭时会安全降级为原来的纯 ASR，不会让文件上传失败。重叠语音第一版只标记和降低归属置信度，
+不会把混合语音伪装成已经分离的双路文本。
+
+### 6. 实时麦克风转写
 
 打开前端后点击顶部 `Mic`，允许浏览器使用麦克风即可。浏览器通过
 `AudioWorklet` 连续采集音频，按实际设备采样率降采样为 16 kHz 单声道
@@ -179,9 +210,9 @@ python backend/evaluate_profiles.py manifest.json --profiles low-latency meeting
 | 逻辑校验 | ✅ | 数据冲突检测 (数字/百分比对比) |
 | 不确定性估计 | ✅ | 低置信度区段标记 |
 | 音频波形可视化 | ✅ | wavesurfer.js + WAV 编码 |
-| 实时录音转写 | ✅ | AudioWorklet + DTP2 帧序号 + partial/final + 持久 WAV + 停止后二次定稿 |
+| 实时录音转写 | ✅ | AudioWorklet + DTP2 帧序号 + partial/final + 持久 WAV + 停止后二次定稿和离线说话人对齐 |
 | Eval_Ali 评测 | ✅ | CER 计算 / 热词提取 |
-| 说话人日志/分段 | 🔜 | LocalMeet 已有 pyannote segmentation + 3D-Speaker 离线实现，尚未迁入本项目 |
+| 说话人日志/分段 | ✅ | pyannote segmentation + 3D-Speaker，全局聚类、时间平滑、边界重识别与可重命名标签 |
 | 重叠语音双路分离 | 🔜 | LocalMeet 已有 MossFormer2 离线 GPU 实现；不放入低延迟实时预览主链路 |
 | 说话人识别 | 🔜 | 声纹注册库匹配 待实现 |
 

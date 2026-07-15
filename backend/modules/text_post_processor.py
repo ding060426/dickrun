@@ -1,20 +1,23 @@
 """
-谛听 DiTing - 文本后处理器
+谛听 DiTing - 文本后处理器 (统一版)
 ============================================================================
 ASR 转写文本的后处理管线：
 
-  raw ASR text → ① 语气词过滤 → ② 标点恢复(模型优先, 规则兜底)
-               → ③ 强制断句 → ④ 规范化
+  raw ASR text → ① 语气词过滤 → ② 重复词合并 → ③ 标点恢复(模型优先, 规则兜底)
+               → ④ 强制断句 → ⑤ MacBERT纠错(可选) → ⑥ 规范化
 
 标点恢复：
   - 优先使用 sherpa-onnx CT-Transformer 模型 (高精度)
   - 模型不可用时自动降级到规则引擎
-  - 零外部依赖 (punct 模型可选)
+
+MacBERT 纠错：
+  - 同音字/形似字纠错 (如 真→正, 他→她)
+  - 需 pycorrector + torch，不可用时自动跳过
 """
 
 import re
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 logger = logging.getLogger("text_postproc")
 
@@ -300,10 +303,11 @@ def process_asr_text(
     enable_punctuation: bool = True,
     enable_force_split: bool = True,
     enable_normalize: bool = True,
+    enable_macbert: bool = True,
     max_chars_per_segment: int = None,
 ) -> str:
     """
-    ASR 文本后处理主入口。
+    ASR 文本后处理主入口（返回纯文本）。
 
     Args:
         raw_text: 原始 ASR 识别文本
@@ -311,6 +315,7 @@ def process_asr_text(
         enable_punctuation: 是否恢复标点
         enable_force_split: 是否强制分割长句
         enable_normalize: 是否规范化
+        enable_macbert: 是否启用 MacBERT 纠错
         max_chars_per_segment: 单句最大汉字数 (默认 40)
 
     Returns:
@@ -323,11 +328,17 @@ def process_asr_text(
     if enable_filler_filter:
         text = remove_fillers(text)
 
+    # Merge repetitions (是是是→是, 好的好的→好的)
+    text = _merge_repetitions(text)
+
     if enable_punctuation:
         text = restore_punctuation(text)
 
     if enable_force_split:
         text = force_split_long_sentence(text, max_chars=max_chars_per_segment)
+
+    if enable_macbert:
+        text, _ = _macbert_correct(text)
 
     if enable_normalize:
         text = normalize_text(text)
@@ -341,3 +352,195 @@ def process_transcript_segments(
 ) -> List[str]:
     """批量处理多个转写片段。"""
     return [process_asr_text(seg, **kwargs) for seg in segments]
+
+
+# ============================================================
+# 统一接口：postprocess_text (返回 text + info_dict)
+# ============================================================
+
+def postprocess_text(text: str) -> Tuple[str, Dict]:
+    """
+    完整后处理管线，返回文本 + 详细信息。
+
+    管线：语气词过滤 → 重复词合并 → 标点恢复 → 断句 → MacBERT纠错 → 规范化
+
+    Args:
+        text: Raw ASR output text
+
+    Returns:
+        (final_text, info_dict) where info_dict contains:
+            - original_text: raw input
+            - final_text: after all processing
+            - fillers_removed: list of removed filler words
+            - corrections: list of MacBERT corrections
+    """
+    if not text or not text.strip():
+        return text, {
+            'original_text': text,
+            'final_text': text,
+            'fillers_removed': [],
+            'corrections': [],
+        }
+
+    original = text
+
+    # Step 1: Remove filler words (track what was removed)
+    text, fillers_removed = _remove_filler_words_tracked(text)
+
+    # Step 2: Merge repetitions
+    text = _merge_repetitions(text)
+
+    # Step 3: Restore punctuation
+    text = restore_punctuation(text)
+
+    # Step 4: Force split long sentences
+    text = force_split_long_sentence(text)
+
+    # Step 5: MacBERT correction
+    text, corrections = _macbert_correct(text)
+
+    # Step 6: Normalize
+    text = normalize_text(text)
+
+    info = {
+        'original_text': original,
+        'final_text': text,
+        'fillers_removed': fillers_removed,
+        'corrections': corrections,
+    }
+
+    return text, info
+
+
+# ============================================================
+# Helper functions (merged from text_postprocessor.py)
+# ============================================================
+
+# Repetition patterns
+_REP_SINGLE = re.compile(r'(.)\1{2,}')
+_REP_TWO_CHAR = re.compile(r'([\u4e00-\u9fff]{2})\1+')
+
+
+def _merge_repetitions(text: str) -> str:
+    """Merge repeated characters and words: '是是是' → '是', '好的好的' → '好的'."""
+    text = _REP_SINGLE.sub(r'\1', text)
+    text = _REP_TWO_CHAR.sub(r'\1', text)
+    return text
+
+
+# Filler word patterns for tracked removal
+_FILLER_BOUNDARY = re.compile(
+    r'^[嗯额啊呃诶唉哦噢哇呀哈]+[，,。.！!？?\s]*|'
+    r'[，,。.！!？?\s]*[嗯额啊呃诶唉哦噢哇呀哈]+$'
+)
+_MULTI_FILLER = re.compile(
+    r'(?:^|(?<=[，,。.！!？?\s]))'
+    r'(?:那个|这个|就是说|等于说|怎么说呢|你知道吧|你懂的|那什么)'
+    r'(?=[，,。.！!？?\s]|$)'
+)
+
+
+def _remove_filler_words_tracked(text: str) -> Tuple[str, List[str]]:
+    """Remove filler words and return list of what was removed."""
+    removed = []
+    original = text
+
+    text = _FILLER_BOUNDARY.sub('', text)
+
+    for match in _MULTI_FILLER.finditer(original):
+        removed.append(match.group())
+
+    text = _MULTI_FILLER.sub('', text)
+
+    for filler in ['嗯', '额', '啊', '呃', '诶', '唉', '哦', '噢']:
+        pattern = re.compile(
+            rf'(?:^|(?<=[，,。.！!？?\s])){filler}+(?=[，,。.！!？?\s]|$)'
+        )
+        if pattern.search(text):
+            removed.append(filler)
+        text = pattern.sub('', text)
+
+    return text, removed
+
+
+# ============================================================
+# MacBERT neural correction (optional, lazy-loaded)
+# ============================================================
+
+_macbert_corrector = None
+_macbert_loaded = False
+
+
+def _get_macbert_corrector():
+    """Lazy-load MacBertCorrector (first call ~65s, subsequent calls instant)."""
+    global _macbert_corrector, _macbert_loaded
+
+    if _macbert_corrector is not None:
+        return _macbert_corrector
+
+    if _macbert_loaded and _macbert_corrector is None:
+        return None
+
+    _macbert_loaded = True
+
+    try:
+        import sys
+
+        try:
+            import torch
+        except ImportError:
+            for p in ['C:\\pylibs']:
+                if p not in sys.path:
+                    sys.path.append(p)
+            try:
+                import torch
+            except ImportError:
+                logger.info("torch not available, MacBERT disabled")
+                return None
+
+        if not hasattr(torch, 'Tensor'):
+            return None
+
+        from pycorrector import MacBertCorrector
+        logger.info("Loading MacBERT correction model (first load ~65s)...")
+        _macbert_corrector = MacBertCorrector()
+        logger.info("MacBERT model loaded successfully")
+        return _macbert_corrector
+    except Exception as e:
+        logger.info(f"MacBERT not available: {e}")
+        return None
+
+
+def _macbert_correct(text: str) -> Tuple[str, List[dict]]:
+    """MacBERT neural correction for homophones and typos.
+
+    Returns (corrected_text, corrections_list).
+    """
+    if not text or not text.strip():
+        return text, []
+
+    corrector = _get_macbert_corrector()
+    if corrector is None:
+        return text, []
+
+    try:
+        results = corrector.correct_batch([text])
+        if results and len(results) > 0:
+            result = results[0]
+            corrected = result.get('target', text)
+            errors = result.get('errors', [])
+
+            corrections = []
+            for err in errors:
+                if len(err) >= 3:
+                    corrections.append({
+                        'original': err[0],
+                        'corrected': err[1],
+                        'position': err[2],
+                    })
+
+            return corrected, corrections
+    except Exception as e:
+        logger.warning(f"MacBERT correction failed: {e}")
+
+    return text, []

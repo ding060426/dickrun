@@ -6,6 +6,17 @@ backend/xasr/models/*.onnx
 backend/xasr/models/**/*.onnx
 backend/xasr/models/punct/
 
+# ── Model weights and VAD models ──
+backend/xasr/models/firered_vad/
+*.pth.tar
+*.part
+
+# ── Incomplete model downloads ──
+backend/xasr/model_downloads/
+
+# ── Backup files ──
+*.wrong_backup
+
 # ── Audio/video files (large) ──
 *.mp3
 *.mp4

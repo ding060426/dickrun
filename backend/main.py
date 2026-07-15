@@ -1,6 +1,6 @@
 """
 谛听 (DiTing) - Smart Meeting Speech Cognitive System
-Backend Server v2.0 (2026-07-15)
+Backend Server v4.5 (2026-07-15)
 ==========================================================================
 Changelog:
   - Fixed ASR engine: per-utterance processing with VAD+endpoint detection
@@ -25,9 +25,9 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Query, Request
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # ── Paths ───────────────────────────────────────────────────────
@@ -61,20 +61,30 @@ except ImportError as e:
 
 # ── Text Post-Processor ───────────────────────────────────────
 try:
-    from modules.text_postprocessor import postprocess_text
+    from modules.text_post_processor import postprocess_text
     HAS_POSTPROCESSOR = True
     logger.info("Text post-processor loaded")
 except ImportError as e:
-    try:
-        from modules.text_post_processor import process_asr_text
-        def postprocess_text(text: str):
-            final = process_asr_text(text)
-            return final, {"original_text": text, "final_text": final, "corrections": []}
-        HAS_POSTPROCESSOR = True
-        logger.info("Text post-processor loaded via new pipeline")
-    except ImportError:
-        logger.warning(f"Text post-processor not available: {e}")
-        HAS_POSTPROCESSOR = False
+    logger.warning(f"Text post-processor not available: {e}")
+    HAS_POSTPROCESSOR = False
+
+# ── VAD Manager ───────────────────────────────────────────────
+try:
+    from modules.vad_manager import segment_audio as vad_segment_audio, get_vad_info
+    HAS_VAD_MANAGER = True
+    logger.info("VAD manager loaded (FireRedVAD → Silero → Energy)")
+except ImportError as e:
+    logger.warning(f"VAD manager not available: {e}")
+    HAS_VAD_MANAGER = False
+
+# ── Action Extractor ─────────────────────────────────────────
+try:
+    from modules.action_extractor import extract_action_items, ActionExtractor
+    HAS_ACTION_EXTRACTOR = True
+    logger.info("Action extractor loaded")
+except ImportError as e:
+    logger.warning(f"Action extractor not available: {e}")
+    HAS_ACTION_EXTRACTOR = False
 
 # ===========================================================================
 # Lifespan: Load X-ASR in background
@@ -122,7 +132,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="DiTing - Smart Meeting Speech Cognitive System",
-    version="2.0.0",
+    version="4.5.0",
     lifespan=lifespan,
 )
 
@@ -208,6 +218,127 @@ class ConnectionManager:
 manager = ConnectionManager()
 upload_sessions: dict = {}
 upload_cancel_events: dict = {}
+upload_tasks: dict = {}
+upload_tasks_lock = threading.RLock()
+upload_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+UPLOAD_TASK_TTL_SEC = 3600
+UPLOAD_TERMINAL_STATUSES = {"completed", "error", "cancelled", "demo_mode"}
+
+
+def _now_ts() -> float:
+    return time.time()
+
+
+def _cleanup_upload_tasks():
+    """Remove old terminal upload tasks from the in-memory task table."""
+    now = _now_ts()
+    with upload_tasks_lock:
+        stale_ids = [
+            file_id for file_id, task in upload_tasks.items()
+            if task.get("status") in UPLOAD_TERMINAL_STATUSES
+            and now - float(task.get("updated_at", now)) > UPLOAD_TASK_TTL_SEC
+        ]
+        for file_id in stale_ids:
+            upload_tasks.pop(file_id, None)
+
+
+def _new_upload_task(file_id: str, filename: str = None, size_mb: float = 0.0, engine: str = "") -> dict:
+    """Create or refresh an in-memory upload task."""
+    _cleanup_upload_tasks()
+    now = _now_ts()
+    with upload_tasks_lock:
+        task = upload_tasks.get(file_id) or {
+            "file_id": file_id,
+            "created_at": now,
+            "segments": [],
+            "summary": None,
+            "domain": None,
+            "hotwords": [],
+            "speaker_stats": {},
+            "error": None,
+            "cancel_requested": False,
+        }
+        task.update({
+            "filename": filename or task.get("filename"),
+            "status": "processing",
+            "size_mb": round(float(size_mb or 0.0), 2),
+            "engine": engine or task.get("engine", ""),
+            "updated_at": now,
+            "progress_stage": "upload_saved",
+            "progress_fraction": 0.0,
+            "segments_count": len(task.get("segments", [])),
+        })
+        upload_tasks[file_id] = task
+        return task
+
+
+def _update_upload_task(file_id: str, **fields) -> dict:
+    now = _now_ts()
+    with upload_tasks_lock:
+        task = upload_tasks.get(file_id) or {
+            "file_id": file_id,
+            "created_at": now,
+            "segments": [],
+            "summary": None,
+            "domain": None,
+            "hotwords": [],
+            "speaker_stats": {},
+            "error": None,
+            "cancel_requested": False,
+        }
+        task.update(fields)
+        task["updated_at"] = now
+        upload_tasks[file_id] = task
+        return task
+
+
+def _append_upload_segment(file_id: str, segment: dict, segment_index: int = None, total_estimated: int = None) -> dict:
+    with upload_tasks_lock:
+        task = upload_tasks.get(file_id) or _update_upload_task(file_id)
+        segments = list(task.get("segments", []))
+        if segment_index is None:
+            segments.append(segment)
+        else:
+            while len(segments) <= segment_index:
+                segments.append(None)
+            segments[segment_index] = segment
+        compact_segments = [s for s in segments if s]
+        task["segments"] = compact_segments
+        task["segments_count"] = len(compact_segments)
+        if total_estimated is not None:
+            task["total_estimated"] = total_estimated
+        task["updated_at"] = _now_ts()
+        upload_tasks[file_id] = task
+        return task
+
+
+def _get_upload_task(file_id: str) -> Optional[dict]:
+    with upload_tasks_lock:
+        task = upload_tasks.get(file_id)
+        return dict(task) if task else None
+
+
+def _serialize_upload_task(task: dict, include_segments: bool = True) -> dict:
+    data = dict(task or {})
+    if not include_segments:
+        data.pop("segments", None)
+    return _sanitize(data)
+
+
+async def _broadcast_upload(file_id: str, msg: dict):
+    queues = list(upload_sessions.get(file_id, set()) or [])
+    for queue in queues:
+        try:
+            await queue.put(msg)
+        except Exception:
+            pass
+
+
+def _broadcast_upload_threadsafe(file_id: str, msg: dict, loop):
+    try:
+        asyncio.run_coroutine_threadsafe(_broadcast_upload(file_id, msg), loop)
+    except Exception as e:
+        logger.warning(f"Upload broadcast failed for {file_id[:8]}: {e}")
 
 # ===========================================================================
 # API Routes
@@ -217,7 +348,7 @@ upload_cancel_events: dict = {}
 async def health():
     return {
         "status": "ok",
-        "service": "DiTing v2.0",
+        "service": "DiTing v4.5",
         "xasr_available": HAS_XASR and xasr_engine is not None and xasr_engine.is_model_available,
         "xasr_loading": xasr_loading,
         "eval_available": HAS_EVAL,
@@ -446,6 +577,78 @@ async def get_cognitive_status():
     }
 
 
+@app.get("/api/vad/status")
+async def get_vad_status():
+    """Get VAD (Voice Activity Detection) system status."""
+    if HAS_VAD_MANAGER:
+        info = get_vad_info()
+        return {
+            "available": True,
+            **info,
+            "active_vad": info.get("active_vad") or "auto",
+            "priority_label": "FireRedVAD → Silero → Energy",
+        }
+    return {"available": False, "active_vad": "energy_fallback"}
+
+
+@app.post("/api/action-items")
+async def extract_actions(request: Request):
+    """
+    从会议 segments 中提取行动项。
+
+    Request body:
+        {
+            "segments": [
+                {"speaker": "张三", "text": "...", "start": 0.0, "end": 5.0},
+                ...
+            ]
+        }
+
+    Returns:
+        {
+            "action_items": [
+                {
+                    "task": "整理测试报告",
+                    "assignee": "张三",
+                    "deadline": "周五前",
+                    "priority": "high",
+                    "source_text": "张三负责整理测试报告，周五前完成",
+                    "speaker": "主持人",
+                    "segment_index": 2
+                },
+                ...
+            ],
+            "count": 2,
+            "extractor": "rules"  # or "llm"
+        }
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid JSON body"}
+        )
+
+    segments = body.get("segments", [])
+    if not segments:
+        return {"action_items": [], "count": 0, "extractor": "none"}
+
+    if not HAS_ACTION_EXTRACTOR:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Action extractor not available", "action_items": [], "count": 0}
+        )
+
+    actions = await asyncio.to_thread(extract_action_items, segments)
+
+    return {
+        "action_items": actions,
+        "count": len(actions),
+        "extractor": "llm" if actions and any(a.get("source_text") for a in actions) else "rules",
+    }
+
+
 # ===========================================================================
 # Audio Upload (with real-time WebSocket progress)
 # ===========================================================================
@@ -537,17 +740,29 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
 @app.post("/api/audio/upload/{file_id}/cancel")
 async def cancel_upload(file_id: str):
     """Cancel an in-progress upload recognition task."""
+    task = _get_upload_task(file_id)
+    if task and task.get("status") in UPLOAD_TERMINAL_STATUSES:
+        return {"ok": True, "file_id": file_id, "cancel_requested": False, "status": task.get("status")}
+
     event = upload_cancel_events.get(file_id)
     if event:
         event.set()
-    queue = upload_sessions.get(file_id)
-    if queue:
-        await queue.put({
-            "type": "cancelled",
-            "data": {"file_id": file_id, "message": "Upload processing cancelled"},
-        })
+    _update_upload_task(file_id, status="cancelling", cancel_requested=True)
+    await _broadcast_upload(file_id, {
+        "type": "cancelled",
+        "data": {"file_id": file_id, "status": "cancelling", "message": "Upload cancellation requested"},
+    })
     logger.info(f"Upload cancellation requested: {file_id[:8]}...")
-    return {"ok": True, "file_id": file_id, "cancelled": bool(event or queue)}
+    return {"ok": True, "file_id": file_id, "cancel_requested": True, "status": "cancelling", "cancelled": bool(event or task)}
+
+
+@app.get("/api/audio/upload/{file_id}/status")
+async def get_upload_status(file_id: str, include_segments: bool = Query(True)):
+    """Get current in-memory upload task status."""
+    task = _get_upload_task(file_id)
+    if not task:
+        return {"ok": False, "file_id": file_id, "error": "not_found"}
+    return {"ok": True, "task": _serialize_upload_task(task, include_segments=include_segments)}
 
 
 @app.post("/api/audio/upload")
@@ -570,18 +785,24 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
         queue = upload_sessions.get(file_id)
         cancel_event = threading.Event()
         upload_cancel_events[file_id] = cancel_event
+        task = _new_upload_task(
+            file_id,
+            filename=file.filename,
+            size_mb=file_size_mb,
+            engine="X-ASR (sherpa-onnx zipformer2 v4.5)" if (xasr_engine and xasr_engine.is_model_available) else "Demo (model not loaded)",
+        )
 
         if xasr_engine and xasr_engine.is_model_available:
             if queue:
                 # ── WebSocket streaming mode ──────────────────
-                await queue.put({
+                await _broadcast_upload(file_id, {
                     "type": "status",
                     "data": {
                         "status": "processing",
                         "message": f"Processing {file.filename} ({file_size_mb:.1f}MB)...",
                         "filename": file.filename,
                         "file_id": file_id,
-                        "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                        "engine": "X-ASR (sherpa-onnx zipformer2 v4.5)",
                     }
                 })
 
@@ -600,41 +821,36 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                             logger.warning(f"Audio encoding failed for segment {idx}: {enc_err}")
                     seg_data["audio_wav_base64"] = audio_b64
 
-                    asyncio.run_coroutine_threadsafe(
-                        queue.put({
-                            "type": "segment",
-                            "data": {
-                                "segment": seg_data,
-                                "segment_index": idx - 1,
-                                "total_estimated": total,
-                                "cumulative_stats": {"segments_processed": idx},
-                            }
-                        }),
-                        loop
-                    )
+                    segment_index = idx - 1
+                    _append_upload_segment(file_id, seg_data, segment_index=segment_index, total_estimated=total)
+                    _broadcast_upload_threadsafe(file_id, {
+                        "type": "segment",
+                        "data": {
+                            "segment": seg_data,
+                            "segment_index": segment_index,
+                            "total_estimated": total,
+                            "cumulative_stats": {"segments_processed": idx},
+                        }
+                    }, loop)
 
                 def on_progress(stage, fraction):
                     if cancel_event.is_set():
                         return
-                    asyncio.run_coroutine_threadsafe(
-                        queue.put({
-                            "type": "progress",
-                            "data": {"stage": stage, "fraction": fraction}
-                        }),
-                        loop
-                    )
+                    _update_upload_task(file_id, status="processing", progress_stage=stage, progress_fraction=float(fraction))
+                    _broadcast_upload_threadsafe(file_id, {
+                        "type": "progress",
+                        "data": {"stage": stage, "fraction": fraction}
+                    }, loop)
 
                 def do_process():
                     try:
                         if cancel_event.is_set():
                             logger.info(f"Processing cancelled before start: {file.filename}")
-                            asyncio.run_coroutine_threadsafe(
-                                queue.put({
-                                    "type": "cancelled",
-                                    "data": {"file_id": file_id, "message": "Upload processing cancelled"},
-                                }),
-                                loop
-                            )
+                            _update_upload_task(file_id, status="cancelled", cancel_requested=True, progress_stage="cancelled")
+                            _broadcast_upload_threadsafe(file_id, {
+                                "type": "cancelled",
+                                "data": {"file_id": file_id, "status": "cancelled", "message": "Upload processing cancelled"},
+                            }, loop)
                             return
 
                         results = xasr_engine.process_file(
@@ -642,13 +858,11 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                         )
                         if cancel_event.is_set():
                             logger.info(f"Processing cancelled after ASR: {file.filename}")
-                            asyncio.run_coroutine_threadsafe(
-                                queue.put({
-                                    "type": "cancelled",
-                                    "data": {"file_id": file_id, "message": "Upload processing cancelled"},
-                                }),
-                                loop
-                            )
+                            _update_upload_task(file_id, status="cancelled", cancel_requested=True, progress_stage="cancelled")
+                            _broadcast_upload_threadsafe(file_id, {
+                                "type": "cancelled",
+                                "data": {"file_id": file_id, "status": "cancelled", "message": "Upload processing cancelled"},
+                            }, loop)
                             return
 
                         # Build final segments list with audio
@@ -698,31 +912,36 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                             except Exception as e:
                                 logger.debug(f"Summary generation skipped: {e}")
 
-                        asyncio.run_coroutine_threadsafe(
-                            queue.put({
-                                "type": "complete",
-                                "data": {
-                                    "file_id": file_id,
-                                    "filename": file.filename,
-                                    "status": "completed",
-                                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
-                                    "segments_count": len(results),
-                                    "segments": final_segments,
-                                    "summary": meeting_summary,
-                                    "domain": meeting_domain,
-                                    "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
-                                    "speaker_stats": speaker_stats,
-                                }
-                            }),
-                            loop
+                        complete_data = {
+                            "file_id": file_id,
+                            "filename": file.filename,
+                            "status": "completed",
+                            "engine": "X-ASR (sherpa-onnx zipformer2 v4.5)",
+                            "segments_count": len(results),
+                            "segments": final_segments,
+                            "summary": meeting_summary,
+                            "domain": meeting_domain,
+                            "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
+                            "speaker_stats": speaker_stats,
+                        }
+                        _update_upload_task(
+                            file_id,
+                            status="completed",
+                            progress_stage="done",
+                            progress_fraction=1.0,
+                            segments_count=len(results),
+                            segments=final_segments,
+                            summary=meeting_summary,
+                            domain=meeting_domain,
+                            hotwords=complete_data["hotwords"],
+                            speaker_stats=speaker_stats,
                         )
+                        _broadcast_upload_threadsafe(file_id, {"type": "complete", "data": complete_data}, loop)
                     except Exception as e:
                         logger.error(f"Processing error: {e}")
                         logger.error(traceback.format_exc())
-                        asyncio.run_coroutine_threadsafe(
-                            queue.put({"type": "error", "data": {"message": str(e)}}),
-                            loop
-                        )
+                        _update_upload_task(file_id, status="error", error=str(e), progress_stage="error")
+                        _broadcast_upload_threadsafe(file_id, {"type": "error", "data": {"message": str(e)}}, loop)
                     finally:
                         upload_cancel_events.pop(file_id, None)
                         if xasr_engine.logic_validator:
@@ -732,15 +951,15 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                         except Exception:
                             pass
 
-                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                executor.submit(do_process)
+                future = upload_executor.submit(do_process)
+                _update_upload_task(file_id, future_id=id(future))
 
                 return {
                     "file_id": file_id,
                     "filename": file.filename,
                     "status": "processing",
                     "size_mb": round(file_size_mb, 2),
-                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                    "engine": "X-ASR (sherpa-onnx zipformer2 v4.5)",
                 }
             else:
                 # ── Synchronous mode (no WebSocket) ────────────
@@ -772,18 +991,32 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                 meeting_domain = xasr_engine.get_meeting_domain() if getattr(xasr_engine, 'enable_cognitive', False) else None
                 meeting_hotwords = xasr_engine.get_meeting_hotwords() if getattr(xasr_engine, 'enable_cognitive', False) else []
 
-                logger.info(f"Done: {len(segments)} segments from {file.filename}")
-                return {
+                sync_data = {
                     "file_id": file_id,
                     "filename": file.filename,
                     "status": "completed",
-                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                    "engine": "X-ASR (sherpa-onnx zipformer2 v4.5)",
                     "segments_count": len(segments),
                     "segments": segments,
+                    "summary": None,
                     "domain": meeting_domain,
                     "hotwords": meeting_hotwords[:20] if meeting_hotwords else [],
                     "speaker_stats": speaker_stats,
                 }
+                _update_upload_task(
+                    file_id,
+                    status="completed",
+                    progress_stage="done",
+                    progress_fraction=1.0,
+                    segments_count=len(segments),
+                    segments=segments,
+                    summary=None,
+                    domain=meeting_domain,
+                    hotwords=sync_data["hotwords"],
+                    speaker_stats=speaker_stats,
+                )
+                logger.info(f"Done: {len(segments)} segments from {file.filename}")
+                return sync_data
         else:
             # ── X-ASR unavailable ──────────────────────────────
             try:
@@ -792,32 +1025,37 @@ async def upload_audio(file: UploadFile = File(...), file_id: str = Query(None))
                 pass
 
             logger.warning(f"X-ASR not available for {file.filename}, returning demo")
-            if queue:
-                await queue.put({
-                    "type": "complete",
-                    "data": {
-                        "file_id": file_id,
-                        "filename": file.filename,
-                        "status": "demo_mode",
-                        "engine": "Demo (model not loaded)",
-                        "message": "Place ONNX models in backend/xasr/models/",
-                        "demo_data": DEMO_MEETING,
-                    }
-                })
-
-            return {
+            demo_data = {
                 "file_id": file_id,
                 "filename": file.filename,
                 "status": "demo_mode",
                 "engine": "Demo (model not loaded)",
+                "message": "Place ONNX models in backend/xasr/models/",
                 "demo_data": DEMO_MEETING,
             }
+            _update_upload_task(
+                file_id,
+                status="demo_mode",
+                progress_stage="demo_mode",
+                progress_fraction=1.0,
+                segments_count=len(DEMO_MEETING.get("segments", [])),
+                segments=DEMO_MEETING.get("segments", []),
+                summary=DEMO_MEETING.get("summary"),
+                hotwords=DEMO_MEETING.get("hotwords", []),
+                speaker_stats={},
+            )
+            if queue:
+                await _broadcast_upload(file_id, {"type": "complete", "data": demo_data})
+
+            return demo_data
 
     except Exception as e:
         logger.error(f"Upload error: {e}")
         logger.error(traceback.format_exc())
+        error_file_id = file_id or str(uuid.uuid4())
+        _update_upload_task(error_file_id, status="error", error=str(e), progress_stage="error")
         return {
-            "file_id": file_id or str(uuid.uuid4()),
+            "file_id": error_file_id,
             "filename": file.filename if file else "unknown",
             "status": "error",
             "error": str(e),
@@ -895,7 +1133,7 @@ async def ws_live(websocket: WebSocket):
         )
 
     try:
-        backend_type = "X-ASR v2.0" if (engine and engine.is_model_available) else "Demo"
+        backend_type = "X-ASR v4.5" if (engine and engine.is_model_available) else "Demo"
         await manager.send_json(websocket, {
             "type": "ready",
             "engine": backend_type,
@@ -999,17 +1237,25 @@ async def ws_upload_progress(websocket: WebSocket, file_id: str):
     """Real-time upload progress via WebSocket."""
     await websocket.accept()
     queue = asyncio.Queue()
-    upload_sessions[file_id] = queue
+    upload_sessions.setdefault(file_id, set()).add(queue)
     logger.info(f"Upload WS connected: {file_id[:8]}...")
 
     try:
-        await websocket.send_json({
-            "type": "connected",
-            "data": {
-                "file_id": file_id,
-                "message": "WebSocket connected, waiting for upload...",
-            }
-        })
+        task = _get_upload_task(file_id)
+        if task:
+            await websocket.send_json({
+                "type": "snapshot",
+                "data": {"task": _serialize_upload_task(task, include_segments=True)}
+            })
+            if task.get("status") == "completed":
+                await websocket.send_json({"type": "complete", "data": _serialize_upload_task(task, include_segments=True)})
+                return
+            if task.get("status") == "error":
+                await websocket.send_json({"type": "error", "data": {"message": task.get("error") or "Upload failed"}})
+                return
+            if task.get("status") == "cancelled":
+                await websocket.send_json({"type": "cancelled", "data": {"file_id": file_id, "status": "cancelled"}})
+                return
 
         while True:
             try:
@@ -1033,7 +1279,11 @@ async def ws_upload_progress(websocket: WebSocket, file_id: str):
         except Exception:
             pass
     finally:
-        upload_sessions.pop(file_id, None)
+        queues = upload_sessions.get(file_id)
+        if queues:
+            queues.discard(queue)
+            if not queues:
+                upload_sessions.pop(file_id, None)
 
 
 @app.websocket("/ws/logs")
@@ -1085,7 +1335,7 @@ async def serve_spa():
 if __name__ == "__main__":
     import uvicorn
     print("=" * 60)
-    print("  DiTing v2.0 - Smart Meeting Speech Cognitive System")
+    print("  DiTing v4.5 - Smart Meeting Speech Cognitive System")
     print("  Backend: http://localhost:8765")
     print("  API Docs: http://localhost:8765/docs")
     print("  Logs: backend/logs/diting.log")

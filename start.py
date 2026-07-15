@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DiTing - One-click startup script v2.0
+DiTing - One-click startup script v4.5
 Starts backend API (with X-ASR engine) and frontend page.
 
 Usage:
@@ -51,7 +51,7 @@ def check_xasr_models():
 
 def start_backend():
     """Start FastAPI backend."""
-    print("[DiTing] Starting backend service (with X-ASR engine v2.0)...")
+    print("[DiTing] Starting backend service (with X-ASR engine v4.5)...")
     os.chdir(BACKEND_DIR)
 
     env = os.environ.copy()
@@ -111,7 +111,7 @@ def start_frontend_server():
 
 def main():
     print("=" * 62)
-    print("  DiTing v2.0 - Smart Meeting Speech Cognitive System")
+    print("  DiTing v4.5 - Smart Meeting Speech Cognitive System")
     print("  Environment x Hotwords x Logic Validation")
     print("  ASR Engine: X-ASR (sherpa-onnx zipformer2)")
     print("=" * 62)

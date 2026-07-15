@@ -483,11 +483,20 @@ class MeetingSummarizer:
             "summary": f"[{domain_str}]\n{summary}" if summary else domain_str,
             "topics": topics,
             "decisions": [],
-            "action_items": [],
+            "action_items": self._extract_actions(segments),
             "key_metrics": [],
             "data_conflicts": conflicts,
             "next_meeting": "",
         }
+
+    def _extract_actions(self, segments: list) -> list:
+        """使用 ActionExtractor 从 segments 中提取行动项。"""
+        try:
+            from .action_extractor import extract_action_items
+            return extract_action_items(segments)
+        except Exception as e:
+            logger.debug(f"Action extraction failed: {e}")
+            return []
 
 
 # ======================================================================

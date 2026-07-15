@@ -45,8 +45,21 @@ backend/xasr/models/
   ├── encoder-160ms.onnx    (~295 MB)
   ├── decoder-160ms.onnx    (~2.5 MB)
   ├── joiner-160ms.onnx     (~2.0 MB)
-  └── tokens.txt            (~20 KB)
+  ├── tokens.txt            (~20 KB)
+  ├── silero_vad.onnx       (~629 KB, VAD)
+  └── firered_vad/          (~2.2 MB, FireRedVAD)
+      └── Stream-VAD/
 ```
+
+> **VAD 模型下载**：
+> ```bash
+> # Silero VAD (sherpa-onnx 内置支持)
+> python -c "import urllib.request; urllib.request.urlretrieve('https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx', 'backend/xasr/models/silero_vad.onnx')"
+>
+> # FireRedVAD (97.57% F1, SOTA)
+> pip install modelscope
+> modelscope download --model xukaituo/FireRedVAD --local_dir backend/xasr/models/firered_vad
+> ```
 
 > **可选**：如需说话人分离功能，还需下载声纹模型（~35MB）：
 > ```bash
@@ -90,7 +103,7 @@ python start.py
 | 功能 | 状态 | 说明 |
 |------|------|------|
 | ASR 转写 | ✅ | sherpa-onnx zipformer2 流式推理 |
-| VAD + 端点检测 | ✅ | 能量检测 + 动态阈值 + 片段合并 |
+| VAD + 端点检测 | ✅ | 三级降级: FireRedVAD(97.57% F1) → Silero → Energy |
 | 热词修正 | ✅ | 拼音匹配 + 模糊音校正 |
 | 逻辑校验 | ✅ | 数据冲突检测 (数字/百分比对比) |
 | 不确定性估计 | ✅ | 低置信度区段标记 |

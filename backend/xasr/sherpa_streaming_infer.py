@@ -189,3 +189,27 @@ class SherpaStreamingASR:
         if hasattr(self.recognizer, "is_endpoint"):
             return self.recognizer.is_endpoint(self.stream)
         return False
+
+    def get_token_info(self) -> dict:
+        """
+        Get token-level information from the current stream state.
+
+        Returns:
+            {
+                "tokens": [str, ...],         # decoded tokens
+                "timestamps": [float, ...],   # per-token timestamps (seconds)
+                "ys_probs": [float, ...],     # per-token log-probabilities
+            }
+            or empty dict if unavailable.
+        """
+        try:
+            tokens = list(self.recognizer.tokens(self.stream))
+            timestamps = list(self.recognizer.timestamps(self.stream))
+            ys_probs = list(self.recognizer.ys_probs(self.stream))
+            return {
+                "tokens": tokens,
+                "timestamps": timestamps,
+                "ys_probs": ys_probs,
+            }
+        except Exception:
+            return {}

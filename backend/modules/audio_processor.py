@@ -128,6 +128,122 @@ def acoustic_quality_score(snr_db: float, rt60: float, overlap_ratio: float = 0.
     return 0.5 * snr_score + 0.3 * rt60_score + 0.2 * overlap_score
 
 
+def compute_token_confidence(
+    ys_probs: list,
+    tokens: list = None,
+    text: str = "",
+    snr_db: float = 25.0,
+    rt60: float = 0.3,
+    hotwords: list = None,
+) -> dict:
+    """
+    三层置信度计算：Token 概率 + 声学质量 + 文本后验。
+
+    Args:
+        ys_probs: per-token log-probabilities from sherpa-onnx
+        tokens: per-token strings (optional, for uncertain spans)
+        text: decoded text (for text-quality bonus)
+        snr_db: SNR in dB
+        rt60: reverberation time
+        hotwords: list of matched hotwords (for bonus)
+
+    Returns:
+        {
+            "confidence": float,           # final confidence 0-1
+            "token_confidence": float,     # token-level avg
+            "acoustic_quality": float,     # SNR/RT60 based
+            "text_bonus": float,           # text quality signal
+            "uncertain_tokens": [dict],    # tokens below threshold
+            "label": str,                  # high/medium/low
+        }
+    """
+    import math
+
+    # ── Layer 1: Token-level probability (60% weight) ──────
+    if ys_probs and len(ys_probs) > 0:
+        # Convert log-probs to probabilities: exp(log_prob)
+        token_probs = [math.exp(min(0.0, p)) for p in ys_probs]
+        # Mean token probability
+        token_conf = sum(token_probs) / len(token_probs)
+    else:
+        # No token info — use 0.5 as neutral default
+        token_conf = 0.5
+        token_probs = []
+
+    # ── Layer 2: Acoustic quality (30% weight) ──────────────
+    snr_score = min(1.0, max(0.0, snr_db / 30.0))
+    rt60_score = min(1.0, max(0.0, 1.0 - (rt60 - 0.2) / 1.8))
+    acoustic_quality = 0.5 * snr_score + 0.5 * rt60_score
+
+    # ── Layer 3: Text quality bonus (10% weight) ────────────
+    text_bonus = 0.5  # neutral default
+    if text:
+        # Repetition penalty: "是是是" pattern → lower confidence
+        import re
+        rep_match = re.search(r'(.)\1{2,}', text)
+        if rep_match:
+            text_bonus -= 0.15
+
+        # No punctuation in long text → slight penalty
+        if len(text) > 15 and not any(p in text for p in '，。！？,.!?'):
+            text_bonus -= 0.1
+
+        # Very short text (< 3 chars) → slight penalty
+        stripped = text.strip()
+        if len(stripped) < 3:
+            text_bonus -= 0.1
+
+        # Hotword match → bonus
+        if hotwords:
+            matched = sum(1 for hw in hotwords if hw in text)
+            text_bonus += min(0.2, matched * 0.05)
+
+        # Reasonable sentence length (5-50 chars) → bonus
+        if 5 <= len(stripped) <= 50:
+            text_bonus += 0.05
+
+    text_bonus = max(0.0, min(1.0, text_bonus))
+
+    # ── Combine: weighted average ──────────────────────────
+    final_conf = (
+        0.6 * token_conf
+        + 0.3 * acoustic_quality
+        + 0.1 * text_bonus
+    )
+    final_conf = max(0.1, min(0.99, final_conf))
+
+    # ── Identify uncertain tokens ───────────────────────────
+    uncertain_tokens = []
+    if tokens and token_probs:
+        for i, (tok, prob) in enumerate(zip(tokens, token_probs)):
+            if prob < 0.3:  # below 30% confidence
+                # Clean up token string (remove leading space)
+                clean_tok = tok.strip()
+                if clean_tok and len(clean_tok) > 0:
+                    uncertain_tokens.append({
+                        "token": clean_tok,
+                        "confidence": round(prob, 3),
+                        "index": i,
+                    })
+
+    # ── Label ───────────────────────────────────────────────
+    if final_conf > 0.75:
+        label = "high"
+    elif final_conf > 0.5:
+        label = "medium"
+    else:
+        label = "low"
+
+    return {
+        "confidence": round(final_conf, 3),
+        "token_confidence": round(token_conf, 3),
+        "acoustic_quality": round(acoustic_quality, 3),
+        "text_bonus": round(text_bonus, 3),
+        "uncertain_tokens": uncertain_tokens,
+        "label": label,
+    }
+
+
 # ============================================================
 # 2. 说话人嵌入 (模拟)
 # ============================================================

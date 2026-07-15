@@ -1,0 +1,18 @@
+# 谛听 DiTing - 后端依赖
+# 核心 Web 框架
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+
+# 音频处理
+numpy>=1.24.0
+scipy>=1.11.0
+librosa>=0.10.0
+soundfile>=0.12.0
+pydub>=0.25.1
+imageio-ffmpeg>=0.4.9
+
+# Supabase
+supabase>=2.0.0

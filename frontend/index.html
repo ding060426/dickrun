@@ -1,0 +1,2601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DiTing v3.0 - Smart Meeting Speech Cognitive System</title>
+<style>
+/* ============================================================
+   DiTing v3.0 - Global Styles (with wavesurfer.js integration)
+   ============================================================ */
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #181b24;
+  --bg-tertiary: #1e2130;
+  --bg-card: #1a1d28;
+  --border: #2a2d3a;
+  --border-active: #3a3f55;
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0b0;
+  --text-muted: #5f6577;
+  --accent-blue: #4A90D9;
+  --accent-orange: #E8743C;
+  --accent-green: #50B86C;
+  --accent-red: #e0556a;
+  --accent-yellow: #e8b83c;
+  --accent-purple: #8b6ce8;
+  --gradient-brand: linear-gradient(135deg, #4A90D9 0%, #8b6ce8 100%);
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-logo {
+  width: 34px; height: 34px;
+  background: var(--gradient-brand);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.header-title {
+  font-size: 16px; font-weight: 700;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header-subtitle { font-size: 11px; color: var(--text-muted); }
+.header-info { display: flex; align-items: center; gap: 12px; }
+.header-meeting-title { font-size: 12px; color: var(--text-secondary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+}
+
+/* ── Global Home Header ── */
+.topbar {
+  height: 56px;
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15,17,23,0.88);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  backdrop-filter: blur(10px);
+}
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-brand {
+  display: flex; align-items: center; gap: 10px;
+  margin-right: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.topbar-brand-mark {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-brand);
+  color: white;
+  font-size: 14px;
+}
+.topbar-nav { display: flex; align-items: center; gap: 4px; }
+.topbar-nav-item {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 16px 12px 14px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: color 0.2s, border-color 0.2s;
+}
+.topbar-nav-item:hover { color: var(--text-primary); }
+.topbar-nav-item.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+.topbar-user { color: var(--text-secondary); font-size: 12px; }
+.topbar-action {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+.topbar-action:hover { border-color: var(--accent-blue); }
+.topbar-action.danger:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+.home-hero {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-image:
+    radial-gradient(circle at 50% 35%, rgba(74,144,217,0.12), transparent 36%),
+    radial-gradient(circle at 70% 70%, rgba(139,108,232,0.08), transparent 35%);
+}
+.home-hero.hidden { display: none; }
+.home-hero h1 {
+  font-size: clamp(64px, 12vw, 140px);
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  padding-bottom: 0.08em;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.home-hero p {
+  margin-top: 20px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+.legacy-meeting-header { display: none !important; }
+
+/* ── Main Layout ── */
+.main-container {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
+  padding: 10px 20px;
+  height: calc(100vh - 130px);
+}
+
+/* ── Transcript Panel ── */
+.transcript-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.transcript-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg-tertiary);
+}
+.transcript-header h3 { font-size: 13px; font-weight: 600; }
+.transcript-body {
+  flex: 1; overflow-y: auto; padding: 8px;
+}
+.transcript-body::-webkit-scrollbar { width: 4px; }
+.transcript-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Segment Card (v3.0: with waveform) ── */
+.segment {
+  margin-bottom: 8px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  overflow: hidden;
+  animation: slideIn 0.35s ease;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.segment.playing {
+  border-left-color: var(--accent-purple);
+  box-shadow: 0 0 12px rgba(139,108,232,0.15);
+}
+.segment.has-audio { cursor: pointer; }
+.segment.has-audio:hover { border-left-color: var(--accent-blue); }
+.segment.no-audio { cursor: default; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.segment-top {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px 2px 10px;
+}
+.segment-index { font-size: 10px; color: var(--text-muted); font-weight: 600; min-width: 28px; }
+.segment-speaker { font-size: 11px; font-weight: 600; }
+.segment-time { font-size: 10px; color: var(--text-muted); font-family: 'SF Mono', 'Cascadia Code', monospace; }
+.segment-dur { font-size: 10px; color: var(--text-muted); }
+.segment-snr {
+  margin-left: auto; font-size: 10px; padding: 1px 6px;
+  border-radius: 8px; font-weight: 500; white-space: nowrap;
+}
+.segment-snr.high { background: rgba(80,184,108,0.15); color: var(--accent-green); }
+.segment-snr.medium { background: rgba(232,184,60,0.15); color: var(--accent-yellow); }
+.segment-snr.low { background: rgba(224,85,106,0.15); color: var(--accent-red); }
+
+.segment-play-btn {
+  background: none; border: 1px solid var(--border-active); border-radius: 50%;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-secondary); font-size: 10px;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.segment-play-btn:hover { background: var(--accent-purple); border-color: var(--accent-purple); color: white; }
+.segment-play-btn.playing { background: var(--accent-purple); border-color: var(--accent-purple); color: white; }
+
+/* ── Waveform Container ── */
+.segment-waveform {
+  margin: 4px 10px 2px 10px;
+  height: 44px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.25);
+  position: relative;
+}
+.segment-waveform canvas { display: block; }
+.segment-waveform-placeholder {
+  height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(90deg, rgba(74,144,217,0.06) 0%, rgba(139,108,232,0.06) 100%);
+  border-radius: 4px; margin: 4px 10px 2px 10px;
+}
+.segment-waveform-placeholder .mini-wave {
+  display: flex; align-items: flex-end; gap: 1px; height: 20px;
+}
+.segment-waveform-placeholder .mini-wave-bar {
+  width: 2px; background: var(--border); border-radius: 1px;
+}
+
+.segment-text {
+  padding: 4px 10px 6px 10px;
+  font-size: 13px; color: var(--text-primary); line-height: 1.7;
+}
+
+/* ── dB Meter (live) ── */
+.db-meter {
+  display: flex; align-items: center; gap: 4px; padding: 0 10px 4px 10px;
+  font-size: 10px; color: var(--text-muted);
+}
+.db-meter-bar {
+  flex: 1; height: 3px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;
+}
+.db-meter-fill {
+  height: 100%; border-radius: 2px; transition: width 0.1s linear;
+  background: linear-gradient(90deg, var(--accent-green), var(--accent-yellow), var(--accent-red));
+}
+.db-meter-value { min-width: 40px; text-align: right; font-family: monospace; }
+
+.term-highlight {
+  color: var(--accent-purple); font-weight: 500;
+  border-bottom: 1px dashed rgba(139,108,232,0.4); cursor: pointer;
+}
+.segment-logic-flag {
+  margin: 2px 10px 4px 10px; padding: 4px 8px; border-radius: 4px; font-size: 11px;
+  display: flex; align-items: flex-start; gap: 4px;
+}
+.segment-logic-flag.warning { background: rgba(232,184,60,0.1); border: 1px solid rgba(232,184,60,0.3); color: var(--accent-yellow); }
+.segment-logic-flag.resolved { background: rgba(80,184,108,0.1); border: 1px solid rgba(80,184,108,0.3); color: var(--accent-green); }
+
+/* ── Global Audio Bar ── */
+.global-audio-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 14px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border);
+  min-height: 28px;
+}
+.global-audio-bar .audio-status {
+  font-size: 10px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 4px;
+}
+.global-audio-bar .audio-status .pulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.global-audio-bar .audio-status .pulse.inactive { animation: none; background: var(--text-muted); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
+}
+
+/* ── Right Sidebar ── */
+.sidebar { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sidebar-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sidebar-card-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  font-size: 12px; font-weight: 600;
+}
+.sidebar-card-body { padding: 10px 12px; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat-item { text-align: center; padding: 6px; background: var(--bg-card); border-radius: 6px; }
+.stat-value { font-size: 18px; font-weight: 700; }
+.stat-label { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+
+/* ── Controls Bar ── */
+.controls-bar {
+  padding: 8px 20px;
+  display: flex; gap: 8px; align-items: center;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+}
+.btn {
+  padding: 6px 16px;
+  border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--gradient-brand); color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--bg-tertiary); color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--border-active); }
+.btn-secondary.active { border-color: var(--accent-blue); background: rgba(74,144,217,0.1); }
+.btn-danger { background: rgba(224,85,106,0.15); color: var(--accent-red); border: 1px solid rgba(224,85,106,0.3); }
+.progress-bar {
+  flex: 1; height: 4px;
+  background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--gradient-brand); border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.time-display {
+  font-size: 12px; font-family: 'SF Mono', 'Cascadia Code', monospace;
+  color: var(--text-secondary); min-width: 60px; text-align: center;
+}
+
+/* ── Bottom Summary ── */
+.summary-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  grid-column: 1 / -1;
+  max-height: 160px; overflow-y: auto;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed; top: 70px; right: 20px;
+  background: var(--bg-tertiary); border: 1px solid var(--border-active);
+  border-radius: 8px; padding: 10px 16px; font-size: 12px;
+  z-index: 1000; box-shadow: var(--shadow);
+}
+
+/* ── Debug Log Panel ── */
+.log-panel {
+  position: fixed; bottom: 0; right: 0;
+  width: 420px; max-height: 260px;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 8px 8px 0 0;
+  z-index: 500;
+  display: none;
+  flex-direction: column;
+}
+.log-panel.visible { display: flex; }
+.log-panel-header {
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px 8px 0 0;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; cursor: pointer;
+}
+.log-panel-body {
+  flex: 1; overflow-y: auto; padding: 6px 10px;
+  font-size: 10px; font-family: 'SF Mono', 'Cascadia Code', monospace;
+  color: var(--text-secondary);
+}
+
+/* Upload status */
+.upload-status-card {
+  margin-top: 6px; padding: 8px;
+  background: var(--bg-card); border-radius: 6px;
+  font-size: 11px;
+}
+.upload-status-card .stage { color: var(--accent-blue); }
+.upload-status-card .done { color: var(--accent-green); }
+
+/* Login modal */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(15,17,23,0.78);
+  backdrop-filter: blur(6px);
+}
+.login-overlay.visible { display: flex; }
+.login-card {
+  width: min(400px, calc(100vw - 32px)); padding: 32px 28px;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+.login-card h2 { font-size: 20px; margin-bottom: 6px; }
+.login-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+.form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.form-row label { font-size: 11px; color: var(--text-secondary); }
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-primary); color: var(--text-primary); padding: 8px 10px; font-size: 12px; outline: none;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent-blue); }
+.login-error { min-height: 18px; color: var(--accent-red); font-size: 11px; margin-top: 8px; }
+.user-pill { font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; }
+.management-panel {
+  position: fixed; right: 18px; bottom: 58px; z-index: 200;
+  width: min(520px, calc(100vw - 36px)); max-height: min(680px, calc(100vh - 110px));
+  display: none; flex-direction: column; background: var(--bg-secondary);
+  border: 1px solid var(--border-active); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.management-panel.visible { display: flex; }
+.management-header { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); }
+.management-header strong { font-size: 13px; }
+.management-body { padding: 12px; overflow-y: auto; }
+.management-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.management-tab { flex: 1; }
+.management-section { display: none; }
+.management-section.active { display: block; }
+.entity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.entity-card { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); padding: 8px; font-size: 11px; }
+.entity-card .title { font-weight: 700; color: var(--text-primary); }
+.entity-card .meta { color: var(--text-muted); margin-top: 3px; word-break: break-all; }
+
+/* Module selector - Codex style */
+.module-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  display: none; align-items: center; justify-content: center;
+  background: var(--bg-primary);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(74,144,217,0.08) 0%, transparent 60%),
+    radial-gradient(circle at 80% 100%, rgba(139,108,232,0.06) 0%, transparent 50%);
+}
+.module-overlay.visible { display: flex; }
+.module-container {
+  width: min(800px, calc(100vw - 64px));
+  padding: 0 24px;
+  text-align: center;
+}
+.module-hero {
+  margin-bottom: 48px;
+}
+.module-hero .brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.module-hero .brand-icon {
+  width: 42px; height: 42px;
+  background: var(--gradient-brand);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: white;
+}
+.module-hero h2 {
+  font-size: 32px; font-weight: 800; margin: 0;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.module-hero .sub {
+  font-size: 14px; color: var(--text-muted);
+  margin-top: 8px; line-height: 1.6;
+}
+.module-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.module-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 24px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  position: relative; overflow: hidden;
+}
+.module-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 14px;
+  background: var(--gradient-brand);
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 0;
+}
+.module-card:hover::before { opacity: 0.04; }
+.module-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(74,144,217,0.15);
+}
+.module-card:hover .card-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+.module-card > * { position: relative; z-index: 1; }
+.module-card .icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: rgba(74,144,217,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; margin-bottom: 16px;
+}
+.module-card:nth-child(2) .icon { background: rgba(232,116,60,0.1); }
+.module-card:nth-child(3) .icon { background: rgba(80,184,108,0.1); }
+.module-card:nth-child(4) .icon { background: rgba(139,108,232,0.1); }
+.module-card .name {
+  font-size: 16px; font-weight: 700; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.module-card .card-arrow {
+  font-size: 14px; opacity: 0; transform: translateX(-8px);
+  transition: all 0.3s;
+  color: var(--accent-blue);
+}
+.module-card .desc { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+
+/* Main app wrapper: hidden until a module is selected */
+#mainApp { display: none; }
+#mainApp.active { display: block; }
+
+.back-btn {
+  position: fixed; top: 12px; left: 12px; z-index: 999;
+  background: var(--bg-secondary); border: 1px solid var(--border-active);
+  border-radius: 8px; padding: 8px 16px; font-size: 13px;
+  color: var(--text-primary); cursor: pointer;
+  display: none; align-items: center; gap: 6px;
+  box-shadow: var(--shadow);
+}
+.back-btn.visible { display: flex; }
+.back-btn:hover { background: var(--bg-tertiary); border-color: var(--accent-blue); }
+
+.module-nav {
+  position: fixed; top: 12px; right: 20px; z-index: 999;
+  display: none; gap: 6px;
+}
+.module-nav.visible { display: flex; }
+.module-nav-item {
+  padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg-secondary);
+  color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.module-nav-item:hover { border-color: var(--border-active); color: var(--text-primary); }
+.module-nav-item.active {
+  border-color: var(--accent-blue); color: var(--accent-blue);
+  background: rgba(74,144,217,0.1);
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-brand">
+      <div class="topbar-brand-mark">D</div>
+      <span>DiTing</span>
+    </div>
+    <nav class="topbar-nav" aria-label="模块导航">
+      <button class="topbar-nav-item" data-module="meeting">会议转写</button>
+      <button class="topbar-nav-item" data-module="reservation">会议预约</button>
+      <button class="topbar-nav-item" data-module="analysis">会议分析</button>
+      <button class="topbar-nav-item" data-module="users">用户管理</button>
+    </nav>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbarUser">未登录</span>
+    <button class="topbar-action" id="topbarLogin">登录</button>
+    <button class="topbar-action danger" id="topbarLogout" style="display:none;">退出</button>
+  </div>
+</header>
+
+<section class="home-hero" id="homeHero">
+  <h1>DiTing</h1>
+  <p>智能会议语音认知系统 · 转写 · 分析 · 协作</p>
+</section>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h2>会议控制台登录</h2>
+    <p>基于 Supabase 的用户认证系统</p>
+    <form id="loginForm">
+      <div class="form-row">
+        <label for="loginUsername">用户名</label>
+        <input id="loginUsername" autocomplete="username" value="admin">
+      </div>
+      <div class="form-row">
+        <label for="loginPassword">密码</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" value="admin123">
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;">登录</button>
+      <div class="login-error" id="loginError"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Module Selector                                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="module-overlay" id="moduleOverlay">
+  <div class="module-container">
+    <div class="module-hero">
+      <div class="brand">
+        <div class="brand-icon">D</div>
+        <h2>DiTing</h2>
+      </div>
+      <div class="sub">智能会议语音认知系统 — 转写 · 分析 · 协作</div>
+    </div>
+    <div class="module-grid">
+      <div class="module-card" data-module="meeting">
+        <div class="icon">转</div>
+        <div class="name">会议转写 <span class="card-arrow">→</span></div>
+        <div class="desc">实时语音转写、波形可视化、ASR 声学分析</div>
+      </div>
+      <div class="module-card" data-module="reservation">
+        <div class="icon">预</div>
+        <div class="name">会议预约 <span class="card-arrow">→</span></div>
+        <div class="desc">创建与管理会议预约，生成参会码，一键加入</div>
+      </div>
+      <div class="module-card" data-module="analysis">
+        <div class="icon">析</div>
+        <div class="name">会议分析 <span class="card-arrow">→</span></div>
+        <div class="desc">历史会议分析结果、转写记录与统计报表</div>
+      </div>
+      <div class="module-card" data-module="users">
+        <div class="icon">管</div>
+        <div class="name">用户管理 <span class="card-arrow">→</span></div>
+        <div class="desc">用户账号管理、角色权限分配与安全审计</div>
+      </div>
+    </div>
+    <div style="color:var(--text-muted);font-size:12px;">
+      <span id="moduleUserDisplay"></span>
+      <button class="btn btn-secondary" id="btnModuleLogout" style="font-size:11px;margin-left:12px;">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Main App (hidden until module selected)                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<button class="back-btn" id="btnBack" title="返回模块选择"> 返回</button>
+<nav class="module-nav" id="moduleNav">
+  <button class="module-nav-item" data-module="meeting">会议转写</button>
+  <button class="module-nav-item" data-module="reservation">会议预约</button>
+  <button class="module-nav-item" data-module="analysis">会议分析</button>
+  <button class="module-nav-item" data-module="users">用户管理</button>
+</nav>
+<div id="mainApp"><!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Header                                                      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="header legacy-meeting-header">
+  <div class="header-brand">
+    <div class="header-logo">E</div>
+    <div>
+      <div class="header-title">DiTing v3.0</div>
+      <div class="header-subtitle">智能会议语音认知系统</div>
+    </div>
+  </div>
+  <div class="header-info">
+    <span class="header-meeting-title" id="meetingTitleDisplay">未加载会议</span>
+    <span class="user-pill" id="currentUserDisplay">未登录</span>
+  </div>
+  <div class="header-status">
+    <span id="xasrStatus" style="font-size:11px;color:var(--text-muted);">检测中...</span>
+    <span id="connectionStatus" style="font-size:11px;">⚪ 离线</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Main Content                                                -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="main-container">
+  <!-- Transcript Panel -->
+  <div class="transcript-panel">
+    <div class="transcript-header">
+      <h3>转写 &amp; 波形</h3>
+      <span style="font-size:11px;color:var(--text-muted);" id="segmentCounter">0/0</span>
+    </div>
+    <!-- Global Audio Status -->
+    <div class="global-audio-bar" id="globalAudioBar">
+      <span class="audio-status">
+        <span class="pulse inactive" id="audioPulse"></span>
+        <span id="audioStatusText">无音频</span>
+      </span>
+      <span style="flex:1;"></span>
+      <span style="font-size:10px;color:var(--text-muted);" id="audioTimeDisplay">--:-- / --:--</span>
+    </div>
+    <div class="transcript-body" id="transcriptBody">
+      <div class="empty-state" id="emptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:150px;color:var(--text-muted);gap:8px;">
+        <div style="font-size:40px;opacity:0.3;">Mic</div>
+        <div>等待会议开始...</div>
+        <div style="font-size:11px;">点击 [演示] 或上传音频文件</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">统计</div>
+      <div class="sidebar-card-body">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" style="color:var(--accent-blue);" id="statSegments">0</div>
+            <div class="stat-label">分段数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" style="color:var(--accent-orange);" id="statLogicFlags">0</div>
+            <div class="stat-label">逻辑标记</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" style="color:var(--accent-red);" id="statLowConf">0</div>
+            <div class="stat-label">低置信</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" style="color:var(--accent-green);" id="statCorrections">0</div>
+            <div class="stat-label">修正</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <div style="height:3px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden;">
+            <div id="overallConfBar" style="height:100%;width:0%;background:var(--accent-green);border-radius:2px;transition:width 0.5s;"></div>
+          </div>
+          <div style="font-size:10px;text-align:right;color:var(--text-muted);margin-top:2px;" id="overallConfText">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">处理</div>
+      <div class="sidebar-card-body" id="processingPanel">
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>
+      </div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">逻辑校验</div>
+      <div class="sidebar-card-body" id="logicPanel">
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Panel -->
+  <div class="summary-panel" id="summaryPanel">
+    <div style="font-size:12px;color:var(--text-muted);text-align:center;">
+      会议处理完成后将生成摘要...
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Controls Bar                                                -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="controls-bar">
+  <button class="btn btn-primary" id="btnStart">演示</button>
+  <button class="btn btn-secondary" id="btnReset">重置</button>
+  <span style="color:var(--text-muted);margin:0 4px;">|</span>
+  <button class="btn btn-secondary" id="btnMic">录音</button>
+  <button class="btn btn-secondary" id="btnUpload">上传</button>
+  <input type="file" id="fileUpload" accept="audio/*" style="display:none">
+  <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="time-display" id="timeDisplay">--:--</div>
+  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">日志</button>
+</div>
+
+<div class="management-panel" id="managementPanel">
+  <div class="management-header">
+    <strong>用户 &amp; 会议管理</strong>
+    <button class="btn btn-secondary" id="btnCloseManagement">关闭</button>
+  </div>
+  <div class="management-body">
+    <div class="management-tabs">
+      <button class="btn btn-secondary management-tab" data-section="usersSection">用户</button>
+      <button class="btn btn-secondary management-tab" data-section="reserveSection">预约</button>
+      <button class="btn btn-secondary management-tab" data-section="joinSection">加入</button>
+      <button class="btn btn-secondary management-tab" data-section="analysisSection">分析</button>
+    </div>
+
+    <div class="management-section active" id="usersSection">
+      <div class="form-row"><label>用户名</label><input id="newUsername" placeholder="zhangsan"></div>
+      <div class="form-row"><label>显示名</label><input id="newDisplayName" placeholder="张三"></div>
+      <div class="form-row"><label>密码</label><input id="newPassword" type="password" value="123456"></div>
+      <button class="btn btn-primary" id="btnCreateUser">创建用户</button>
+      <div class="entity-list" id="usersList"></div>
+    </div>
+
+    <div class="management-section" id="reserveSection">
+      <div class="form-row"><label>标题</label><input id="reservationTitle" placeholder="周例会"></div>
+      <div class="form-row"><label>开始时间</label><input id="reservationStart" type="datetime-local"></div>
+      <div class="form-row"><label>结束时间</label><input id="reservationEnd" type="datetime-local"></div>
+      <div class="form-row"><label>地点</label><input id="reservationLocation" placeholder="会议室A / 线上"></div>
+      <button class="btn btn-primary" id="btnCreateReservation">创建预约</button>
+      <div class="entity-list" id="reservationsList"></div>
+    </div>
+
+    <div class="management-section" id="joinSection">
+      <div class="form-row"><label>参会码</label><input id="joinCode" placeholder="粘贴参会码"></div>
+      <div class="form-row"><label>显示名</label><input id="joinDisplayName" placeholder="嘉宾"></div>
+      <button class="btn btn-primary" id="btnJoinMeeting">加入会议</button>
+      <div class="entity-list" id="joinResult"></div>
+    </div>
+
+    <div class="management-section" id="analysisSection">
+      <div class="form-row"><label>关联会议</label><select id="analysisMeetingId"><option value="">-- 选择 --</option></select></div>
+      <button class="btn btn-primary" id="btnSaveAnalysis">保存当前分析</button>
+      <button class="btn btn-secondary" id="btnRefreshAnalyses">刷新</button>
+      <div class="entity-list" id="analysesList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Debug Log Panel                                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="log-panel" id="logPanel">
+  <div class="log-panel-header" id="logPanelHeader">
+    <span>调试日志</span>
+    <span style="font-size:10px;color:var(--text-muted);">点击关闭</span>
+  </div>
+  <div class="log-panel-body" id="logPanelBody"><div>连接中...</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Scripts                                                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script type="module">
+// ============================================================
+// DiTing v3.0 - Frontend with wavesurfer.js
+// ============================================================
+
+// ── Import wavesurfer.js (non-blocking — don't block UI init) ──
+let WaveSurfer = null;
+let HAS_WAVESURFER = false;
+
+// Load wavesurfer.js asynchronously — do NOT block the UI from initializing.
+// If the CDN is unreachable or slow, the page still works fully.
+(async function loadWaveSurfer() {
+  try {
+    // Race against a 5-second timeout so we don't wait forever
+    const importPromise = import('https://unpkg.com/wavesurfer.js@7.8/dist/wavesurfer.esm.js');
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('CDN timeout')), 5000)
+    );
+    const wsModule = await Promise.race([importPromise, timeoutPromise]);
+    WaveSurfer = wsModule.default;
+    HAS_WAVESURFER = true;
+    console.log('[DiTing] WaveSurfer.js loaded');
+  } catch (e) {
+    console.warn('[DiTing] WaveSurfer.js unavailable — waveform disabled:', e.message);
+    WaveSurfer = null;
+    HAS_WAVESURFER = false;
+  }
+})();
+
+// ── Constants ────────────────────────────────────────────────
+const API_BASE = 'http://localhost:8765';
+
+// ── DOM refs ─────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const transcriptBody = $('transcriptBody');
+const emptyState = $('emptyState');
+const globalAudioBar = $('globalAudioBar');
+const audioPulse = $('audioPulse');
+const audioStatusText = $('audioStatusText');
+const audioTimeDisplay = $('audioTimeDisplay');
+const segmentCounter = $('segmentCounter');
+const progressFill = $('progressFill');
+const timeDisplay = $('timeDisplay');
+const meetingTitleDisplay = $('meetingTitleDisplay');
+const connectionStatus = $('connectionStatus');
+const xasrStatus = $('xasrStatus');
+const statSegments = $('statSegments');
+const statLogicFlags = $('statLogicFlags');
+const statLowConf = $('statLowConf');
+const statCorrections = $('statCorrections');
+const overallConfBar = $('overallConfBar');
+const overallConfText = $('overallConfText');
+const processingPanel = $('processingPanel');
+const logicPanel = $('logicPanel');
+const summaryPanel = $('summaryPanel');
+const micStatus = $('micStatus');
+const loginOverlay = $('loginOverlay');
+const loginForm = $('loginForm');
+const loginError = $('loginError');
+const currentUserDisplay = $('currentUserDisplay');
+const managementPanel = $('managementPanel');
+const moduleOverlay = $('moduleOverlay');
+const mainApp = $('mainApp');
+const btnBack = $('btnBack');
+const homeHero = $('homeHero');
+const topbarUser = $('topbarUser');
+const topbarLogin = $('topbarLogin');
+const topbarLogout = $('topbarLogout');
+
+// ── State ────────────────────────────────────────────────────
+let allSegments = [];
+let currentSegmentIndex = -1;
+let isPlaying = false;
+let playbackTimer = null;
+let demoData = null;
+
+// Upload
+let uploadWs = null;
+let uploadFileId = null;
+let uploadHttpResult = null;   // fallback: HTTP response when WS doesn't deliver
+let uploadWsDelivered = false; // whether WS delivered any segments
+
+// Live mic
+let micStream = null;
+let micWs = null;
+let isRecording = false;
+
+// Log stream
+let logWs = null;
+let logVisible = false;
+
+// Auth and management
+let authToken = localStorage.getItem('diting_auth_token') || '';
+let currentUser = null;
+
+function authHeaders() {
+  return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, authHeaders(), options.headers || {});
+  const resp = await fetch(`${API_BASE}${path}`, Object.assign({}, options, { headers }));
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+  return data;
+}
+
+function setLoggedIn(user, token) {
+  currentUser = user;
+  if (token) {
+    authToken = token;
+    localStorage.setItem('diting_auth_token', token);
+  }
+  if (loginOverlay) loginOverlay.classList.remove('visible');
+  if (currentUserDisplay) currentUserDisplay.textContent = `${user.display_name || user.username} · ${user.role}`;
+  const joinName = $('joinDisplayName');
+  if (joinName && user.display_name) joinName.value = user.display_name;
+  updateTopbar();
+  if (pendingModule) {
+    switchModule(pendingModule);
+  } else {
+    showHome();
+  }
+  pendingModule = null;
+}
+
+function showLogin() {
+  if (loginOverlay) loginOverlay.classList.add('visible');
+  updateTopbar();
+}
+
+function showHome() {
+  if (loginOverlay) loginOverlay.classList.remove('visible');
+  if (moduleOverlay) moduleOverlay.classList.remove('visible');
+  if (mainApp) mainApp.classList.remove('active');
+  if (btnBack) btnBack.classList.remove('visible');
+  if (homeHero) homeHero.classList.remove('hidden');
+  const nav = $('moduleNav');
+  if (nav) nav.classList.remove('visible');
+  currentModule = null;
+  updateTopbar();
+}
+
+let currentModule = null;
+let pendingModule = null;
+
+function updateTopbar() {
+  document.querySelectorAll('.topbar-nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.module === currentModule);
+  });
+  if (currentUser) {
+    if (topbarUser) topbarUser.textContent = `${currentUser.display_name || currentUser.username} · ${currentUser.role}`;
+    if (topbarLogin) topbarLogin.style.display = 'none';
+    if (topbarLogout) topbarLogout.style.display = '';
+  } else {
+    if (topbarUser) topbarUser.textContent = '未登录';
+    if (topbarLogin) topbarLogin.style.display = '';
+    if (topbarLogout) topbarLogout.style.display = 'none';
+  }
+}
+
+function switchModule(name) {
+  if (!currentUser) {
+    pendingModule = name;
+    showLogin();
+    return;
+  }
+  currentModule = name;
+  if (moduleOverlay) moduleOverlay.classList.remove('visible');
+  if (btnBack) btnBack.classList.remove('visible');
+  if (homeHero) homeHero.classList.add('hidden');
+
+  const nav = $('moduleNav');
+  if (nav) {
+    nav.classList.remove('visible');
+    nav.querySelectorAll('.module-nav-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.module === name);
+    });
+  }
+
+  history.pushState({ module: name }, '', `#${name}`);
+
+  if (name === 'meeting') {
+    if (mainApp) mainApp.classList.add('active');
+    ensureMeetingViewVisible();
+  } else if (name === 'reservation') {
+    if (mainApp) mainApp.classList.add('active');
+    showReservationView();
+  } else if (name === 'analysis') {
+    if (mainApp) mainApp.classList.add('active');
+    showAnalysisView();
+  } else if (name === 'users') {
+    if (mainApp) mainApp.classList.add('active');
+    showUsersView();
+  }
+  updateTopbar();
+}
+
+function selectModule(name) {
+  switchModule(name);
+}
+
+function ensureMeetingViewVisible() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  if (managementPanel) {
+    managementPanel.classList.remove('visible');
+    managementPanel.removeAttribute('style');
+  }
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'grid';
+  if (controlsBar) controlsBar.style.display = 'flex';
+  if (mainApp) mainApp.style.marginTop = '0';
+}
+
+function showReservationView() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'none';
+  if (controlsBar) controlsBar.style.display = 'none';
+  if (managementPanel) {
+    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
+    const mb = managementPanel.querySelector('.management-body');
+    if (mb) mb.style.maxHeight = 'none';
+  }
+  switchManagementSection('reserveSection');
+  refreshManagementData();
+}
+
+function showAnalysisView() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'none';
+  if (controlsBar) controlsBar.style.display = 'none';
+  if (managementPanel) {
+    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
+    const mb = managementPanel.querySelector('.management-body');
+    if (mb) mb.style.maxHeight = 'none';
+  }
+  switchManagementSection('analysisSection');
+  refreshManagementData();
+}
+
+function showUsersView() {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const mainContainer = document.querySelector('.main-container');
+  const controlsBar = document.querySelector('.controls-bar');
+  if (mainContainer) mainContainer.style.display = 'none';
+  if (controlsBar) controlsBar.style.display = 'none';
+  if (managementPanel) {
+    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
+    const mb = managementPanel.querySelector('.management-body');
+    if (mb) mb.style.maxHeight = 'none';
+  }
+  switchManagementSection('usersSection');
+  refreshManagementData();
+}
+
+function showMeeting() {
+  switchModule('meeting');
+}
+
+async function restoreLogin() {
+  if (!authToken) {
+    showHome();
+    return;
+  }
+  try {
+    const data = await apiFetch('/api/auth/me');
+    setLoggedIn(data.user);
+  } catch (e) {
+    localStorage.removeItem('diting_auth_token');
+    authToken = '';
+    showHome();
+  }
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  if (loginError) loginError.textContent = '';
+  try {
+    const data = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: $('loginUsername').value.trim(),
+        password: $('loginPassword').value,
+      }),
+    });
+    setLoggedIn(data.user, data.token);
+    showToast('登录成功');
+    await refreshManagementData();
+  } catch (err) {
+    if (loginError) loginError.textContent = err.message;
+  }
+}
+
+async function logout() {
+  try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+  authToken = '';
+  currentUser = null;
+  localStorage.removeItem('diting_auth_token');
+  showHome();
+}
+
+function toggleManagementPanel() {
+  if (!managementPanel) return;
+  managementPanel.classList.toggle('visible');
+  if (managementPanel.classList.contains('visible')) refreshManagementData();
+}
+
+function switchManagementSection(sectionId) {
+  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
+  const section = $(sectionId);
+  if (section) section.classList.add('active');
+}
+
+async function refreshManagementData() {
+  if (!authToken) return;
+  await Promise.allSettled([loadUsers(), loadReservations(), loadAnalyses(), loadReservationOptions()]);
+}
+
+async function loadUsers() {
+  const list = $('usersList');
+  if (!list) return;
+  try {
+    const data = await apiFetch('/api/users');
+    list.innerHTML = data.users.map(u => `<div class="entity-card">
+      <div class="title">${escapeHTML(u.display_name || u.username)} <span style="color:var(--text-muted);">@${escapeHTML(u.username)}</span></div>
+      <div class="meta">${escapeHTML(u.role)} · ${escapeHTML(u.status)} · ${escapeHTML(u.id)}</div>
+    </div>`).join('') || '<div class="entity-card">暂无用户</div>';
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function createUser() {
+  try {
+    await apiFetch('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: $('newUsername').value.trim(),
+        display_name: $('newDisplayName').value.trim(),
+        password: $('newPassword').value,
+      }),
+    });
+    showToast('用户已创建');
+    await loadUsers();
+  } catch (e) {
+    showToast('创建用户失败: ' + e.message);
+  }
+}
+
+async function loadReservations() {
+  const list = $('reservationsList');
+  if (!list) return;
+  try {
+    const data = await apiFetch('/api/meetings/reservations');
+    list.innerHTML = data.reservations.map(r => `<div class="entity-card">
+      <div class="title">${escapeHTML(r.title)}</div>
+      <div class="meta">${escapeHTML(r.start_time)} - ${escapeHTML(r.end_time)}</div>
+      <div class="meta">Join code: ${escapeHTML(r.join_code)} · ${escapeHTML(r.status)}</div>
+    </div>`).join('') || '<div class="entity-card">暂无预约</div>';
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function createReservation() {
+  try {
+    await apiFetch('/api/meetings/reservations', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: $('reservationTitle').value.trim(),
+        start_time: $('reservationStart').value,
+        end_time: $('reservationEnd').value,
+        location: $('reservationLocation').value.trim(),
+      }),
+    });
+    showToast('会议已预约');
+    await loadReservations();
+  } catch (e) {
+    showToast('预约失败: ' + e.message);
+  }
+}
+
+async function joinMeeting() {
+  const result = $('joinResult');
+  try {
+    const data = await apiFetch('/api/meetings/join', {
+      method: 'POST',
+      body: JSON.stringify({
+        join_code: $('joinCode').value.trim(),
+        display_name: $('joinDisplayName').value.trim(),
+      }),
+    });
+    if (result) result.innerHTML = `<div class="entity-card"><div class="title">已加入: ${escapeHTML(data.meeting.title)}</div><div class="meta">join_id: ${escapeHTML(data.join_id)}</div></div>`;
+    showToast('已加入会议');
+  } catch (e) {
+    if (result) result.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+// ── Meeting Analysis ──────────────────────────────────────────
+
+async function loadAnalyses() {
+  const list = $('analysesList');
+  if (!list) return;
+  try {
+    const data = await apiFetch('/api/meetings/analysis');
+    if (!data.analyses || data.analyses.length === 0) {
+      list.innerHTML = '<div class="entity-card">暂无分析记录</div>';
+      return;
+    }
+    list.innerHTML = data.analyses.map(a => `<div class="entity-card">
+      <div class="title">${escapeHTML(a.title)} <span style="color:var(--text-muted);">${(a.created_at||'').substring(0,10)}</span></div>
+      <div class="meta">分段: ${a.segments_count} · 时长: ${a.duration_sec?.toFixed(1) || 0}s · 置信度: ${(a.overall_confidence*100 || 0).toFixed(0)}%</div>
+      <div class="meta">逻辑标记: ${a.logic_flags_count} · 低置信: ${a.low_confidence_count} · 修正: ${a.corrections_count}</div>
+      <div style="margin-top:4px;">
+        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" onclick="viewAnalysis('${a.id}')">View</button>
+        <button class="btn btn-danger" style="font-size:10px;padding:2px 8px;" onclick="deleteAnalysis('${a.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="entity-card">${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function saveAnalysis() {
+  if (allSegments.length === 0) {
+      showToast('没有可保存的分段，请先运行演示或上传文件。');
+    return;
+  }
+  try {
+    const logicCount = allSegments.reduce((sum, s) => sum + (s.logic_flags ? s.logic_flags.length : 0), 0);
+    const lowConfCount = allSegments.reduce((sum, s) => sum + (s.uncertain_spans ? s.uncertain_spans.length : 0), 0);
+    const corrCount = allSegments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
+    const duration = allSegments.reduce((sum, s) => sum + ((s.end_sec || s.end || 0) - (s.start_sec || s.start || 0)), 0);
+
+    const payload = {
+      meeting_id: $('analysisMeetingId').value || undefined,
+      title: (meetingTitleDisplay?.textContent || 'Untitled'),
+      transcript_json: allSegments.map(s => ({
+        text: s.display_text || s.text || '',
+        start: s.start_sec || s.start || 0,
+        end: s.end_sec || s.end || 0,
+        speaker: s.speaker || '',
+        snr_db: s.snr_db,
+      })),
+      segments_count: allSegments.length,
+      duration_sec: duration,
+      logic_flags_count: logicCount,
+      low_confidence_count: lowConfCount,
+      corrections_count: corrCount,
+      overall_confidence: parseFloat($('overallConfText')?.textContent || '0') / 100,
+      hotwords: [],
+      summary_json: {},
+    };
+    await apiFetch('/api/meetings/analysis', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    showToast('分析已保存');
+    await loadAnalyses();
+  } catch (e) {
+    showToast('保存失败: ' + e.message);
+  }
+}
+
+async function viewAnalysis(analysisId) {
+  try {
+    const data = await apiFetch(`/api/meetings/analysis/${analysisId}`);
+    const a = data.analysis;
+    if (transcriptBody) transcriptBody.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'none';
+    allSegments = (a.transcript_json || []).map((s, i) => ({
+      ...s,
+      display_text: s.text,
+      start_sec: s.start,
+      end_sec: s.end,
+      snr_db: s.snr_db || 25,
+      quality_label: 'high',
+      corrections: [],
+      logic_flags: [],
+      uncertain_spans: [],
+    }));
+    allSegments.forEach((seg, i) => renderSegment(seg, i, false));
+    updateStats(allSegments.length);
+    if (segmentCounter) segmentCounter.textContent = `${allSegments.length}/${allSegments.length}`;
+    if (progressFill) progressFill.style.width = '100%';
+    if (overallConfBar) overallConfBar.style.width = `${(a.overall_confidence || 0) * 100}%`;
+    if (overallConfText) overallConfText.textContent = `${((a.overall_confidence || 0) * 100).toFixed(0)}%`;
+    if (meetingTitleDisplay) meetingTitleDisplay.textContent = a.title || 'Analysis';
+    if (managementPanel) managementPanel.classList.remove('visible');
+    showToast(`已加载: ${a.title}`);
+  } catch (e) {
+    showToast('查看失败: ' + e.message);
+  }
+}
+
+async function deleteAnalysis(analysisId) {
+  try {
+    await apiFetch(`/api/meetings/analysis/${analysisId}`, { method: 'DELETE' });
+    showToast('已删除');
+    await loadAnalyses();
+  } catch (e) {
+    showToast('删除失败: ' + e.message);
+  }
+}
+
+async function loadReservationOptions() {
+  try {
+    const data = await apiFetch('/api/meetings/reservations');
+    const sel = $('analysisMeetingId');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select --</option>' +
+      (data.reservations || []).map(r => `<option value="${r.id}">${escapeHTML(r.title)} (${(r.start_time||'').substring(0,10)})</option>`).join('');
+  } catch (e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AudioPlaybackManager (wavesurfer.js based)
+// ═══════════════════════════════════════════════════════════
+class AudioPlaybackManager {
+  constructor() {
+    /** @type {Map<number, {ws: object, blobUrl: string, duration: number}>} */
+    this.instances = new Map();
+    /** @type {number | null} */
+    this.activeIndex = null;
+    /** @type {number | null} */
+    this.dBUpdateRAF = null;
+    this.maxInstances = 40;  // soft cap — destroy oldest when exceeded
+  }
+
+  /**
+   * Convert base64 WAV to a Blob URL and create a WaveSurfer instance.
+   */
+  async create(segIndex, audioBase64, containerEl) {
+    if (!HAS_WAVESURFER || !audioBase64) return null;
+
+    // Destroy existing instance for this index (shouldn't happen, but be safe)
+    this.destroy(segIndex);
+
+    // Decode base64 → Blob
+    let blob;
+    try {
+      blob = this._b64toBlob(audioBase64, 'audio/wav');
+    } catch (e) {
+      console.warn(`[Audio] base64 decode failed for seg ${segIndex}:`, e);
+      return null;
+    }
+
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Create WaveSurfer
+    const ws = WaveSurfer.create({
+      container: containerEl,
+      waveColor: '#3a3f55',
+      progressColor: '#8b6ce8',
+      cursorColor: 'rgba(139,108,232,0.5)',
+      cursorWidth: 1,
+      height: 44,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 2,
+      normalize: true,
+      interact: true,
+      dragToSeek: true,
+      autoScroll: false,
+    });
+
+    // Wire events
+    ws.on('play', () => {
+      this._onPlay(segIndex);
+    });
+    ws.on('pause', () => {
+      this._onPause(segIndex);
+    });
+    ws.on('finish', () => {
+      this._onFinish(segIndex);
+    });
+    ws.on('timeupdate', (t) => {
+      this._onTimeUpdate(segIndex, t, ws.getDuration());
+    });
+    ws.on('ready', () => {
+      console.log(`[Audio] Seg ${segIndex} waveform ready, duration=${ws.getDuration().toFixed(1)}s`);
+      // Auto-play if this is the most recent segment
+    });
+    ws.on('interaction', () => {
+      // User clicked the waveform — play it
+      this.play(segIndex);
+    });
+
+    // Load the blob
+    await ws.loadBlob(blob);
+
+    const entry = { ws, blobUrl, duration: ws.getDuration() };
+    this.instances.set(segIndex, entry);
+
+    // Evict old instances
+    this._evict();
+
+    return entry;
+  }
+
+  /**
+   * Play a specific segment's audio.
+   */
+  play(segIndex) {
+    const entry = this.instances.get(segIndex);
+    if (!entry) return;
+
+    // Pause the currently active one
+    if (this.activeIndex !== null && this.activeIndex !== segIndex) {
+      const current = this.instances.get(this.activeIndex);
+      if (current && current.ws) {
+        try { current.ws.pause(); } catch (e) { /* ignore */ }
+      }
+    }
+
+    this.activeIndex = segIndex;
+    try {
+      entry.ws.play();
+    } catch (e) {
+      console.warn(`[Audio] Play failed for seg ${segIndex}:`, e);
+    }
+  }
+
+  /**
+   * Pause the currently active segment.
+   */
+  pause() {
+    if (this.activeIndex === null) return;
+    const entry = this.instances.get(this.activeIndex);
+    if (entry && entry.ws) {
+      try { entry.ws.pause(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  /**
+   * Stop and destroy all instances.
+   */
+  reset() {
+    this.pause();
+    this._stopDBUpdates();
+    for (const [idx, entry] of this.instances) {
+      try { entry.ws.destroy(); } catch (e) { /* ignore */ }
+      try { URL.revokeObjectURL(entry.blobUrl); } catch (e) { /* ignore */ }
+    }
+    this.instances.clear();
+    this.activeIndex = null;
+    this._updateGlobalUI(false);
+  }
+
+  /**
+   * Destroy a single instance.
+   */
+  destroy(segIndex) {
+    const entry = this.instances.get(segIndex);
+    if (!entry) return;
+    if (this.activeIndex === segIndex) {
+      this.activeIndex = null;
+      this._stopDBUpdates();
+    }
+    try { entry.ws.destroy(); } catch (e) { /* ignore */ }
+    try { URL.revokeObjectURL(entry.blobUrl); } catch (e) { /* ignore */ }
+    this.instances.delete(segIndex);
+  }
+
+  /**
+   * Get the duration of a segment in seconds.
+   */
+  getDuration(segIndex) {
+    const entry = this.instances.get(segIndex);
+    return entry ? entry.duration : 0;
+  }
+
+  // ── Private helpers ──────────────────────────────────────
+
+  _b64toBlob(b64, mimeType) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mimeType });
+  }
+
+  _onPlay(segIndex) {
+    this.activeIndex = segIndex;
+    this._startDBUpdates(segIndex);
+    this._updateGlobalUI(true);
+    this._highlightSegment(segIndex, true);
+  }
+
+  _onPause(segIndex) {
+    if (this.activeIndex === segIndex) {
+      this._stopDBUpdates();
+      this._updateGlobalUI(false);
+      this._highlightSegment(segIndex, false);
+    }
+  }
+
+  _onFinish(segIndex) {
+    if (this.activeIndex === segIndex) {
+      this._stopDBUpdates();
+      this._updateGlobalUI(false);
+      this._highlightSegment(segIndex, false);
+    }
+  }
+
+  _onTimeUpdate(segIndex, currentTime, duration) {
+    if (this.activeIndex !== segIndex) return;
+    const m = Math.floor(currentTime / 60);
+    const s = Math.floor(currentTime % 60);
+    const dm = Math.floor(duration / 60);
+    const ds = Math.floor(duration % 60);
+    if (audioTimeDisplay) {
+      audioTimeDisplay.textContent =
+        `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} / ${String(dm).padStart(2,'0')}:${String(ds).padStart(2,'0')}`;
+    }
+    // Update dB meter via RMS estimation from the segment's SNR
+    this._updateDBMeter(segIndex, currentTime, duration);
+  }
+
+  _startDBUpdates(segIndex) {
+    this._stopDBUpdates();
+    // We don't have real-time PCM access via wavesurfer public API,
+    // but we can poll timeupdate and use the segment's SNR + position
+    // to simulate dB movement. Real implementation would use AnalyserNode.
+    const poll = () => {
+      const entry = this.instances.get(segIndex);
+      if (!entry || this.activeIndex !== segIndex) {
+        this._stopDBUpdates();
+        return;
+      }
+      // Update is handled in _onTimeUpdate
+      this.dBUpdateRAF = requestAnimationFrame(poll);
+    };
+    this.dBUpdateRAF = requestAnimationFrame(poll);
+  }
+
+  _stopDBUpdates() {
+    if (this.dBUpdateRAF !== null) {
+      cancelAnimationFrame(this.dBUpdateRAF);
+      this.dBUpdateRAF = null;
+    }
+  }
+
+  _updateDBMeter(segIndex, currentTime, duration) {
+    // Update the dB meter bar for this segment
+    const meterFill = document.querySelector(`.db-meter-fill[data-seg="${segIndex}"]`);
+    if (!meterFill) return;
+
+    // Simulate dB level based on position in segment
+    // (Real implementation would use AnalyserNode from AudioContext)
+    const seg = allSegments[segIndex];
+    const snr = seg ? (seg.snr_db || 25) : 25;
+    // Normalize: higher SNR → quieter noise floor, so dBFS is lower (better)
+    // Map: SNR 0→ -30dB, SNR 30→ -5dB
+    const baseLevel = -30 + (snr / 30) * 25;
+    // Add small variation based on time position
+    const variation = Math.sin(currentTime * 8) * 3 + Math.sin(currentTime * 23) * 1.5;
+    const dbLevel = Math.max(-60, Math.min(0, baseLevel + variation));
+
+    // Map to 0-100% width (0dB = 100%, -60dB = 0%)
+    const pct = ((dbLevel + 60) / 60) * 100;
+    meterFill.style.width = Math.max(2, pct) + '%';
+
+    // Color based on level
+    if (pct > 70) meterFill.style.background = 'var(--accent-green)';
+    else if (pct > 35) meterFill.style.background = 'var(--accent-yellow)';
+    else meterFill.style.background = 'var(--accent-red)';
+  }
+
+  _updateGlobalUI(active) {
+    if (audioPulse) {
+      audioPulse.className = 'pulse' + (active ? '' : ' inactive');
+    }
+    if (audioStatusText) {
+      audioStatusText.textContent = active ? '播放中...' : '无音频';
+    }
+    if (!active && audioTimeDisplay) {
+          audioTimeDisplay.textContent = '--:-- / --:--';
+    }
+  }
+
+  _highlightSegment(segIndex, on) {
+    const el = document.querySelector(`.segment[data-seg-index="${segIndex}"]`);
+    if (el) {
+      if (on) el.classList.add('playing');
+      else el.classList.remove('playing');
+    }
+    const btn = document.querySelector(`.segment-play-btn[data-seg-index="${segIndex}"]`);
+    if (btn) {
+      if (on) btn.classList.add('playing');
+      else btn.classList.remove('playing');
+    }
+  }
+
+  _evict() {
+    if (this.instances.size <= this.maxInstances) return;
+    const keys = [...this.instances.keys()].sort((a, b) => a - b);
+    const toRemove = keys.slice(0, this.instances.size - this.maxInstances);
+    for (const idx of toRemove) {
+      if (idx !== this.activeIndex) {
+        this.destroy(idx);
+      }
+    }
+  }
+}
+
+// Singleton
+const audioManager = new AudioPlaybackManager();
+
+// ═══════════════════════════════════════════════════════════
+// Utility Functions
+// ═══════════════════════════════════════════════════════════
+
+function formatTime(s) {
+  if (s === undefined || s === null) return '--:--';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function showToast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function updateConnectionStatus(status) {
+  if (!connectionStatus) return;
+  const map = {
+    'connected': '已连接',
+    'completed': '已完成',
+    'disconnected': '离线',
+  };
+  connectionStatus.textContent = map[status] || status;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Segment Rendering (with waveform)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Render a single segment card into the transcript body.
+ * Creates a waveform container and optionally initializes wavesurfer.
+ */
+function renderSegment(seg, index, autoPlay = false) {
+  if (!transcriptBody) return;
+  if (emptyState) emptyState.style.display = 'none';
+
+  const qLabel = seg.quality_label || seg.quality || 'high';
+  const displayText = seg.display_text || seg.text || '';
+  const snrDb = seg.snr_db != null ? seg.snr_db.toFixed(0) : '--';
+  const startSec = seg.start_sec != null ? seg.start_sec : (seg.start || 0);
+  const endSec = seg.end_sec != null ? seg.end_sec : (seg.end || 0);
+  const dur = (endSec - startSec) || 0;
+  const hasAudio = !!(seg.audio_wav_base64);
+
+  // Build logic flags HTML
+  let flagsHTML = '';
+  if (seg.logic_flags && seg.logic_flags.length > 0) {
+    flagsHTML = seg.logic_flags.map(f =>
+      `<div class="segment-logic-flag ${f.severity || 'warning'}">
+        <span>${f.severity === 'resolved' ? 'OK' : '!'}</span>
+        <span>${f.message || ''}</span>
+      </div>`
+    ).join('');
+  }
+
+  // Build the card
+  const card = document.createElement('div');
+  card.className = 'segment' + (hasAudio ? ' has-audio' : ' no-audio');
+  card.setAttribute('data-seg-index', index);
+
+  card.innerHTML = `
+    <div class="segment-top">
+      <span class="segment-index">#${index + 1}</span>
+      <span class="segment-speaker" style="color:var(--accent-blue);">Seg ${index + 1}</span>
+      <span class="segment-time">${formatTime(startSec)}</span>
+      <span class="segment-dur">(${dur.toFixed(1)}s)</span>
+      <span class="segment-snr ${qLabel}">SNR ${snrDb}dB</span>
+      ${hasAudio
+        ? `<button class="segment-play-btn" data-seg-index="${index}" title="Play/Pause">▶</button>`
+        : ''}
+    </div>
+    ${hasAudio
+      ? `<div class="segment-waveform" id="waveform-seg-${index}" data-seg-index="${index}"></div>
+         <div class="db-meter">
+           <span style="font-size:9px;">dB</span>
+           <div class="db-meter-bar"><div class="db-meter-fill" data-seg="${index}" style="width:2%;background:var(--accent-green);"></div></div>
+           <span class="db-meter-value">${snrDb}dB</span>
+         </div>`
+      : `<div class="segment-waveform-placeholder">
+           <div class="mini-wave">
+             ${Array.from({length: 28}, () => {
+               const h = Math.floor(Math.random() * 16 + 4);
+               return `<div class="mini-wave-bar" style="height:${h}px;"></div>`;
+             }).join('')}
+           </div>
+         </div>`
+    }
+    <div class="segment-text">${escapeHTML(displayText)}</div>
+    ${flagsHTML}
+  `;
+
+  transcriptBody.appendChild(card);
+
+  // Initialize wavesurfer if audio is available
+  if (hasAudio && HAS_WAVESURFER) {
+    const waveformContainer = card.querySelector(`#waveform-seg-${index}`);
+    if (waveformContainer) {
+      audioManager.create(index, seg.audio_wav_base64, waveformContainer).then((entry) => {
+        if (entry && autoPlay) {
+          // Small delay to let the waveform render
+          setTimeout(() => audioManager.play(index), 150);
+        }
+      }).catch(err => {
+        console.warn(`[Audio] WaveSurfer init failed for seg ${index}:`, err);
+      });
+    }
+  }
+
+  // Attach click handler to play button
+  if (hasAudio) {
+    const playBtn = card.querySelector(`.segment-play-btn[data-seg-index="${index}"]`);
+    if (playBtn) {
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (audioManager.activeIndex === index) {
+          audioManager.pause();
+        } else {
+          audioManager.play(index);
+        }
+      });
+    }
+
+    // Click on card body (not button) also toggles play
+    card.addEventListener('click', (e) => {
+      // Don't trigger if clicking the button (handled above)
+      if (e.target.closest('.segment-play-btn')) return;
+      if (audioManager.activeIndex === index) {
+        audioManager.pause();
+      } else {
+        audioManager.play(index);
+      }
+    });
+  }
+
+  // Scroll to bottom
+  transcriptBody.scrollTop = transcriptBody.scrollHeight;
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sidebar Updates
+// ═══════════════════════════════════════════════════════════
+
+function updateStats(segmentsProcessed) {
+  if (statSegments) statSegments.textContent = segmentsProcessed;
+
+  const logicCount = allSegments.reduce((sum, s) => sum + (s.logic_flags ? s.logic_flags.length : 0), 0);
+  const lowConfCount = allSegments.reduce((sum, s) => sum + (s.uncertain_spans ? s.uncertain_spans.length : 0), 0);
+  const corrCount = allSegments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
+
+  if (statLogicFlags) statLogicFlags.textContent = logicCount;
+  if (statLowConf) statLowConf.textContent = lowConfCount;
+  if (statCorrections) statCorrections.textContent = corrCount;
+
+  const pct = Math.min(90, 50 + segmentsProcessed * 3);
+  if (overallConfBar) overallConfBar.style.width = pct + '%';
+  if (overallConfText) overallConfText.textContent = pct + '%';
+}
+
+function updateLogicPanel() {
+  if (!logicPanel) return;
+  const flags = [];
+  for (const seg of allSegments) {
+    for (const f of (seg.logic_flags || [])) {
+      flags.push(f);
+    }
+  }
+  if (flags.length === 0) {
+    logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No logic flags</div>';
+    return;
+  }
+  logicPanel.innerHTML = flags.map(f => {
+    const icon = f.severity === 'resolved' ? 'OK' : '!';
+    return `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span style="color:${f.severity === 'resolved' ? 'var(--accent-green)' : 'var(--accent-yellow)'};">${icon}</span>
+      ${f.message || ''}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Demo Mode
+// ═══════════════════════════════════════════════════════════
+
+async function startDemo() {
+  if (isPlaying) return;
+  resetAll();
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/meeting/demo`);
+    demoData = await resp.json();
+  } catch (e) {
+    console.log('Using embedded demo data');
+    demoData = getEmbeddedDemoData();
+  }
+
+  if (meetingTitleDisplay) {
+    meetingTitleDisplay.textContent = demoData.title || 'Demo Meeting';
+  }
+  allSegments = demoData.segments || [];
+
+  isPlaying = true;
+  const btnStart = $('btnStart');
+  if (btnStart) { btnStart.textContent = '播放中...'; btnStart.disabled = true; }
+  updateConnectionStatus('connected');
+
+  currentSegmentIndex = -1;
+  playNextDemoSegment();
+}
+
+function playNextDemoSegment() {
+  if (!isPlaying) return;
+  currentSegmentIndex++;
+  if (currentSegmentIndex >= allSegments.length) {
+    finishDemo();
+    return;
+  }
+
+  const seg = allSegments[currentSegmentIndex];
+  renderSegment(seg, currentSegmentIndex, false);  // demo: no audio, no auto-play
+  updateStats(currentSegmentIndex + 1);
+  updateProgress(currentSegmentIndex);
+  if (seg.logic_flags && seg.logic_flags.length > 0) {
+    updateLogicPanel();
+    for (const f of seg.logic_flags) {
+      if (f.severity === 'warning') showToast('逻辑冲突: ' + (f.message || '').substring(0, 60));
+    }
+  }
+
+  const delay = 1500;
+  playbackTimer = setTimeout(playNextDemoSegment, delay);
+}
+
+function finishDemo() {
+  isPlaying = false;
+  const btnStart = $('btnStart');
+  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
+  updateConnectionStatus('completed');
+  showToast('演示完成');
+}
+
+function updateProgress(segIndex) {
+  const pct = ((segIndex + 1) / Math.max(1, allSegments.length)) * 100;
+  if (progressFill) progressFill.style.width = pct + '%';
+  if (segmentCounter) segmentCounter.textContent = `${segIndex + 1}/${allSegments.length}`;
+  const last = allSegments[segIndex];
+  if (timeDisplay) timeDisplay.textContent = formatTime(last ? (last.end_sec || last.end || 0) : 0);
+}
+
+function getEmbeddedDemoData() {
+  return {
+    "title": "Q3 产品回顾演示",
+    "date": "2024-07-14 14:00",
+    "duration": "04:30",
+    "participants": [],
+    "hotwords": ["BERT", "Q3", "Conversion"],
+    "segments": [
+      {"start":0,"end":5,"snr_db":28,"quality_label":"high","display_text":"演示分段1: 这是模拟会议数据，不含音频。"},
+      {"start":6,"end":12,"snr_db":26,"quality_label":"high","display_text":"演示分段2: 请上传真实音频文件以查看实时波形。"},
+      {"start":13,"end":18,"snr_db":27,"quality_label":"high","display_text":"演示分段3: 更多详情请查看后台日志。"},
+    ],
+    "summary": {"topics":["Demo"], "todos":[], "low_confidence_spots":[], "stats":{}}
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// File Upload (with real-time WebSocket + audio waveforms)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Render segments from HTTP response (fallback when WS doesn't deliver).
+ */
+function handleUploadHTTPResponse(result) {
+  if (!result || uploadWsDelivered) return;
+
+  if (result.status === 'completed' && result.segments && result.segments.length > 0) {
+    console.log('[Upload] Rendering from HTTP response:', result.segments.length, 'segments');
+    uploadWsDelivered = true;  // prevent double processing
+    allSegments = result.segments;
+    if (transcriptBody) transcriptBody.innerHTML = '';
+    result.segments.forEach((seg, i) => renderSegment(seg, i, false));
+    if (segmentCounter) segmentCounter.textContent = `${result.segments.length}/${result.segments.length}`;
+    if (statSegments) statSegments.textContent = result.segments_count || result.segments.length;
+    updateLogicPanel();
+    showToast(`完成: ${result.segments_count || result.segments.length} 个分段`);
+    finishUploadUI('complete');
+  } else if (result.status === 'demo_mode') {
+    uploadWsDelivered = true;  // prevent double processing
+    showToast('X-ASR 未加载，使用演示模式');
+    if (result.demo_data) {
+      demoData = result.demo_data;
+      startDemo();
+    }
+    finishUploadUI('demo');
+  } else if (result.status === 'processing') {
+    // Server is processing — wait for WS or fallback timer
+    console.log('[Upload] Server processing, waiting for WS...');
+  }
+}
+
+async function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const fileId = generateUUID();
+  uploadFileId = fileId;
+  uploadHttpResult = null;
+  uploadWsDelivered = false;
+  const btnUpload = $('btnUpload');
+  if (btnUpload) { btnUpload.textContent = '连接中...'; btnUpload.disabled = true; }
+
+  if (uploadWs) { try { uploadWs.close(); } catch(e) {} uploadWs = null; }
+
+  showToast(`上传: ${file.name}`);
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
+
+  // Clear previous state
+  resetAll();
+  allSegments = [];
+
+  // Show uploading state
+  if (transcriptBody) transcriptBody.innerHTML = '';
+  if (emptyState) {
+    emptyState.style.display = 'flex';
+    const msgEl = emptyState.querySelector('div:nth-child(2)');
+    if (msgEl) msgEl.textContent = `Processing: ${file.name}`;
+  }
+  if (processingPanel) {
+    processingPanel.innerHTML = `<div class="upload-status-card">
+      <div class="stage">Uploading: ${file.name}</div>
+      <div style="color:var(--text-muted);">${(file.size/1024/1024).toFixed(1)} MB</div>
+    </div>`;
+  }
+
+  // ── Fallback timer: if WS doesn't deliver within 30s, use HTTP result ──
+  let fallbackTimer = setTimeout(() => {
+    if (!uploadWsDelivered && uploadHttpResult) {
+      console.log('[Upload] WS timeout — rendering from HTTP fallback');
+      handleUploadHTTPResponse(uploadHttpResult);
+    } else if (!uploadWsDelivered && !uploadHttpResult) {
+      showToast('处理超时，请检查后台日志');
+      finishUploadUI('timeout');
+    }
+  }, 30000);
+
+  try {
+    uploadWs = new WebSocket(`ws://localhost:8765/ws/upload/${fileId}`);
+
+    uploadWs.onopen = async () => {
+      console.log('[Upload] WS connected');
+      if (btnUpload) btnUpload.textContent = '上传中...';
+
+      // Now upload the file via HTTP
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const resp = await fetch(`${API_BASE}/api/audio/upload?file_id=${fileId}`, {
+          method: 'POST', body: formData,
+        });
+        const result = await resp.json();
+        console.log('[Upload] HTTP status:', result.status);
+        uploadHttpResult = result;
+
+        if (result.status === 'error') {
+          showToast('错误: ' + (result.error || '未知'));
+          clearTimeout(fallbackTimer);
+          finishUploadUI('error');
+        } else if (result.status === 'demo_mode') {
+          clearTimeout(fallbackTimer);
+          handleUploadHTTPResponse(result);
+        }
+        // For 'processing'/'completed': wait for WS to deliver segments
+      } catch (e) {
+        console.error('[Upload] Fetch error:', e);
+        if (!uploadWsDelivered) {
+          clearTimeout(fallbackTimer);
+          uploadFallback(file);
+        }
+      }
+    };
+
+    uploadWs.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'segment') uploadWsDelivered = true;
+        if (msg.type === 'complete') {
+          uploadWsDelivered = true;
+          clearTimeout(fallbackTimer);
+        }
+        handleUploadWSMessage(msg);
+      } catch (e) {
+        console.warn('[Upload] Bad WS message:', e);
+      }
+    };
+
+    uploadWs.onerror = () => {
+      console.error('[Upload] WS error');
+    };
+
+    uploadWs.onclose = () => {
+      console.log('[Upload] WS closed');
+      // If WS closed without delivering segments, use HTTP fallback
+      if (!uploadWsDelivered && uploadHttpResult) {
+        clearTimeout(fallbackTimer);
+        // Small delay to let any in-flight messages arrive
+        setTimeout(() => {
+          if (!uploadWsDelivered) {
+            handleUploadHTTPResponse(uploadHttpResult);
+          }
+        }, 1500);
+      }
+    };
+
+  } catch (e) {
+    console.error('[Upload] WS creation failed:', e);
+    clearTimeout(fallbackTimer);
+    uploadFallback(file);
+  }
+}
+
+async function uploadFallback(file) {
+  // Already tried — don't double-upload
+  if (uploadHttpResult) {
+    handleUploadHTTPResponse(uploadHttpResult);
+    return;
+  }
+
+  showToast('正在上传（无实时预览）...');
+  const fileId = uploadFileId || generateUUID();
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const resp = await fetch(`${API_BASE}/api/audio/upload?file_id=${fileId}`, {
+      method: 'POST', body: formData,
+    });
+    const result = await resp.json();
+    uploadHttpResult = result;
+    handleUploadHTTPResponse(result);
+  } catch (e) {
+    console.error('[Upload] Fallback failed:', e);
+    showToast('上传失败，请检查后台是否运行');
+    finishUploadUI('error');
+  }
+  const btnUpload = $('btnUpload');
+  if (btnUpload) { btnUpload.textContent = '上传'; btnUpload.disabled = false; }
+  const fileInput = $('fileUpload');
+  if (fileInput) fileInput.value = '';
+}
+
+function handleUploadWSMessage(msg) {
+  const panel = processingPanel;
+
+  switch (msg.type) {
+    case 'connected':
+      console.log('[Upload] WS ready, waiting for file...');
+      break;
+
+    case 'status':
+      if (panel) {
+        panel.innerHTML = `<div class="upload-status-card">
+          <div class="stage">Processing: ${escapeHTML(msg.data.filename || '')}</div>
+          <div style="color:var(--text-muted);">Engine: ${escapeHTML(msg.data.engine || '')}</div>
+        </div>`;
+      }
+      break;
+
+    case 'progress':
+      if (panel) {
+        const progEl = panel.querySelector('.stage');
+        if (progEl) progEl.textContent = `Stage: ${msg.data.stage} (${(msg.data.fraction*100).toFixed(0)}%)`;
+      }
+      break;
+
+    case 'segment': {
+      const seg = msg.data.segment;
+      const segIndex = msg.data.segment_index;
+
+      // Store in allSegments (preserve existing if already set)
+      if (!allSegments[segIndex]) {
+        allSegments[segIndex] = seg;
+      }
+
+      // Auto-play only first 3 segments to confirm audio works
+      const autoPlay = (segIndex <= 2);
+
+      // Check if segment card already exists
+      const existingCard = document.querySelector(`.segment[data-seg-index="${segIndex}"]`);
+      if (!existingCard) {
+        renderSegment(seg, segIndex, autoPlay);
+      }
+
+      // Update counters
+      const realCount = allSegments.filter(Boolean).length;
+      const totalEst = msg.data.total_estimated || realCount || 50;
+      if (segmentCounter) segmentCounter.textContent = `${realCount}/${totalEst}`;
+      if (statSegments) statSegments.textContent = msg.data.cumulative_stats?.segments_processed || realCount;
+      if (progressFill) progressFill.style.width = Math.min(95, (realCount / Math.max(1, totalEst)) * 100) + '%';
+
+      updateLogicPanel();
+      break;
+    }
+
+    case 'complete':
+      showToast(`完成: ${msg.data.segments_count || allSegments.filter(Boolean).length} 个分段`);
+      // If WS delivered segments but 'complete' has the final full list with audio, use those
+      if (msg.data.segments && msg.data.segments.length > 0) {
+        const wsCount = allSegments.filter(Boolean).length;
+        if (msg.data.segments.length > wsCount) {
+          // We got more segments in the complete message — render missing ones
+          msg.data.segments.forEach((seg, i) => {
+            if (!allSegments[i]) {
+              allSegments[i] = seg;
+              const existingCard = document.querySelector(`.segment[data-seg-index="${i}"]`);
+              if (!existingCard) {
+                renderSegment(seg, i, false);
+              }
+            }
+          });
+        }
+      }
+      finishUploadUI('complete');
+      break;
+
+    case 'error':
+      showToast('错误: ' + (msg.data?.message || '未知'));
+      // Try HTTP fallback if WS delivered nothing
+      if (!uploadWsDelivered && uploadHttpResult) {
+        handleUploadHTTPResponse(uploadHttpResult);
+      } else {
+        finishUploadUI('error');
+      }
+      break;
+
+    case 'timeout':
+      showToast('处理超时');
+      if (!uploadWsDelivered && uploadHttpResult) {
+        handleUploadHTTPResponse(uploadHttpResult);
+      } else {
+        finishUploadUI('timeout');
+      }
+      break;
+  }
+}
+
+function finishUploadUI(status) {
+  const btnUpload = $('btnUpload');
+  if (btnUpload) { btnUpload.textContent = '上传'; btnUpload.disabled = false; }
+
+  if (status === 'complete') {
+    updateConnectionStatus('completed');
+    if (progressFill) progressFill.style.width = '100%';
+    if (overallConfBar) { overallConfBar.style.width = '85%'; overallConfBar.style.background = 'var(--accent-green)'; }
+    if (overallConfText) overallConfText.textContent = '85%';
+  } else {
+    updateConnectionStatus('disconnected');
+  }
+
+  if (uploadWs) { uploadWs.close(); uploadWs = null; }
+  const fileInput = $('fileUpload');
+  if (fileInput) fileInput.value = '';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Live Mic Recording
+// ═══════════════════════════════════════════════════════════
+
+async function toggleMic() {
+  const btnMic = $('btnMic');
+  const micStatusEl = micStatus;
+
+  if (isRecording) {
+    stopMicRecording();
+    if (btnMic) { btnMic.textContent = '录音'; btnMic.classList.remove('active'); }
+    if (micStatusEl) micStatusEl.textContent = '';
+    return;
+  }
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true }
+    });
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(micStream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    try {
+      micWs = new WebSocket('ws://localhost:8765/ws/live');
+      micWs.onopen = () => {
+        if (micStatusEl) { micStatusEl.textContent = 'X-ASR 实时'; micStatusEl.style.color = 'var(--accent-green)'; }
+      };
+      micWs.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'live_result' && msg.data.text) {
+          updateMicResult(msg.data);
+        }
+      };
+      micWs.onerror = () => {
+        if (micStatusEl) { micStatusEl.textContent = '本地模式'; micStatusEl.style.color = 'var(--accent-yellow)'; }
+      };
+    } catch (e) {
+      if (micStatusEl) { micStatusEl.textContent = '本地模式'; micStatusEl.style.color = 'var(--accent-yellow)'; }
+    }
+
+    let chunkCount = 0;
+    processor.onaudioprocess = (e) => {
+      if (!isRecording) return;
+      const inputData = e.inputBuffer.getChannelData(0);
+      chunkCount++;
+      if (micWs && micWs.readyState === WebSocket.OPEN && chunkCount % 4 === 0) {
+        const float32 = new Float32Array(inputData);
+        const bytes = new Uint8Array(float32.buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        micWs.send(JSON.stringify({ action: 'process_chunk', audio: btoa(binary) }));
+      }
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    isRecording = true;
+    if (btnMic) { btnMic.textContent = '停止'; btnMic.classList.add('active'); }
+    if (micStatusEl) { micStatusEl.textContent = '录音中...'; micStatusEl.style.color = 'var(--accent-red)'; }
+    showToast('开始录音');
+  } catch (err) {
+    console.error('Mic error:', err);
+    if (micStatusEl) { micStatusEl.textContent = '麦克风被拒'; micStatusEl.style.color = 'var(--accent-red)'; }
+    showToast('无法访问麦克风');
+  }
+}
+
+function stopMicRecording() {
+  isRecording = false;
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micWs) { micWs.send(JSON.stringify({ action: 'stop' })); micWs.close(); micWs = null; }
+}
+
+function updateMicResult(data) {
+  if (!transcriptBody) return;
+  if (emptyState) emptyState.style.display = 'none';
+
+  const liveEl = document.getElementById('live-result');
+  if (data.is_partial) {
+    if (liveEl) {
+      const textEl = liveEl.querySelector('.segment-text');
+      if (textEl) textEl.textContent = data.text || '...';
+      return;
+    }
+    const html = `<div class="segment no-audio" id="live-result" style="opacity:0.7;">
+      <div class="segment-top">
+        <span class="segment-speaker" style="color:var(--accent-blue);">Live</span>
+        <span class="segment-snr medium">SNR ${(data.snr_db||20).toFixed(0)}dB</span>
+      </div>
+      <div class="segment-waveform-placeholder"><div class="mini-wave">${Array.from({length: 28}, () => `<div class="mini-wave-bar" style="height:${Math.floor(Math.random()*10+2)}px;"></div>`).join('')}</div></div>
+      <div class="segment-text">${escapeHTML(data.text || '(listening...)')}</div>
+    </div>`;
+    transcriptBody.insertAdjacentHTML('beforeend', html);
+  } else if (data.is_final && data.text) {
+    if (liveEl) liveEl.remove();
+    const idx = allSegments.length;
+    allSegments.push(data);
+    renderSegment(data, idx, false);
+  }
+  transcriptBody.scrollTop = transcriptBody.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Debug Log Panel
+// ═══════════════════════════════════════════════════════════
+
+function toggleLogPanel() {
+  const panel = $('logPanel');
+  logVisible = !logVisible;
+  if (logVisible) {
+    panel.classList.add('visible');
+  } else {
+    panel.classList.remove('visible');
+  }
+}
+
+function connectLogStream() {
+  try {
+    logWs = new WebSocket('ws://localhost:8765/ws/logs');
+    logWs.onmessage = (event) => {
+      if (!logVisible) return;
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'logs') {
+        const body = $('logPanelBody');
+        if (body) {
+          body.innerHTML = msg.data.slice(-30).map(l =>
+            `<div style="color:${l.level==='ERROR'?'var(--accent-red)':l.level==='WARNING'?'var(--accent-yellow)':'var(--text-muted)'};font-size:10px;">
+              [${(l.timestamp||'').substring(11,19)}] ${l.level} ${(l.message||'').substring(0,120)}
+            </div>`
+          ).join('');
+          body.scrollTop = body.scrollHeight;
+        }
+      }
+    };
+    logWs.onerror = () => { /* silent */ };
+  } catch (e) { /* silent */ }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Reset
+// ═══════════════════════════════════════════════════════════
+
+function resetAll() {
+  isPlaying = false;
+  currentSegmentIndex = -1;
+  clearTimeout(playbackTimer);
+  allSegments = [];
+  demoData = null;
+  audioManager.reset();
+
+  const btnStart = $('btnStart');
+  if (btnStart) { btnStart.textContent = '演示'; btnStart.disabled = false; }
+
+  if (transcriptBody) {
+    transcriptBody.innerHTML = '';
+  }
+  if (emptyState) {
+    emptyState.style.display = 'flex';
+    const msgEl = emptyState.querySelector('div:nth-child(2)');
+    if (msgEl) msgEl.textContent = '等待会议开始...';
+  }
+
+  if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>';
+  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>';
+  if (summaryPanel) summaryPanel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;">会议处理完成后将生成摘要...</div>';
+
+  if (progressFill) progressFill.style.width = '0%';
+  if (timeDisplay) timeDisplay.textContent = '--:--';
+  if (segmentCounter) segmentCounter.textContent = '0/0';
+  if (statSegments) statSegments.textContent = '0';
+  if (statLogicFlags) statLogicFlags.textContent = '0';
+  if (statLowConf) statLowConf.textContent = '0';
+  if (statCorrections) statCorrections.textContent = '0';
+  if (overallConfBar) overallConfBar.style.width = '0%';
+  if (overallConfText) overallConfText.textContent = '--';
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = '未加载会议';
+  if (connectionStatus) connectionStatus.textContent = '离线';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Backend Status Check
+// ═══════════════════════════════════════════════════════════
+
+async function checkBackendStatus() {
+  if (!xasrStatus) return;
+  try {
+    const resp = await fetch(`${API_BASE}/api/xasr/status`);
+    const data = await resp.json();
+    if (data.model_available) {
+      xasrStatus.innerHTML = 'X-ASR 就绪';
+      xasrStatus.style.color = 'var(--accent-green)';
+    } else if (data.loading) {
+      xasrStatus.innerHTML = 'X-ASR 加载中...';
+      xasrStatus.style.color = 'var(--accent-yellow)';
+    } else {
+      xasrStatus.innerHTML = 'X-ASR 演示模式';
+      xasrStatus.style.color = 'var(--accent-orange)';
+    }
+    updateConnectionStatus('connected');
+  } catch (e) {
+    xasrStatus.innerHTML = '后端离线';
+    xasrStatus.style.color = 'var(--accent-red)';
+    updateConnectionStatus('disconnected');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Event Listeners (replaces inline onclick handlers)
+// ═══════════════════════════════════════════════════════════
+//
+// NOTE: Because <script type="module"> is deferred, DOMContentLoaded
+// has ALREADY fired by the time this code runs. We must NOT use
+// addEventListener('DOMContentLoaded', ...) — it will never fire.
+// Instead, we run initialization directly since the DOM is fully parsed.
+// ═══════════════════════════════════════════════════════════
+
+function initApp() {
+  checkBackendStatus();
+  connectLogStream();
+  restoreLogin();
+
+  // Button wiring
+  const btnStart = $('btnStart');
+  const btnReset = $('btnReset');
+  const btnMic = $('btnMic');
+  const btnUpload = $('btnUpload');
+  const fileUpload = $('fileUpload');
+  const btnLog = $('btnLog');
+  const logPanelHeader = $('logPanelHeader');
+
+  if (btnStart) btnStart.addEventListener('click', startDemo);
+  if (btnReset) btnReset.addEventListener('click', resetAll);
+  if (btnMic) btnMic.addEventListener('click', toggleMic);
+  if (btnUpload) btnUpload.addEventListener('click', () => { if (fileUpload) fileUpload.click(); });
+  if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
+  if (btnLog) btnLog.addEventListener('click', toggleLogPanel);
+  if (logPanelHeader) logPanelHeader.addEventListener('click', toggleLogPanel);
+
+  // Login form
+  if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  if (topbarLogin) topbarLogin.addEventListener('click', showLogin);
+  if (topbarLogout) topbarLogout.addEventListener('click', logout);
+
+  document.querySelectorAll('.topbar-nav-item').forEach(item => {
+    item.addEventListener('click', () => switchModule(item.dataset.module));
+  });
+
+  // Management panel
+  const btnCloseManagement = $('btnCloseManagement');
+  if (btnCloseManagement) btnCloseManagement.addEventListener('click', toggleManagementPanel);
+
+  // Module cards (in moduleOverlay - hidden by default)
+  document.querySelectorAll('.module-card').forEach(card => {
+    card.addEventListener('click', () => switchModule(card.dataset.module));
+  });
+
+  // Module nav items (hidden by default)
+  document.querySelectorAll('.module-nav-item').forEach(item => {
+    item.addEventListener('click', () => switchModule(item.dataset.module));
+  });
+
+  // Back button (hidden by default)
+  const btnBackEl = $('btnBack');
+  if (btnBackEl) btnBackEl.addEventListener('click', showHome);
+
+  // Module logout (in moduleOverlay)
+  const btnModuleLogout = $('btnModuleLogout');
+  if (btnModuleLogout) btnModuleLogout.addEventListener('click', logout);
+
+  // Browser back button → return to module selector
+  window.addEventListener('popstate', () => {
+    showHome();
+  });
+
+  // Management tabs
+  document.querySelectorAll('.management-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchManagementSection(btn.dataset.section));
+  });
+
+  // Management CRUD
+  const btnCreateUser = $('btnCreateUser');
+  const btnCreateReservation = $('btnCreateReservation');
+  const btnJoinMeeting = $('btnJoinMeeting');
+  if (btnCreateUser) btnCreateUser.addEventListener('click', createUser);
+  if (btnCreateReservation) btnCreateReservation.addEventListener('click', createReservation);
+  if (btnJoinMeeting) btnJoinMeeting.addEventListener('click', joinMeeting);
+
+  // Analysis buttons
+  const btnSaveAnalysis = $('btnSaveAnalysis');
+  const btnRefreshAnalyses = $('btnRefreshAnalyses');
+  if (btnSaveAnalysis) btnSaveAnalysis.addEventListener('click', saveAnalysis);
+  if (btnRefreshAnalyses) btnRefreshAnalyses.addEventListener('click', loadAnalyses);
+
+  // Expose analysis functions to global scope for onclick handlers
+  window.viewAnalysis = viewAnalysis;
+  window.deleteAnalysis = deleteAnalysis;
+
+  console.log('[DiTing] App initialized — all event listeners registered');
+}
+
+// Run immediately — DOM is already parsed (module scripts are deferred)
+initApp();
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && !e.target.closest('input,textarea')) {
+    e.preventDefault();
+    if (!isPlaying) startDemo();
+  }
+  if (e.code === 'KeyR' && e.ctrlKey) {
+    e.preventDefault();
+    resetAll();
+  }
+  if (e.code === 'KeyL' && e.ctrlKey) {
+    e.preventDefault();
+    toggleLogPanel();
+  }
+});
+</script>
+</div><!-- /#mainApp -->
+</body>
+</html>

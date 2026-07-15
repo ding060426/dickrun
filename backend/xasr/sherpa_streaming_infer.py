@@ -13,6 +13,25 @@ import sherpa_onnx
 _CJK_RANGE = r"\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
 _CJK_PUNCT = re.escape("，。！？；：、（）《》〈〉【】「」『』“”‘’")
 _ASCII_PUNCT_NO_LEADING_SPACE = re.escape(",.!?;:%)]}")
+_BYTE_FALLBACK_RE = re.compile(r"<0x[0-9A-Fa-f]{2}>(?:\s*<0x[0-9A-Fa-f]{2}>)*")
+_SINGLE_BYTE_RE = re.compile(r"<0x([0-9A-Fa-f]{2})>")
+
+
+def _decode_byte_fallback(text: str) -> str:
+    """Decode sentencepiece byte-fallback tokens such as <0xE4><0xBD><0xA0>."""
+    if "<0x" not in text:
+        return text
+
+    def replace(match: re.Match) -> str:
+        values = _SINGLE_BYTE_RE.findall(match.group(0))
+        if not values:
+            return match.group(0)
+        data = bytes(int(v, 16) for v in values)
+        decoded = data.decode("utf-8", errors="ignore")
+        decoded = re.sub(r"[\x00-\x1f\x7f]", "", decoded)
+        return decoded
+
+    return _BYTE_FALLBACK_RE.sub(replace, text)
 
 
 def _normalize_cjk_spacing(text: str) -> str:
@@ -25,11 +44,12 @@ def _normalize_cjk_spacing(text: str) -> str:
 
 
 def format_text(text: str, mode: str = "none") -> str:
+    text = _decode_byte_fallback(text)
     if mode == "lower":
         text = text.lower()
     elif mode == "capitalize":
         text = text[:1].upper() + text[1:].lower() if text else text
-    return _normalize_cjk_spacing(text)
+    return _normalize_cjk_spacing(text).replace("�", "")
 
 
 @dataclass

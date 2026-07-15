@@ -507,7 +507,13 @@ let HAS_WAVESURFER = false;
 })();
 
 // ── Constants ────────────────────────────────────────────────
-const API_BASE = 'http://localhost:8765';
+const PAGE_PARAMS = new URLSearchParams(window.location.search);
+const API_HOST = PAGE_PARAMS.get('apiHost') || window.location.hostname || 'localhost';
+const API_PORT = PAGE_PARAMS.get('apiPort') || '8765';
+const API_PROTOCOL = window.location.protocol === 'https:' ? 'https:' : 'http:';
+const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const API_BASE = `${API_PROTOCOL}//${API_HOST}:${API_PORT}`;
+const WS_BASE = `${WS_PROTOCOL}//${API_HOST}:${API_PORT}`;
 
 // ── DOM refs ─────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -550,6 +556,9 @@ let uploadWsDelivered = false; // whether WS delivered any segments
 // Live mic
 let micStream = null;
 let micWs = null;
+let micAudioContext = null;
+let micWorklet = null;
+let micStopTimer = null;
 let isRecording = false;
 
 // Log stream
@@ -1216,7 +1225,7 @@ async function handleFileUpload(event) {
   }, 30000);
 
   try {
-    uploadWs = new WebSocket(`ws://localhost:8765/ws/upload/${fileId}`);
+    uploadWs = new WebSocket(`${WS_BASE}/ws/upload/${fileId}`);
 
     uploadWs.onopen = async () => {
       console.log('[Upload] WS connected');
@@ -1443,67 +1452,120 @@ async function toggleMic() {
   if (isRecording) {
     stopMicRecording();
     if (btnMic) { btnMic.textContent = 'Mic'; btnMic.classList.remove('active'); }
-    if (micStatusEl) micStatusEl.textContent = '';
     return;
   }
 
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true }
-    });
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    const source = audioContext.createMediaStreamSource(micStream);
-    const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-    try {
-      micWs = new WebSocket('ws://localhost:8765/ws/live');
-      micWs.onopen = () => {
-        if (micStatusEl) { micStatusEl.textContent = 'X-ASR Live'; micStatusEl.style.color = 'var(--accent-green)'; }
-      };
-      micWs.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'live_result' && msg.data.text) {
-          updateMicResult(msg.data);
-        }
-      };
-      micWs.onerror = () => {
-        if (micStatusEl) { micStatusEl.textContent = 'Local'; micStatusEl.style.color = 'var(--accent-yellow)'; }
-      };
-    } catch (e) {
-      if (micStatusEl) { micStatusEl.textContent = 'Local'; micStatusEl.style.color = 'var(--accent-yellow)'; }
+    if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
+      throw new Error('This browser does not support AudioWorklet microphone capture');
     }
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: false,
+      }
+    });
+    micAudioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    await micAudioContext.audioWorklet.addModule('./audio-worklet.js');
 
-    let chunkCount = 0;
-    processor.onaudioprocess = (e) => {
-      if (!isRecording) return;
-      const inputData = e.inputBuffer.getChannelData(0);
-      chunkCount++;
-      if (micWs && micWs.readyState === WebSocket.OPEN && chunkCount % 4 === 0) {
-        const float32 = new Float32Array(inputData);
-        const bytes = new Uint8Array(float32.buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        micWs.send(JSON.stringify({ action: 'process_chunk', audio: btoa(binary) }));
+    micWs = new WebSocket(`${WS_BASE}/ws/live`);
+    micWs.binaryType = 'arraybuffer';
+    micWs.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'ready') {
+        micWs.send(JSON.stringify({
+          action: 'configure',
+          sample_rate: 16000,
+          channels: 1,
+          sample_format: 'pcm_s16le',
+          browser_sample_rate: micAudioContext?.sampleRate,
+        }));
+      } else if (msg.type === 'configured') {
+        if (micStatusEl) {
+          micStatusEl.textContent = `Recording · ${msg.data.vad}`;
+          micStatusEl.style.color = 'var(--accent-red)';
+        }
+      } else if (msg.type === 'live_result' && msg.data.text) {
+        updateMicResult(msg.data);
+      } else if (msg.type === 'stopped') {
+        const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
+        if (micStatusEl) {
+          micStatusEl.textContent = 'Complete';
+          micStatusEl.style.color = 'var(--accent-green)';
+        }
+        showToast(`Recording stopped · ${seconds}s received`);
+        cleanupMicRecording();
+      } else if (msg.type === 'error') {
+        showToast(msg.message || 'Live recognition failed');
       }
     };
+    micWs.onerror = () => {
+      if (micStatusEl) { micStatusEl.textContent = 'Live error'; micStatusEl.style.color = 'var(--accent-red)'; }
+    };
+    await new Promise((resolve, reject) => {
+      micWs.addEventListener('open', resolve, { once: true });
+      micWs.addEventListener('error', () => reject(new Error('Cannot connect to live ASR')), { once: true });
+    });
 
-    source.connect(processor);
-    processor.connect(audioContext.destination);
+    const source = micAudioContext.createMediaStreamSource(micStream);
+    micWorklet = new AudioWorkletNode(micAudioContext, 'diting-pcm');
+    const silent = micAudioContext.createGain();
+    silent.gain.value = 0;
+    micWorklet.port.onmessage = (event) => {
+      if (event.data?.type === 'audio.pcm' && micWs?.readyState === WebSocket.OPEN) {
+        micWs.send(event.data.payload);
+      }
+    };
+    source.connect(micWorklet).connect(silent).connect(micAudioContext.destination);
     isRecording = true;
     if (btnMic) { btnMic.textContent = 'Stop'; btnMic.classList.add('active'); }
-    if (micStatusEl) { micStatusEl.textContent = 'Recording...'; micStatusEl.style.color = 'var(--accent-red)'; }
-    showToast('Recording started');
+    if (micStatusEl) {
+      micStatusEl.textContent = `${micAudioContext.sampleRate}Hz → 16kHz`;
+      micStatusEl.style.color = 'var(--accent-red)';
+    }
+    showToast('Recording started · real-time ASR connected');
   } catch (err) {
     console.error('Mic error:', err);
     if (micStatusEl) { micStatusEl.textContent = 'Mic denied'; micStatusEl.style.color = 'var(--accent-red)'; }
-    showToast('Cannot access microphone');
+    showToast(err.message || 'Cannot access microphone');
+    cleanupMicRecording();
   }
 }
 
 function stopMicRecording() {
   isRecording = false;
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-  if (micWs) { micWs.send(JSON.stringify({ action: 'stop' })); micWs.close(); micWs = null; }
+  micWorklet?.port.postMessage({ type: 'capture.stop' });
+  if (micStatus) {
+    micStatus.textContent = 'Finalizing...';
+    micStatus.style.color = 'var(--accent-yellow)';
+  }
+  setTimeout(() => {
+    if (micWs?.readyState === WebSocket.OPEN) {
+      micWs.send(JSON.stringify({ action: 'stop' }));
+    }
+  }, 100);
+  clearTimeout(micStopTimer);
+  micStopTimer = setTimeout(() => cleanupMicRecording(), 15000);
+}
+
+async function cleanupMicRecording() {
+  clearTimeout(micStopTimer);
+  micStopTimer = null;
+  isRecording = false;
+  if (micStream) micStream.getTracks().forEach(track => track.stop());
+  micStream = null;
+  micWorklet = null;
+  if (micAudioContext && micAudioContext.state !== 'closed') {
+    await micAudioContext.close();
+  }
+  micAudioContext = null;
+  if (micWs) {
+    if (micWs.readyState === WebSocket.OPEN) micWs.close(1000, 'capture complete');
+    micWs = null;
+  }
 }
 
 function updateMicResult(data) {
@@ -1551,7 +1613,7 @@ function toggleLogPanel() {
 
 function connectLogStream() {
   try {
-    logWs = new WebSocket('ws://localhost:8765/ws/logs');
+    logWs = new WebSocket(`${WS_BASE}/ws/logs`);
     logWs.onmessage = (event) => {
       if (!logVisible) return;
       const msg = JSON.parse(event.data);

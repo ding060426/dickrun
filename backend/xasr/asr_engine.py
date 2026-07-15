@@ -395,7 +395,9 @@ class XASREngine:
         logger.info(f"VAD found {total_segments} speech segments")
 
         # 3. Process each speech segment
-        self.start_session()
+        # File mode creates an isolated recognizer for every VAD slice below;
+        # do not also allocate a full live recognizer for the outer session.
+        self.start_session(create_recognizer=False)
         results = []
 
         for seg_idx, (start_s, end_s) in enumerate(segments):
@@ -572,10 +574,16 @@ class XASREngine:
     # Streaming (for real-time mic input)
     # ------------------------------------------------------------------
 
-    def start_session(self):
+    def start_session(self, create_recognizer: bool = True):
         """Start a new recognition session (for streaming mode)."""
-        if self.asr:
+        if create_recognizer and self.asr:
             self.asr.reset()
+        elif create_recognizer:
+            # File recognition creates a short-lived recognizer per VAD slice,
+            # while microphone recognition needs one recognizer for the whole
+            # live session.  Construct it lazily so concurrent WebSockets do
+            # not share sherpa-onnx stream state.
+            self.asr = self._create_asr()
         self._session_active = True
         self._total_segments_processed = 0
         if self.logic_validator:
@@ -643,19 +651,25 @@ class XASREngine:
             logger.debug("Session ended")
 
     def _finalize_results(self) -> Optional[ASRResult]:
-        """Get final recognition result for streaming mode."""
-        if self.asr:
-            raw_text = self.asr.get_final_result()
-        else:
-            raw_text = "[Demo mode] X-ASR model not found"
+        """Backward-compatible finalization for the end of a live session."""
+        return self.finalize_utterance(reset_stream=False)
 
-        if not raw_text.strip():
+    def finalize_utterance(self, reset_stream: bool = True) -> Optional[ASRResult]:
+        """Finalize one VAD utterance and optionally prepare the next stream."""
+        if not self.asr:
             return None
 
-        return self._build_result(
-            raw_text=raw_text,
-            is_partial=False, is_final=True,
-        )
+        raw_text = self.asr.get_final_result()
+        result = None
+        if raw_text.strip():
+            result = self._build_result(
+                raw_text=raw_text,
+                is_partial=False,
+                is_final=True,
+            )
+        if reset_stream:
+            self.asr.reset()
+        return result
 
     # ------------------------------------------------------------------
     # Cognitive enhancement pipeline

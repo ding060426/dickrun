@@ -160,7 +160,9 @@ def restore_punctuation(text: str, use_model: bool = True) -> str:
     text = text.replace(';', '；').replace(':', '：')
 
     # ── 尝试 ML 模型 ──
-    if use_model:
+    # CT-Punc expects raw, unpunctuated ASR text. Feeding it transducer output
+    # that already contains punctuation commonly produces "。。" / "。，".
+    if use_model and not _HAS_PUNCT.search(text):
         restorer = _get_punct_restorer()
         if restorer and restorer.is_available:
             try:
@@ -262,6 +264,15 @@ def force_split_long_sentence(text: str, max_chars: int = None) -> str:
 
 # 连续重复字 (3 次及以上)
 _REPEATED_CHAR = re.compile(r'(.)\1{2,}')
+_PUNCTUATION_RUN = re.compile(r'[，。！？、；：]{2,}')
+
+
+def _collapse_punctuation(match: re.Match) -> str:
+    run = match.group(0)
+    for punctuation in ('？', '！', '。', '；', '：', '，', '、'):
+        if punctuation in run:
+            return punctuation
+    return run[-1]
 
 
 def normalize_text(text: str) -> str:
@@ -276,6 +287,9 @@ def normalize_text(text: str) -> str:
 
     # 连续重复 3 次以上 → 保留 2 次
     text = _REPEATED_CHAR.sub(r'\1\1', text)
+
+    # ASR 自带标点与恢复模型叠加时，只保留语义最强的边界。
+    text = _PUNCTUATION_RUN.sub(_collapse_punctuation, text)
 
     # 英文单词前后与中文之间加空格 (可选，让排版更美观)
     # 数字前后加空格

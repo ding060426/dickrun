@@ -43,6 +43,12 @@ logger = get_logger("main")
 # ── X-ASR ───────────────────────────────────────────────────────
 try:
     from xasr.asr_engine import XASREngine, ASRResult
+    from xasr.live_audio import (
+        LiveAudioProtocolError,
+        LiveAudioSession,
+        create_live_vad,
+        find_silero_vad_model,
+    )
     HAS_XASR = True
     logger.info("X-ASR module loaded")
 except ImportError as e:
@@ -197,11 +203,13 @@ upload_sessions: dict = {}
 
 @app.get("/api/health")
 async def health():
+    vad_model = find_silero_vad_model() if HAS_XASR else None
     return {
         "status": "ok",
         "service": "DiTing v2.0",
         "xasr_available": HAS_XASR and xasr_engine is not None and xasr_engine.is_model_available,
         "xasr_loading": xasr_loading,
+        "live_vad_available": vad_model is not None,
         "eval_available": HAS_EVAL,
         "timestamp": time.time(),
     }
@@ -217,11 +225,17 @@ async def get_xasr_status():
     if xasr_engine is None:
         return {"available": False, "reason": "Engine init failed", "model_available": False, "loading": False}
 
+    vad_model = find_silero_vad_model(xasr_engine.model_dir)
     return {
         "available": True,
         "model_available": xasr_engine.is_model_available,
         "model_dir": xasr_engine.model_dir,
         "endpoint_detection": xasr_engine.enable_endpoint_detection,
+        "live_vad": {
+            "provider": "sherpa-silero-vad" if vad_model else "asr-endpoint-fallback",
+            "available": vad_model is not None,
+            "model_path": str(vad_model) if vad_model else None,
+        },
         "hotwords_count": len(xasr_engine.hotword_corrector.hotwords) if xasr_engine.hotword_corrector else 0,
         "features": {
             "logic_validation": xasr_engine.enable_logic_validation,
@@ -411,6 +425,17 @@ def _result_to_dict(result: ASRResult, index: int) -> dict:
         "uncertain_spans": result.uncertain_spans,
         "uncertainty": result.uncertainty,
     })
+
+
+def _live_result_to_dict(result: ASRResult) -> dict:
+    """Convert a streaming result while preserving partial/final semantics."""
+    payload = _result_to_dict(result, 0)
+    payload.update({
+        "timestamp": result.timestamp,
+        "is_partial": result.is_partial,
+        "is_final": result.is_final,
+    })
+    return payload
 
 
 @app.post("/api/audio/upload")
@@ -663,7 +688,7 @@ async def ws_meeting(websocket: WebSocket):
 
 @app.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
-    """Real-time audio streaming with X-ASR."""
+    """Real-time 16 kHz mono pcm_s16le streaming with Silero VAD + X-ASR."""
     await manager.connect(websocket)
     logger.info("Live WebSocket connected")
 
@@ -679,62 +704,107 @@ async def ws_live(websocket: WebSocket):
             num_threads=1,
         )
 
+    session = None
+    vad_provider = "unavailable"
     try:
         backend_type = "X-ASR v2.0" if (engine and engine.is_model_available) else "Demo"
         await manager.send_json(websocket, {
             "type": "ready",
             "engine": backend_type,
-            "message": f"DiTing ready ({backend_type})",
+            "protocol": "pcm_s16le/16000/mono",
+            "message": f"DiTing ready ({backend_type}); send configure then binary PCM",
         })
 
         if engine and engine.is_model_available:
-            engine.start_session()
             while True:
-                data = await websocket.receive_text()
-                msg = json.loads(data)
+                message = await websocket.receive()
+                if message["type"] == "websocket.disconnect":
+                    raise WebSocketDisconnect(message.get("code", 1000))
 
-                if msg.get("action") == "process_chunk":
+                pcm_payload = message.get("bytes")
+                if pcm_payload is not None:
+                    if session is None:
+                        raise LiveAudioProtocolError("send configure before binary PCM")
+                    results = await asyncio.to_thread(session.push_pcm_s16le, pcm_payload)
+                    for result in results:
+                        await manager.send_json(websocket, {
+                            "type": "live_result",
+                            "data": _live_result_to_dict(result),
+                        })
+                    continue
+
+                data = message.get("text")
+                if data is None:
+                    continue
+                msg = json.loads(data)
+                action = msg.get("action") or msg.get("type")
+
+                if action in {"configure", "stream.configure"}:
+                    if session is not None:
+                        raise LiveAudioProtocolError("live stream is already configured")
+                    sample_rate = int(msg.get("sample_rate", 16000))
+                    channels = int(msg.get("channels", 1))
+                    sample_format = msg.get("sample_format", "pcm_s16le")
+                    if (sample_rate, channels, sample_format) != (16000, 1, "pcm_s16le"):
+                        raise LiveAudioProtocolError(
+                            "live stream requires 16000 Hz mono pcm_s16le"
+                        )
+                    vad = create_live_vad(engine.model_dir)
+                    vad_provider = getattr(vad, "provider_name", type(vad).__name__)
+                    session = await asyncio.to_thread(
+                        LiveAudioSession,
+                        engine,
+                        vad=vad,
+                        pre_roll_ms=200,
+                    )
+                    await manager.send_json(websocket, {
+                        "type": "configured",
+                        "data": {
+                            "sample_rate": 16000,
+                            "channels": 1,
+                            "sample_format": "pcm_s16le",
+                            "vad": vad_provider,
+                        },
+                    })
+                elif action == "process_chunk":
+                    # Compatibility with the former base64 Float32 JSON client.
+                    if session is None:
+                        vad = create_live_vad(engine.model_dir)
+                        vad_provider = getattr(vad, "provider_name", type(vad).__name__)
+                        session = await asyncio.to_thread(
+                            LiveAudioSession,
+                            engine,
+                            vad=vad,
+                            pre_roll_ms=200,
+                        )
                     audio_b64 = msg.get("audio", "")
                     if audio_b64:
                         audio_bytes = base64.b64decode(audio_b64)
-                        audio_chunk = np.frombuffer(audio_bytes, dtype=np.float32)
-                        result = engine.process_chunk(audio_chunk)
-
+                        audio_chunk = np.frombuffer(audio_bytes, dtype="<f4")
+                        pcm = (
+                            np.clip(audio_chunk, -1.0, 1.0) * 32767.0
+                        ).astype("<i2").tobytes()
+                        results = await asyncio.to_thread(session.push_pcm_s16le, pcm)
+                        for result in results:
+                            await manager.send_json(websocket, {
+                                "type": "live_result",
+                                "data": _live_result_to_dict(result),
+                            })
+                elif action in {"finalize", "stop", "stream.stop"}:
+                    results = await asyncio.to_thread(session.finish) if session else []
+                    for result in results:
                         await manager.send_json(websocket, {
                             "type": "live_result",
-                            "data": {
-                                "timestamp": result.timestamp,
-                                "text": result.text,
-                                "raw_text": result.raw_text,
-                                "is_partial": result.is_partial,
-                                "is_final": result.is_final,
-                                "snr_db": result.snr_db,
-                                "quality_label": result.quality_label,
-                                "asr_confidence": result.asr_confidence,
-                                "corrections": result.corrections,
-                                "logic_flags": result.logic_flags,
-                                "terms": result.terms,
-                                "uncertain_spans": result.uncertain_spans,
-                            }
+                            "data": _live_result_to_dict(result),
                         })
-                elif msg.get("action") == "finalize":
-                    result = engine._finalize_results()
-                    if result:
-                        await manager.send_json(websocket, {
-                            "type": "live_result",
-                            "data": {
-                                "timestamp": result.timestamp,
-                                "text": result.text,
-                                "is_partial": False, "is_final": True,
-                                "snr_db": result.snr_db,
-                                "quality_label": result.quality_label,
-                                "asr_confidence": result.asr_confidence,
-                                "logic_flags": result.logic_flags,
-                                "terms": result.terms,
-                            }
-                        })
-                elif msg.get("action") == "stop":
-                    engine.end_session()
+                    await manager.send_json(websocket, {
+                        "type": "stopped",
+                        "data": {
+                            "received_samples": session.received_samples if session else 0,
+                            "forwarded_samples": session.forwarded_samples if session else 0,
+                            "vad": vad_provider,
+                        },
+                    })
                     break
         else:
             # Demo fallback
@@ -753,7 +823,7 @@ async def ws_live(websocket: WebSocket):
                     }
                 })
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        pass
     except Exception as e:
         logger.error(f"Live WS error: {e}")
         try:
@@ -761,7 +831,13 @@ async def ws_live(websocket: WebSocket):
         except Exception:
             pass
     finally:
-        if engine:
+        manager.disconnect(websocket)
+        if session is not None:
+            try:
+                await asyncio.to_thread(session.finish)
+            except Exception as close_error:
+                logger.warning(f"Live session cleanup failed: {close_error}")
+        elif engine:
             engine.end_session()
 
 

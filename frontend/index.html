@@ -179,20 +179,6 @@ body {
 .segment-snr.high { background: rgba(80,184,108,0.15); color: var(--accent-green); }
 .segment-snr.medium { background: rgba(232,184,60,0.15); color: var(--accent-yellow); }
 .segment-snr.low { background: rgba(224,85,106,0.15); color: var(--accent-red); }
-.segment-confidence {
-  font-size: 10px;
-  padding: 1px 6px;
-  border: 1px solid currentColor;
-  border-radius: 8px;
-  white-space: nowrap;
-}
-.uncertain-word {
-  padding: 0 2px;
-  border-bottom: 1px dashed var(--accent-red);
-  border-radius: 2px;
-  background: rgba(224, 85, 106, 0.14);
-}
-
 .segment-play-btn {
   background: none; border: 1px solid var(--border-active); border-radius: 50%;
   width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
@@ -295,7 +281,7 @@ body {
   font-size: 12px; font-weight: 600;
 }
 .sidebar-card-body { padding: 10px 12px; }
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .stat-item { text-align: center; padding: 6px; background: var(--bg-card); border-radius: 6px; }
 .stat-value { font-size: 18px; font-weight: 700; }
 .stat-label { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
@@ -849,19 +835,9 @@ body {
             <div class="stat-label" data-i18n="stats.logic_flags">逻辑提示</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value" style="color:var(--accent-red);" id="statLowConf">0</div>
-            <div class="stat-label" data-i18n="stats.low_confidence">低置信度</div>
-          </div>
-          <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-green);" id="statCorrections">0</div>
             <div class="stat-label" data-i18n="stats.corrections">纠错</div>
           </div>
-        </div>
-        <div style="margin-top:8px;">
-          <div style="height:3px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden;">
-            <div id="overallConfBar" style="height:100%;width:0%;background:var(--accent-green);border-radius:2px;transition:width 0.5s;"></div>
-          </div>
-          <div style="font-size:10px;text-align:right;color:var(--text-muted);margin-top:2px;" id="overallConfText">--</div>
         </div>
       </div>
     </div>
@@ -1162,10 +1138,7 @@ const connectionStatus = $('connectionStatus');
 const xasrStatus = $('xasrStatus');
 const statSegments = $('statSegments');
 const statLogicFlags = $('statLogicFlags');
-const statLowConf = $('statLowConf');
 const statCorrections = $('statCorrections');
-const overallConfBar = $('overallConfBar');
-const overallConfText = $('overallConfText');
 const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
 const summaryPanel = $('summaryPanel');
@@ -1575,29 +1548,6 @@ function speakerColor(speakerId) {
   return `hsl(${hash % 360} 68% 62%)`;
 }
 
-function confidenceColorForTier(tier) {
-  if (tier === 'high') return 'var(--accent-green)';
-  if (tier === 'medium') return 'var(--accent-blue)';
-  if (tier === 'low') return 'var(--accent-red)';
-  return 'var(--text-muted)';
-}
-
-function renderUncertainText(text, uncertainSpans) {
-  let html = escapeHTML(text || '');
-  const spans = Array.isArray(uncertainSpans) ? uncertainSpans : [];
-  spans.forEach(span => {
-    const word = String(span?.text || '').trim();
-    const escapedWord = escapeHTML(word);
-    if (!escapedWord || !html.includes(escapedWord)) return;
-    const confidence = window.DiTingPresentation.formatConfidence(span.confidence);
-    html = html.replace(
-      escapedWord,
-      `<span class="uncertain-word" title="${t('segment.confidence')} ${confidence}">${escapedWord}</span>`,
-    );
-  });
-  return html;
-}
-
 function uploadApiUrl(fileId) {
   const params = new URLSearchParams({
     file_id: fileId,
@@ -1666,13 +1616,6 @@ function renderSegment(seg, index, autoPlay = false) {
   const startSec = seg.start_sec != null ? seg.start_sec : (seg.start || 0);
   const endSec = seg.end_sec != null ? seg.end_sec : (seg.end || 0);
   const durationText = window.DiTingPresentation.formatDuration(seg);
-  const confidenceValue = seg.asr_confidence ?? seg.confidence;
-  const confidenceText = window.DiTingPresentation.formatConfidence(confidenceValue);
-  const confidenceTier = window.DiTingPresentation.confidenceTier(confidenceValue);
-  const confidenceColor = confidenceColorForTier(confidenceTier);
-  const confidenceLabel = confidenceTier === 'unknown'
-    ? ''
-    : t(`segment.confidence_${confidenceTier}`);
   const hasAudio = !!(seg.audio_wav_base64);
   const speakerId = seg.speaker_id || seg.speaker || 'UNKNOWN';
   const speakerLabel = seg.speaker_name || (
@@ -1717,10 +1660,9 @@ function renderSegment(seg, index, autoPlay = false) {
   card.innerHTML = `
     <div class="segment-top">
       <span class="segment-index">#${index + 1}</span>
-      <button class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" data-i18n-title="segment.rename_title" data-i18n-confidence="${window.DiTingPresentation.formatConfidence(seg.speaker_confidence)}" style="color:${color};" title="${t('segment.rename_title', { confidence: window.DiTingPresentation.formatConfidence(seg.speaker_confidence) })}">${escapeHTML(speakerLabel)}</button>
+      <button class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" data-i18n-title="segment.rename_title" style="color:${color};" title="${t('segment.rename_title')}">${escapeHTML(speakerLabel)}</button>
       <span class="segment-time">${formatTime(startSec)}</span>
       <span class="segment-dur"><span data-i18n="segment.duration">${t('segment.duration')}</span> ${durationText}</span>
-      <span class="segment-confidence" style="color:${confidenceColor};"><span data-i18n="segment.confidence">${t('segment.confidence')}</span> ${confidenceText}${confidenceLabel ? ` · <span data-i18n="segment.confidence_${confidenceTier}">${confidenceLabel}</span>` : ''}</span>
       <span class="segment-snr ${qLabel}">SNR ${snrDb}dB</span>
       ${hasAudio
         ? `<button class="segment-play-btn" data-seg-index="${index}" data-i18n-title="segment.play_pause" title="${t('segment.play_pause')}">▶</button>`
@@ -1742,7 +1684,7 @@ function renderSegment(seg, index, autoPlay = false) {
            </div>
          </div>`
     }
-    <div class="segment-text">${renderUncertainText(displayText, seg.uncertain_spans)}</div>
+    <div class="segment-text">${escapeHTML(displayText)}</div>
     ${postprocessHTML}
     ${flagsHTML}
   `;
@@ -1818,23 +1760,10 @@ function updateStats(segmentsProcessed = null) {
   if (statSegments) statSegments.textContent = realCount;
 
   const logicCount = segments.reduce((sum, s) => sum + getVisibleLogicFlags(s).length, 0);
-  const lowConfCount = segments.reduce((sum, s) => {
-    const spans = Array.isArray(s.uncertain_spans) ? s.uncertain_spans.length : 0;
-    const uncertainty = s.uncertainty?.level && s.uncertainty.level !== 'low' ? 1 : 0;
-    return sum + spans + uncertainty;
-  }, 0);
   const corrCount = segments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
 
   if (statLogicFlags) statLogicFlags.textContent = logicCount;
-  if (statLowConf) statLowConf.textContent = lowConfCount;
   if (statCorrections) statCorrections.textContent = corrCount;
-
-  const confidence = window.DiTingPresentation.summarizeConfidence(segments);
-  if (overallConfBar) {
-    overallConfBar.style.width = confidence ? `${confidence.percent}%` : '0%';
-    overallConfBar.style.background = confidenceColorForTier(confidence?.tier || 'unknown');
-  }
-  if (overallConfText) overallConfText.textContent = confidence ? `${confidence.percent}%` : '--';
 }
 
 function updateLogicPanel() {
@@ -3126,10 +3055,7 @@ function resetAll() {
   if (segmentCounter) segmentCounter.textContent = '0/0';
   if (statSegments) statSegments.textContent = '0';
   if (statLogicFlags) statLogicFlags.textContent = '0';
-  if (statLowConf) statLowConf.textContent = '0';
   if (statCorrections) statCorrections.textContent = '0';
-  if (overallConfBar) overallConfBar.style.width = '0%';
-  if (overallConfText) overallConfText.textContent = '--';
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = t('status.no_meeting');
   updateConnectionStatus('disconnected');
 }

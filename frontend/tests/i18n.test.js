@@ -18,7 +18,7 @@ const placeholderNode = {
   placeholder: '',
 };
 const titleNode = {
-  dataset: { i18nTitle: 'segment.rename_title', i18nConfidence: '83%' },
+  dataset: { i18nTitle: 'segment.rename_title' },
   title: '',
 };
 const ariaNode = {
@@ -43,7 +43,7 @@ i18n.apply();
 assert.equal(textNode.textContent, 'Demo');
 assert.equal(parameterNode.textContent, 'Complete: 4 segments');
 assert.equal(placeholderNode.placeholder, 'Search settings...');
-assert.equal(titleNode.title, 'Click to rename; speaker confidence 83%');
+assert.equal(titleNode.title, 'Click to rename speaker');
 assert.equal(ariaNode.attributes['aria-label'], 'Language');
 assert.equal(document.documentElement.lang, 'en-US');
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DiTing v3.0 - Smart Meeting Speech Cognitive System</title>
+<title>DiTing v4.5 - Smart Meeting Speech Cognitive System</title>
 <style>
 /* ============================================================
    DiTing v3.0 - Global Styles (with wavesurfer.js integration)
@@ -71,6 +71,22 @@ body {
 .header-status {
   display: flex; align-items: center; gap: 8px;
   font-size: 12px;
+}
+.language-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.language-control select {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
 }
 
 /* ── Main Layout ── */
@@ -163,6 +179,19 @@ body {
 .segment-snr.high { background: rgba(80,184,108,0.15); color: var(--accent-green); }
 .segment-snr.medium { background: rgba(232,184,60,0.15); color: var(--accent-yellow); }
 .segment-snr.low { background: rgba(224,85,106,0.15); color: var(--accent-red); }
+.segment-confidence {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.uncertain-word {
+  padding: 0 2px;
+  border-bottom: 1px dashed var(--accent-red);
+  border-radius: 2px;
+  background: rgba(224, 85, 106, 0.14);
+}
 
 .segment-play-btn {
   background: none; border: 1px solid var(--border-active); border-radius: 50%;
@@ -757,16 +786,23 @@ body {
   <div class="header-brand">
     <div class="header-logo">E</div>
     <div>
-      <div class="header-title">DiTing v3.0</div>
-      <div class="header-subtitle">Smart Meeting Speech Cognitive System</div>
+      <div class="header-title" data-i18n="app.name">DiTing v4.5</div>
+      <div class="header-subtitle" data-i18n="app.subtitle">智能会议语音认知系统</div>
     </div>
   </div>
   <div class="header-info">
-    <span class="header-meeting-title" id="meetingTitleDisplay">No meeting loaded</span>
+    <span class="header-meeting-title" id="meetingTitleDisplay">未加载会议</span>
   </div>
   <div class="header-status">
-    <span id="xasrStatus" style="font-size:11px;color:var(--text-muted);">Checking...</span>
-    <span id="connectionStatus" style="font-size:11px;">⚪ Offline</span>
+    <label class="language-control">
+      <span data-i18n="language.label">语言</span>
+      <select id="languageSelect" data-i18n-aria-label="language.label" aria-label="语言">
+        <option value="zh-CN">中文</option>
+        <option value="en-US">English</option>
+      </select>
+    </label>
+    <span id="xasrStatus" style="font-size:11px;color:var(--text-muted);" data-i18n="status.checking">检查中...</span>
+    <span id="connectionStatus" style="font-size:11px;">⚪ <span data-i18n="status.offline">离线</span></span>
   </div>
 </div>
 
@@ -777,14 +813,14 @@ body {
   <!-- Transcript Panel -->
   <div class="transcript-panel">
     <div class="transcript-header">
-      <h3>Transcript &amp; Waveform</h3>
+      <h3 data-i18n="transcript.title">转写文本与波形</h3>
       <span style="font-size:11px;color:var(--text-muted);" id="segmentCounter">0/0</span>
     </div>
     <!-- Global Audio Status -->
     <div class="global-audio-bar" id="globalAudioBar">
       <span class="audio-status">
         <span class="pulse inactive" id="audioPulse"></span>
-        <span id="audioStatusText">No audio</span>
+        <span id="audioStatusText" data-i18n="transcript.no_audio">无音频</span>
       </span>
       <span style="flex:1;"></span>
       <span style="font-size:10px;color:var(--text-muted);" id="audioTimeDisplay">--:-- / --:--</span>
@@ -792,8 +828,8 @@ body {
     <div class="transcript-body" id="transcriptBody">
       <div class="empty-state" id="emptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:150px;color:var(--text-muted);gap:8px;">
         <div style="font-size:40px;opacity:0.3;">Mic</div>
-        <div>Waiting for meeting...</div>
-        <div style="font-size:11px;">Click [Demo] or upload an audio file</div>
+        <div data-i18n="transcript.waiting">等待会议输入...</div>
+        <div style="font-size:11px;" data-i18n="transcript.hint">点击“演示”或上传音频文件</div>
       </div>
     </div>
   </div>
@@ -801,24 +837,24 @@ body {
   <!-- Right Sidebar -->
   <div class="sidebar">
     <div class="sidebar-card">
-      <div class="sidebar-card-header">Stats</div>
+      <div class="sidebar-card-header" data-i18n="stats.title">统计</div>
       <div class="sidebar-card-body">
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-blue);" id="statSegments">0</div>
-            <div class="stat-label">Segments</div>
+            <div class="stat-label" data-i18n="stats.segments">片段</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-orange);" id="statLogicFlags">0</div>
-            <div class="stat-label">Logic Flags</div>
+            <div class="stat-label" data-i18n="stats.logic_flags">逻辑提示</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-red);" id="statLowConf">0</div>
-            <div class="stat-label">Low Conf</div>
+            <div class="stat-label" data-i18n="stats.low_confidence">低置信度</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--accent-green);" id="statCorrections">0</div>
-            <div class="stat-label">Corrections</div>
+            <div class="stat-label" data-i18n="stats.corrections">纠错</div>
           </div>
         </div>
         <div style="margin-top:8px;">
@@ -831,16 +867,16 @@ body {
     </div>
 
     <div class="sidebar-card">
-      <div class="sidebar-card-header">Processing</div>
+      <div class="sidebar-card-header" data-i18n="processing.title">处理进度</div>
       <div class="sidebar-card-body" id="processingPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">Waiting for input...</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;" data-i18n="processing.waiting">等待输入...</div>
       </div>
     </div>
 
     <div class="sidebar-card">
-      <div class="sidebar-card-header">Logic Validation</div>
+      <div class="sidebar-card-header" data-i18n="logic.title">逻辑验证</div>
       <div class="sidebar-card-body" id="logicPanel">
-        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No data yet</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;" data-i18n="logic.no_data">暂无数据</div>
       </div>
     </div>
   </div>
@@ -848,7 +884,7 @@ body {
   <!-- Summary Panel -->
   <div class="summary-panel" id="summaryPanel">
     <div style="font-size:12px;color:var(--text-muted);text-align:center;">
-      Summary will be generated after meeting processing...
+      <span data-i18n="summary.waiting">会议处理完成后将生成摘要...</span>
     </div>
   </div>
 </div>
@@ -857,51 +893,51 @@ body {
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
-  <button class="btn btn-primary" id="btnStart">Demo</button>
-  <button class="btn btn-secondary" id="btnReset">Reset</button>
+  <button class="btn btn-primary" id="btnStart" data-i18n="controls.demo">演示</button>
+  <button class="btn btn-secondary" id="btnReset" data-i18n="controls.reset">重置</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
-  <button class="btn btn-secondary" id="btnMic">Mic</button>
-  <button class="btn btn-secondary" id="btnUpload">Upload</button>
-  <label class="diarization-upload-options" title="离线上传时自动区分说话人">
+  <button class="btn btn-secondary" id="btnMic" data-i18n="controls.mic">麦克风</button>
+  <button class="btn btn-secondary" id="btnUpload" data-i18n="controls.upload">上传</button>
+  <label class="diarization-upload-options" data-i18n-title="diarization.title" title="离线上传时自动区分说话人">
     <input type="checkbox" id="enableDiarization" checked>
-    说话人
-    <select id="knownSpeakerCount" title="已知人数通常更稳定">
-      <option value="">人数自动</option>
-      <option value="2">2 人</option>
-      <option value="3">3 人</option>
-      <option value="4">4 人</option>
-      <option value="5">5 人</option>
-      <option value="6">6 人</option>
-      <option value="7">7 人</option>
-      <option value="8">8 人</option>
+    <span data-i18n="diarization.label">说话人</span>
+    <select id="knownSpeakerCount" data-i18n-title="diarization.count_title" title="已知人数通常更稳定">
+      <option value="" data-i18n="diarization.auto">人数自动</option>
+      <option value="2" data-i18n="diarization.people" data-i18n-count="2">2 人</option>
+      <option value="3" data-i18n="diarization.people" data-i18n-count="3">3 人</option>
+      <option value="4" data-i18n="diarization.people" data-i18n-count="4">4 人</option>
+      <option value="5" data-i18n="diarization.people" data-i18n-count="5">5 人</option>
+      <option value="6" data-i18n="diarization.people" data-i18n-count="6">6 人</option>
+      <option value="7" data-i18n="diarization.people" data-i18n-count="7">7 人</option>
+      <option value="8" data-i18n="diarization.people" data-i18n-count="8">8 人</option>
     </select>
   </label>
-  <button class="btn btn-secondary" id="btnHotwords">Settings</button>
+  <button class="btn btn-secondary" id="btnHotwords" data-i18n="controls.settings">设置</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
   <span style="font-size:10px;color:var(--text-muted);" id="micStatus"></span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   <div class="time-display" id="timeDisplay">--:--</div>
-  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;">Log</button>
+  <button class="btn btn-secondary" id="btnLog" style="font-size:10px;" data-i18n="controls.log">日志</button>
 </div>
 
 <div class="hotword-modal" id="hotwordModal" aria-hidden="true">
   <section class="hotword-dialog" role="dialog" aria-modal="true" aria-labelledby="hotwordDialogTitle">
-    <aside class="settings-sidebar" aria-label="设置分类">
+    <aside class="settings-sidebar" data-i18n-aria-label="settings.search_aria" aria-label="设置分类">
       <div class="settings-sidebar-title">
         <span class="settings-sidebar-mark">DT</span>
-        <div><strong>设置</strong><small>识别、设备与领域热词</small></div>
+        <div><strong data-i18n="settings.sidebar_title">设置</strong><small data-i18n="settings.sidebar_subtitle">识别、设备与领域热词</small></div>
       </div>
-      <input class="settings-search" id="settingsSearch" type="search" placeholder="搜索设置..." aria-label="搜索设置分类">
-      <div class="settings-nav-label">语音识别</div>
-      <nav class="settings-nav" id="settingsNav" role="tablist" aria-label="设置分类">
+      <input class="settings-search" id="settingsSearch" type="search" data-i18n-placeholder="settings.search_placeholder" placeholder="搜索设置..." data-i18n-aria-label="settings.search_aria" aria-label="搜索设置分类">
+      <div class="settings-nav-label" data-i18n="settings.category">语音识别</div>
+      <nav class="settings-nav" id="settingsNav" role="tablist" data-i18n-aria-label="settings.search_aria" aria-label="设置分类">
         <button class="settings-nav-button active" id="settingsTabRecognition" type="button" role="tab" data-settings-tab="recognition" data-settings-search="识别 模型 文件 分段 VAD Silero" aria-controls="settingsPanelRecognition" aria-selected="true">
-          <span class="settings-nav-icon">ASR</span><span>识别与分段</span>
+          <span class="settings-nav-icon">ASR</span><span data-i18n="settings.recognition.tab">识别与分段</span>
         </button>
         <button class="settings-nav-button" id="settingsTabMicrophone" type="button" role="tab" data-settings-tab="microphone" data-settings-search="麦克风 设备 延迟 回声 噪声 增益 VAD" aria-controls="settingsPanelMicrophone" aria-selected="false" tabindex="-1">
-          <span class="settings-nav-icon">MIC</span><span>麦克风</span>
+          <span class="settings-nav-icon">MIC</span><span data-i18n="settings.microphone.tab">麦克风</span>
         </button>
         <button class="settings-nav-button" id="settingsTabHotwords" type="button" role="tab" data-settings-tab="hotwords" data-settings-search="热词 领域 预设 拼音 权重 专业词" aria-controls="settingsPanelHotwords" aria-selected="false" tabindex="-1">
-          <span class="settings-nav-icon">Aa</span><span>热词与预设</span>
+          <span class="settings-nav-icon">Aa</span><span data-i18n="settings.hotwords.tab">热词与预设</span>
         </button>
       </nav>
     </aside>
@@ -911,125 +947,125 @@ body {
         <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">识别与分段</div>
         <div id="settingsPageDescription" style="font-size:10px;color:var(--text-muted);">配置实时与最终转写模型，以及文件语音切分参数</div>
       </div>
-      <button class="btn btn-secondary" id="btnCloseHotwords" aria-label="关闭设置">Close</button>
+      <button class="btn btn-secondary" id="btnCloseHotwords" data-i18n-aria-label="controls.close" aria-label="关闭设置" data-i18n="controls.close">关闭</button>
     </div>
     <div class="hotword-dialog-body">
       <div class="settings-panel settings-section active" id="settingsPanelRecognition" role="tabpanel" data-settings-panel="recognition" aria-labelledby="settingsTabRecognition" aria-hidden="false">
         <div class="settings-page-heading">
-          <h2>识别与分段</h2>
-          <p>选择适合实时预览和最终转写的本地模型，并调整长音频的 VAD 切分方式。</p>
+          <h2 data-i18n="settings.recognition.tab">识别与分段</h2>
+          <p data-i18n="settings.recognition.intro">选择适合实时预览和最终转写的本地模型，并调整长音频的 VAD 切分方式。</p>
         </div>
-        <div class="settings-section-title">识别模型与文件切分</div>
+        <div class="settings-section-title" data-i18n="settings.recognition.section">识别模型与文件切分</div>
         <div class="settings-grid">
-          <label class="settings-field"><span>实时预览模型</span>
+          <label class="settings-field"><span data-i18n="settings.recognition.live_model">实时预览模型</span>
             <select class="hotword-input" id="liveAsrProfile">
-              <option value="low-latency">160 ms · 最低延迟</option>
-              <option value="balanced">480 ms · 平衡</option>
-              <option value="meeting">960 ms · 会议默认</option>
-              <option value="quality">1920 ms · 高精度</option>
+              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms · 最低延迟</option>
+              <option value="balanced" data-i18n="settings.profile.balanced">480 ms · 平衡</option>
+              <option value="meeting" data-i18n="settings.profile.meeting">960 ms · 会议默认</option>
+              <option value="quality" data-i18n="settings.profile.quality">1920 ms · 高精度</option>
             </select>
           </label>
-          <label class="settings-field"><span>最终转写模型</span>
+          <label class="settings-field"><span data-i18n="settings.recognition.final_model">最终转写模型</span>
             <select class="hotword-input" id="finalAsrProfile">
-              <option value="low-latency">160 ms · 最低延迟</option>
-              <option value="balanced">480 ms · 平衡</option>
-              <option value="meeting">960 ms · 会议默认</option>
-              <option value="quality">1920 ms · 高精度</option>
+              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms · 最低延迟</option>
+              <option value="balanced" data-i18n="settings.profile.balanced">480 ms · 平衡</option>
+              <option value="meeting" data-i18n="settings.profile.meeting">960 ms · 会议默认</option>
+              <option value="quality" data-i18n="settings.profile.quality">1920 ms · 高精度</option>
             </select>
           </label>
-          <label class="settings-field wide"><span>最终完整文件二次识别</span><input type="checkbox" id="finalTranscriptionEnabled"></label>
-          <label class="settings-field"><span>Silero 阈值</span><input class="hotword-input" id="fileVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
-          <label class="settings-field"><span>最短静音（秒）</span><input class="hotword-input" id="fileVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
-          <label class="settings-field"><span>最短语音（秒）</span><input class="hotword-input" id="fileVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
-          <label class="settings-field"><span>句首缓冲（ms）</span><input class="hotword-input" id="fileVadPrePadding" type="number" min="0" max="2000" step="50"></label>
-          <label class="settings-field"><span>句尾缓冲（ms）</span><input class="hotword-input" id="fileVadPostPadding" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field wide"><span data-i18n="settings.recognition.final_pass">最终完整文件二次识别</span><input type="checkbox" id="finalTranscriptionEnabled"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.threshold">Silero 阈值</span><input class="hotword-input" id="fileVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_silence">最短静音（秒）</span><input class="hotword-input" id="fileVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_speech">最短语音（秒）</span><input class="hotword-input" id="fileVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.pre_padding">句首缓冲（ms）</span><input class="hotword-input" id="fileVadPrePadding" type="number" min="0" max="2000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.post_padding">句尾缓冲（ms）</span><input class="hotword-input" id="fileVadPostPadding" type="number" min="0" max="3000" step="50"></label>
         </div>
-        <div class="settings-model-status" id="modelProfileStatus">正在读取本地模型...</div>
+        <div class="settings-model-status" id="modelProfileStatus" data-i18n="settings.model_loading">正在读取本地模型...</div>
       </div>
 
       <div class="settings-panel settings-section" id="settingsPanelMicrophone" role="tabpanel" data-settings-panel="microphone" aria-labelledby="settingsTabMicrophone" aria-hidden="true">
         <div class="settings-page-heading">
-          <h2>麦克风</h2>
-          <p>管理输入设备、实时断句策略和浏览器侧音频增强选项。</p>
+          <h2 data-i18n="settings.microphone.tab">麦克风</h2>
+          <p data-i18n="settings.microphone.intro">管理输入设备、实时断句策略和浏览器侧音频增强选项。</p>
         </div>
-        <div class="settings-section-title">麦克风设备与延迟</div>
+        <div class="settings-section-title" data-i18n="settings.microphone.section">麦克风设备与延迟</div>
         <div class="settings-grid">
-          <label class="settings-field wide"><span>输入设备</span>
+          <label class="settings-field wide"><span data-i18n="settings.microphone.input">输入设备</span>
             <div class="settings-inline">
-              <select class="hotword-input" id="microphoneDevice"><option value="">系统默认麦克风</option></select>
-              <button class="btn btn-secondary" type="button" id="btnRefreshMics">Refresh</button>
-              <button class="btn btn-secondary" type="button" id="btnTestMic">Test</button>
+              <select class="hotword-input" id="microphoneDevice"><option value="" data-i18n="settings.microphone.system_default">系统默认麦克风</option></select>
+              <button class="btn btn-secondary" type="button" id="btnRefreshMics" data-i18n="controls.refresh">刷新</button>
+              <button class="btn btn-secondary" type="button" id="btnTestMic" data-i18n="controls.test">测试</button>
             </div>
           </label>
           <div class="settings-field wide">
-            <span id="micTestStatus">尚未测试麦克风</span>
+            <span id="micTestStatus" data-i18n="settings.microphone.not_tested">尚未测试麦克风</span>
             <div class="mic-test-meter"><span id="micTestMeter"></span></div>
           </div>
-          <label class="settings-field"><span>实时切句档位</span>
+          <label class="settings-field"><span data-i18n="settings.microphone.profile">实时切句档位</span>
             <select class="hotword-input" id="microphoneLiveProfile">
-              <option value="meeting">会议</option><option value="dictation">听写</option><option value="oncall">持续待机</option>
+              <option value="meeting" data-i18n="settings.microphone.meeting">会议</option><option value="dictation" data-i18n="settings.microphone.dictation">听写</option><option value="oncall" data-i18n="settings.microphone.oncall">持续待机</option>
             </select>
           </label>
-          <label class="settings-field"><span>VAD 门控音频（小声环境建议关闭）</span><input type="checkbox" id="microphoneVadGating"></label>
-          <label class="settings-field"><span>句首预留（ms）</span><input class="hotword-input" id="microphonePreRoll" type="number" min="0" max="3000" step="50"></label>
-          <label class="settings-field"><span>断句等待（ms）</span><input class="hotword-input" id="microphoneEndpointGrace" type="number" min="0" max="5000" step="50"></label>
-          <label class="settings-field"><span>尾部静音（ms）</span><input class="hotword-input" id="microphoneTailPad" type="number" min="0" max="3000" step="50"></label>
-          <label class="settings-field"><span>实时 VAD 阈值</span><input class="hotword-input" id="microphoneVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
-          <label class="settings-field"><span>最短静音（秒）</span><input class="hotword-input" id="microphoneVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
-          <label class="settings-field"><span>最短语音（秒）</span><input class="hotword-input" id="microphoneVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
-          <label class="settings-field"><span>回声消除</span><input type="checkbox" id="microphoneEchoCancellation"></label>
-          <label class="settings-field"><span>噪声抑制</span><input type="checkbox" id="microphoneNoiseSuppression"></label>
-          <label class="settings-field"><span>自动增益</span><input type="checkbox" id="microphoneAutoGain"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.vad_gating">VAD 门控音频（小声环境建议关闭）</span><input type="checkbox" id="microphoneVadGating"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.pre_roll">句首预留（ms）</span><input class="hotword-input" id="microphonePreRoll" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.endpoint_grace">断句等待（ms）</span><input class="hotword-input" id="microphoneEndpointGrace" type="number" min="0" max="5000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.tail_pad">尾部静音（ms）</span><input class="hotword-input" id="microphoneTailPad" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.vad_threshold">实时 VAD 阈值</span><input class="hotword-input" id="microphoneVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_silence">最短静音（秒）</span><input class="hotword-input" id="microphoneVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_speech">最短语音（秒）</span><input class="hotword-input" id="microphoneVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.echo">回声消除</span><input type="checkbox" id="microphoneEchoCancellation"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.noise">噪声抑制</span><input type="checkbox" id="microphoneNoiseSuppression"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.gain">自动增益</span><input type="checkbox" id="microphoneAutoGain"></label>
         </div>
       </div>
 
       <div class="settings-panel settings-section" id="settingsPanelHotwords" role="tabpanel" data-settings-panel="hotwords" aria-labelledby="settingsTabHotwords" aria-hidden="true">
         <div class="settings-page-heading">
-          <h2>热词与领域预设</h2>
-          <p>可同时选择多个领域或维护自定义词条。领域预设不会覆盖已有热词的权重。</p>
+          <h2 data-i18n="settings.hotwords.heading">热词与领域预设</h2>
+          <p data-i18n="settings.hotwords.intro">可同时选择多个领域或维护自定义词条。领域预设不会覆盖已有热词的权重。</p>
         </div>
         <div class="domain-preset-section">
           <div class="domain-preset-heading">
-            <div><strong>领域预设（可多选）</strong><span>点击选中，再次点击取消；建议只启用当前会议相关的 1–2 个领域</span></div>
+            <div><strong data-i18n="settings.hotwords.presets">领域预设（可多选）</strong><span data-i18n="settings.hotwords.preset_hint">点击选中，再次点击取消；建议只启用当前会议相关的 1–2 个领域</span></div>
           </div>
           <div class="domain-preset-grid" id="domainPresetGrid"></div>
           <div class="domain-selection-notice" id="domainSelectionNotice" role="status" hidden>
-            <div><strong>已选领域：</strong><span id="domainSelectionNames"></span></div>
-            <small>对应热词已在下方自动勾选；取消领域后，词条会保留但取消勾选。点击保存后应用到新识别会话。</small>
+            <div><strong data-i18n="settings.hotwords.selected">已选领域：</strong><span id="domainSelectionNames"></span></div>
+            <small data-i18n="settings.hotwords.selected_hint">对应热词已在下方自动勾选；取消领域后，词条会保留但取消勾选。点击保存后应用到新识别会话。</small>
           </div>
         </div>
-        <div class="settings-section-title">热词与模糊拼音</div>
+        <div class="settings-section-title" data-i18n="settings.hotwords.section">热词与模糊拼音</div>
       <div class="hotword-setting-grid">
         <div class="hotword-setting-card">
-          <label><span>启用解码热词增强</span><input type="checkbox" id="hotwordsEnabled"></label>
-          <div class="hotword-note">启用 modified beam search，并将每个热词的权重注入 X-ASR 解码器。</div>
+          <label><span data-i18n="settings.hotwords.enable">启用解码热词增强</span><input type="checkbox" id="hotwordsEnabled"></label>
+          <div class="hotword-note" data-i18n="settings.hotwords.enable_note">启用 modified beam search，并将每个热词的权重注入 X-ASR 解码器。</div>
         </div>
         <div class="hotword-setting-card">
-          <label><span>启用模糊拼音纠错</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
-          <div class="hotword-note">支持平翘舌、n/l 和前后鼻音；只处理至少两个汉字的中文热词。</div>
+          <label><span data-i18n="settings.hotwords.fuzzy">启用模糊拼音纠错</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
+          <div class="hotword-note" data-i18n="settings.hotwords.fuzzy_note">支持平翘舌、n/l 和前后鼻音；只处理至少两个汉字的中文热词。</div>
         </div>
         <div class="hotword-setting-card" style="grid-column:1/-1;">
-          <label><span>新热词默认权重</span><span id="defaultScoreLabel">5.0</span></label>
+          <label><span data-i18n="settings.hotwords.default_score">新热词默认权重</span><span id="defaultScoreLabel">5.0</span></label>
           <div class="hotword-score-controls">
             <input type="range" id="defaultHotwordScore" min="0.5" max="12" step="0.5" value="5">
             <input class="hotword-input" type="number" id="defaultHotwordScoreNumber" min="0.1" max="20" step="0.5" value="5">
           </div>
         </div>
       </div>
-      <div class="hotword-list-header"><span>启用</span><span>标准写法</span><span>权重</span><span></span></div>
+      <div class="hotword-list-header"><span data-i18n="settings.hotwords.enabled">启用</span><span data-i18n="settings.hotwords.spelling">标准写法</span><span data-i18n="settings.hotwords.score">权重</span><span></span></div>
       <div class="hotword-list" id="hotwordList"></div>
       <div class="hotword-add">
-        <input class="hotword-input" id="newHotwordInput" placeholder="输入专业词、人名或缩写，例如 贾扬清 / OpenAI">
-        <button class="btn btn-secondary" id="btnAddHotword">Add</button>
+        <input class="hotword-input" id="newHotwordInput" data-i18n-placeholder="settings.hotwords.add_placeholder" placeholder="输入专业词、人名或缩写，例如 贾扬清 / OpenAI">
+        <button class="btn btn-secondary" id="btnAddHotword" data-i18n="controls.add">添加</button>
       </div>
-      <div class="hotword-note">英文默认限制为 2.5，避免过度偏置；你仍可为单个词显式调整。中文同音替换采用最长词优先，单字不会参与模糊匹配。</div>
+      <div class="hotword-note" data-i18n="settings.hotwords.note">英文默认限制为 2.5，避免过度偏置；你仍可为单个词显式调整。中文同音替换采用最长词优先，单字不会参与模糊匹配。</div>
       </div>
     </div>
     <div class="hotword-dialog-footer">
       <div class="hotword-save-status" id="hotwordSaveStatus"></div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary" id="btnCancelHotwords">Cancel</button>
-        <button class="btn btn-primary" id="btnSaveHotwords">Save &amp; Apply</button>
+        <button class="btn btn-secondary" id="btnCancelHotwords" data-i18n="controls.cancel">取消</button>
+        <button class="btn btn-primary" id="btnSaveHotwords" data-i18n="controls.save_apply">保存并应用</button>
       </div>
     </div>
     </div>
@@ -1047,8 +1083,8 @@ body {
     <span></span><span></span><span></span><span></span><span></span>
     <span></span><span></span><span></span><span></span><span></span>
   </div>
-  <div class="mic-orb-title" id="micOrbTitle">正在听你说话</div>
-  <div class="mic-orb-subtitle" id="micOrbSubtitle">音量越大，语音球越活跃</div>
+  <div class="mic-orb-title" id="micOrbTitle" data-i18n="mic.orb_listening">正在听你说话</div>
+  <div class="mic-orb-subtitle" id="micOrbSubtitle" data-i18n="mic.orb_hint">音量越大，语音球越活跃</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -1056,10 +1092,10 @@ body {
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="log-panel" id="logPanel">
   <div class="log-panel-header" id="logPanelHeader">
-    <span>Debug Logs</span>
-    <span style="font-size:10px;color:var(--text-muted);">click to close</span>
+    <span data-i18n="logs.title">调试日志</span>
+    <span style="font-size:10px;color:var(--text-muted);" data-i18n="logs.close_hint">点击关闭</span>
   </div>
-  <div class="log-panel-body" id="logPanelBody"><div>Connecting...</div></div>
+  <div class="log-panel-body" id="logPanelBody"><div data-i18n="logs.connecting">连接中...</div></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -1070,6 +1106,8 @@ body {
 <script src="./hotword-settings.js"></script>
 <script src="./app-settings.js"></script>
 <script src="./logic-flags.js"></script>
+<script src="./i18n.js"></script>
+<script src="./presentation.js"></script>
 <script type="module">
 // ============================================================
 // DiTing v3.0 - Frontend with wavesurfer.js
@@ -1157,6 +1195,15 @@ const settingsPanels = Array.from(document.querySelectorAll('[data-settings-pane
 const domainPresetGrid = $('domainPresetGrid');
 const domainSelectionNotice = $('domainSelectionNotice');
 const domainSelectionNames = $('domainSelectionNames');
+const languageSelect = $('languageSelect');
+const i18n = window.DiTingI18n.createI18n({
+  storage: window.localStorage,
+  document,
+  navigatorLanguage: window.navigator.language,
+});
+const t = (key, values = {}, fallback = key) => i18n.t(key, values, fallback);
+i18n.apply();
+if (languageSelect) languageSelect.value = i18n.language;
 
 // ── State ────────────────────────────────────────────────────
 let allSegments = [];
@@ -1165,6 +1212,7 @@ let isPlaying = false;
 let playbackTimer = null;
 let demoData = null;
 let selectedDomainPresetIds = new Set();
+let currentConnectionState = 'disconnected';
 
 // Upload
 let uploadWs = null;
@@ -1457,7 +1505,7 @@ class AudioPlaybackManager {
       audioPulse.className = 'pulse' + (active ? '' : ' inactive');
     }
     if (audioStatusText) {
-      audioStatusText.textContent = active ? 'Playing audio...' : 'No audio';
+      audioStatusText.textContent = active ? t('transcript.playing') : t('transcript.no_audio');
     }
     if (!active && audioTimeDisplay) {
       audioTimeDisplay.textContent = '--:-- / --:--';
@@ -1527,6 +1575,29 @@ function speakerColor(speakerId) {
   return `hsl(${hash % 360} 68% 62%)`;
 }
 
+function confidenceColorForTier(tier) {
+  if (tier === 'high') return 'var(--accent-green)';
+  if (tier === 'medium') return 'var(--accent-blue)';
+  if (tier === 'low') return 'var(--accent-red)';
+  return 'var(--text-muted)';
+}
+
+function renderUncertainText(text, uncertainSpans) {
+  let html = escapeHTML(text || '');
+  const spans = Array.isArray(uncertainSpans) ? uncertainSpans : [];
+  spans.forEach(span => {
+    const word = String(span?.text || '').trim();
+    const escapedWord = escapeHTML(word);
+    if (!escapedWord || !html.includes(escapedWord)) return;
+    const confidence = window.DiTingPresentation.formatConfidence(span.confidence);
+    html = html.replace(
+      escapedWord,
+      `<span class="uncertain-word" title="${t('segment.confidence')} ${confidence}">${escapedWord}</span>`,
+    );
+  });
+  return html;
+}
+
 function uploadApiUrl(fileId) {
   const params = new URLSearchParams({
     file_id: fileId,
@@ -1540,7 +1611,7 @@ function uploadApiUrl(fileId) {
 async function renameSpeaker(speakerId) {
   if (!currentMeetingId || !speakerId || speakerId === 'UNKNOWN') return;
   const existing = allSegments.find(seg => seg?.speaker_id === speakerId)?.speaker_name || '';
-  const name = window.prompt(`将 ${speakerId} 重命名为：`, existing);
+  const name = window.prompt(t('segment.rename_prompt', { speaker: speakerId }), existing);
   if (name === null || !name.trim()) return;
   try {
     const response = await fetch(
@@ -1561,18 +1632,20 @@ async function renameSpeaker(speakerId) {
     });
     showToast(`${speakerId} → ${name.trim()}`);
   } catch (error) {
-    showToast(`重命名失败: ${error.message}`);
+    showToast(t('segment.rename_failed', { message: error.message }));
   }
 }
 
 function updateConnectionStatus(status) {
   if (!connectionStatus) return;
+  currentConnectionState = status;
   const map = {
-    'connected': 'Connected',
-    'completed': 'Completed',
-    'disconnected': 'Offline',
+    connected: 'status.connected',
+    completed: 'status.completed',
+    disconnected: 'status.offline',
   };
-  connectionStatus.textContent = map[status] || status;
+  const marker = status === 'disconnected' ? '⚪' : '●';
+  connectionStatus.textContent = `${marker} ${t(map[status] || status, {}, status)}`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1592,7 +1665,14 @@ function renderSegment(seg, index, autoPlay = false) {
   const snrDb = seg.snr_db != null ? seg.snr_db.toFixed(0) : '--';
   const startSec = seg.start_sec != null ? seg.start_sec : (seg.start || 0);
   const endSec = seg.end_sec != null ? seg.end_sec : (seg.end || 0);
-  const dur = (endSec - startSec) || 0;
+  const durationText = window.DiTingPresentation.formatDuration(seg);
+  const confidenceValue = seg.asr_confidence ?? seg.confidence;
+  const confidenceText = window.DiTingPresentation.formatConfidence(confidenceValue);
+  const confidenceTier = window.DiTingPresentation.confidenceTier(confidenceValue);
+  const confidenceColor = confidenceColorForTier(confidenceTier);
+  const confidenceLabel = confidenceTier === 'unknown'
+    ? ''
+    : t(`segment.confidence_${confidenceTier}`);
   const hasAudio = !!(seg.audio_wav_base64);
   const speakerId = seg.speaker_id || seg.speaker || 'UNKNOWN';
   const speakerLabel = seg.speaker_name || (
@@ -1616,13 +1696,13 @@ function renderSegment(seg, index, autoPlay = false) {
 
   const cleanupParts = [];
   if (seg.fillers_removed?.length) {
-    cleanupParts.push(`停顿词: ${seg.fillers_removed.join(', ')}`);
+    cleanupParts.push(`${t('segment.fillers_removed')}: ${seg.fillers_removed.join(', ')}`);
   }
   if (seg.repetitions_merged?.length) {
-    cleanupParts.push(`合并重复: ${seg.repetitions_merged.join(', ')}`);
+    cleanupParts.push(`${t('segment.repetitions_merged')}: ${seg.repetitions_merged.join(', ')}`);
   }
   if (seg.corrections?.length) {
-    cleanupParts.push(`纠错: ${seg.corrections.map(c => `${c.original}→${c.corrected}`).join(', ')}`);
+    cleanupParts.push(`${t('segment.corrections')}: ${seg.corrections.map(c => `${c.original}→${c.corrected}`).join(', ')}`);
   }
   const postprocessHTML = cleanupParts.length
     ? `<div style="margin-top:4px;padding:4px 10px;font-size:11px;color:var(--text-muted);background:rgba(88,166,255,0.08);border-radius:4px;border-left:2px solid var(--accent-blue);">${escapeHTML(cleanupParts.join(' | '))}</div>`
@@ -1637,12 +1717,13 @@ function renderSegment(seg, index, autoPlay = false) {
   card.innerHTML = `
     <div class="segment-top">
       <span class="segment-index">#${index + 1}</span>
-      <button class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" style="color:${color};" title="点击重命名；置信度 ${((seg.speaker_confidence || 0) * 100).toFixed(0)}%">${escapeHTML(speakerLabel)}</button>
+      <button class="segment-speaker" data-speaker-id="${escapeHTML(speakerId)}" data-i18n-title="segment.rename_title" data-i18n-confidence="${window.DiTingPresentation.formatConfidence(seg.speaker_confidence)}" style="color:${color};" title="${t('segment.rename_title', { confidence: window.DiTingPresentation.formatConfidence(seg.speaker_confidence) })}">${escapeHTML(speakerLabel)}</button>
       <span class="segment-time">${formatTime(startSec)}</span>
-      <span class="segment-dur">(${dur.toFixed(1)}s)</span>
+      <span class="segment-dur"><span data-i18n="segment.duration">${t('segment.duration')}</span> ${durationText}</span>
+      <span class="segment-confidence" style="color:${confidenceColor};"><span data-i18n="segment.confidence">${t('segment.confidence')}</span> ${confidenceText}${confidenceLabel ? ` · <span data-i18n="segment.confidence_${confidenceTier}">${confidenceLabel}</span>` : ''}</span>
       <span class="segment-snr ${qLabel}">SNR ${snrDb}dB</span>
       ${hasAudio
-        ? `<button class="segment-play-btn" data-seg-index="${index}" title="Play/Pause">▶</button>`
+        ? `<button class="segment-play-btn" data-seg-index="${index}" data-i18n-title="segment.play_pause" title="${t('segment.play_pause')}">▶</button>`
         : ''}
     </div>
     ${hasAudio
@@ -1661,7 +1742,7 @@ function renderSegment(seg, index, autoPlay = false) {
            </div>
          </div>`
     }
-    <div class="segment-text">${escapeHTML(displayText)}</div>
+    <div class="segment-text">${renderUncertainText(displayText, seg.uncertain_spans)}</div>
     ${postprocessHTML}
     ${flagsHTML}
   `;
@@ -1731,20 +1812,29 @@ function escapeHTML(str) {
 // Sidebar Updates
 // ═══════════════════════════════════════════════════════════
 
-function updateStats(segmentsProcessed) {
-  if (statSegments) statSegments.textContent = segmentsProcessed;
+function updateStats(segmentsProcessed = null) {
+  const segments = allSegments.filter(Boolean);
+  const realCount = segmentsProcessed ?? segments.length;
+  if (statSegments) statSegments.textContent = realCount;
 
-  const logicCount = allSegments.reduce((sum, s) => sum + getVisibleLogicFlags(s).length, 0);
-  const lowConfCount = allSegments.reduce((sum, s) => sum + (s.uncertain_spans ? s.uncertain_spans.length : 0), 0);
-  const corrCount = allSegments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
+  const logicCount = segments.reduce((sum, s) => sum + getVisibleLogicFlags(s).length, 0);
+  const lowConfCount = segments.reduce((sum, s) => {
+    const spans = Array.isArray(s.uncertain_spans) ? s.uncertain_spans.length : 0;
+    const uncertainty = s.uncertainty?.level && s.uncertainty.level !== 'low' ? 1 : 0;
+    return sum + spans + uncertainty;
+  }, 0);
+  const corrCount = segments.reduce((sum, s) => sum + (s.corrections ? s.corrections.length : 0), 0);
 
   if (statLogicFlags) statLogicFlags.textContent = logicCount;
   if (statLowConf) statLowConf.textContent = lowConfCount;
   if (statCorrections) statCorrections.textContent = corrCount;
 
-  const pct = Math.min(90, 50 + segmentsProcessed * 3);
-  if (overallConfBar) overallConfBar.style.width = pct + '%';
-  if (overallConfText) overallConfText.textContent = pct + '%';
+  const confidence = window.DiTingPresentation.summarizeConfidence(segments);
+  if (overallConfBar) {
+    overallConfBar.style.width = confidence ? `${confidence.percent}%` : '0%';
+    overallConfBar.style.background = confidenceColorForTier(confidence?.tier || 'unknown');
+  }
+  if (overallConfText) overallConfText.textContent = confidence ? `${confidence.percent}%` : '--';
 }
 
 function updateLogicPanel() {
@@ -1756,7 +1846,7 @@ function updateLogicPanel() {
     }
   }
   if (flags.length === 0) {
-    logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No logic flags</div>';
+    logicPanel.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">${t('logic.no_flags')}</div>`;
     return;
   }
   logicPanel.innerHTML = flags.map(f => {
@@ -1791,7 +1881,7 @@ async function startDemo() {
 
   isPlaying = true;
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = 'Playing...'; btnStart.disabled = true; }
+  if (btnStart) { btnStart.textContent = t('controls.playing'); btnStart.disabled = true; }
   updateConnectionStatus('connected');
 
   currentSegmentIndex = -1;
@@ -1814,7 +1904,7 @@ function playNextDemoSegment() {
   if (visibleFlags.length > 0) {
     updateLogicPanel();
     for (const f of visibleFlags) {
-      if (f.severity === 'warning') showToast('Logic: ' + (f.message || '').substring(0, 60));
+      if (f.severity === 'warning') showToast(t('logic.toast_prefix') + (f.message || '').substring(0, 60));
     }
   }
 
@@ -1825,9 +1915,9 @@ function playNextDemoSegment() {
 function finishDemo() {
   isPlaying = false;
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = 'Demo'; btnStart.disabled = false; }
+  if (btnStart) { btnStart.textContent = t('controls.demo'); btnStart.disabled = false; }
   updateConnectionStatus('completed');
-  showToast('Demo complete');
+  showToast(t('demo.completed'));
 }
 
 function updateProgress(segIndex) {
@@ -1872,13 +1962,13 @@ function handleUploadHTTPResponse(result) {
     if (transcriptBody) transcriptBody.innerHTML = '';
     result.segments.forEach((seg, i) => renderSegment(seg, i, false));
     if (segmentCounter) segmentCounter.textContent = `${result.segments.length}/${result.segments.length}`;
-    if (statSegments) statSegments.textContent = result.segments_count || result.segments.length;
+    updateStats(result.segments_count || result.segments.length);
     updateLogicPanel();
-    showToast(`Done: ${result.segments_count || result.segments.length} segments`);
+    showToast(t('upload.complete', { count: result.segments_count || result.segments.length }));
     finishUploadUI('complete');
   } else if (result.status === 'demo_mode') {
     uploadWsDelivered = true;  // prevent double processing
-    showToast('X-ASR not loaded, using demo');
+    showToast(t('upload.demo_mode'));
     if (result.demo_data) {
       demoData = result.demo_data;
       startDemo();
@@ -1899,11 +1989,11 @@ async function handleFileUpload(event) {
   uploadHttpResult = null;
   uploadWsDelivered = false;
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = 'Connecting...'; btnUpload.disabled = true; }
+  if (btnUpload) { btnUpload.textContent = t('upload.connecting'); btnUpload.disabled = true; }
 
   if (uploadWs) { try { uploadWs.close(); } catch(e) {} uploadWs = null; }
 
-  showToast(`Uploading: ${file.name}`);
+  showToast(t('upload.uploading', { filename: file.name }));
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
 
   // Clear previous state
@@ -1916,11 +2006,11 @@ async function handleFileUpload(event) {
   if (emptyState) {
     emptyState.style.display = 'flex';
     const msgEl = emptyState.querySelector('div:nth-child(2)');
-    if (msgEl) msgEl.textContent = `Processing: ${file.name}`;
+    if (msgEl) msgEl.textContent = t('processing.file', { filename: file.name });
   }
   if (processingPanel) {
     processingPanel.innerHTML = `<div class="upload-status-card">
-      <div class="stage">Uploading: ${file.name}</div>
+      <div class="stage">${t('processing.uploading', { filename: escapeHTML(file.name) })}</div>
       <div style="color:var(--text-muted);">${(file.size/1024/1024).toFixed(1)} MB</div>
     </div>`;
   }
@@ -1931,7 +2021,7 @@ async function handleFileUpload(event) {
       console.log('[Upload] WS timeout — rendering from HTTP fallback');
       handleUploadHTTPResponse(uploadHttpResult);
     } else if (!uploadWsDelivered && !uploadHttpResult) {
-      showToast('Processing timeout — check backend logs');
+      showToast(t('upload.timeout'));
       finishUploadUI('timeout');
     }
   }, 30000);
@@ -1941,7 +2031,7 @@ async function handleFileUpload(event) {
 
     uploadWs.onopen = async () => {
       console.log('[Upload] WS connected');
-      if (btnUpload) btnUpload.textContent = 'Uploading...';
+      if (btnUpload) btnUpload.textContent = t('upload.in_progress');
 
       // Now upload the file via HTTP
       try {
@@ -1955,7 +2045,7 @@ async function handleFileUpload(event) {
         uploadHttpResult = result;
 
         if (result.status === 'error') {
-          showToast('Error: ' + (result.error || 'unknown'));
+          showToast(t('upload.error', { message: result.error || 'unknown' }));
           clearTimeout(fallbackTimer);
           finishUploadUI('error');
         } else if (result.status === 'demo_mode') {
@@ -2018,7 +2108,7 @@ async function uploadFallback(file) {
     return;
   }
 
-  showToast('Uploading without live view...');
+  showToast(t('upload.without_live'));
   const fileId = uploadFileId || generateUUID();
   try {
     const formData = new FormData();
@@ -2031,11 +2121,11 @@ async function uploadFallback(file) {
     handleUploadHTTPResponse(result);
   } catch (e) {
     console.error('[Upload] Fallback failed:', e);
-    showToast('Upload failed — check if backend is running');
+    showToast(t('upload.failed'));
     finishUploadUI('error');
   }
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = 'Upload'; btnUpload.disabled = false; }
+  if (btnUpload) { btnUpload.textContent = t('controls.upload'); btnUpload.disabled = false; }
   const fileInput = $('fileUpload');
   if (fileInput) fileInput.value = '';
 }
@@ -2051,8 +2141,8 @@ function handleUploadWSMessage(msg) {
     case 'status':
       if (panel) {
         panel.innerHTML = `<div class="upload-status-card">
-          <div class="stage">Processing: ${escapeHTML(msg.data.filename || '')}</div>
-          <div style="color:var(--text-muted);">Engine: ${escapeHTML(msg.data.engine || '')}</div>
+          <div class="stage">${t('processing.file', { filename: escapeHTML(msg.data.filename || '') })}</div>
+          <div style="color:var(--text-muted);">${t('processing.engine', { engine: escapeHTML(msg.data.engine || '') })}</div>
         </div>`;
       }
       break;
@@ -2060,7 +2150,10 @@ function handleUploadWSMessage(msg) {
     case 'progress':
       if (panel) {
         const progEl = panel.querySelector('.stage');
-        if (progEl) progEl.textContent = `Stage: ${msg.data.stage} (${(msg.data.fraction*100).toFixed(0)}%)`;
+        if (progEl) progEl.textContent = t('processing.stage', {
+          stage: msg.data.stage,
+          percent: (msg.data.fraction * 100).toFixed(0),
+        });
       }
       break;
 
@@ -2086,7 +2179,7 @@ function handleUploadWSMessage(msg) {
       const realCount = allSegments.filter(Boolean).length;
       const totalEst = msg.data.total_estimated || realCount || 50;
       if (segmentCounter) segmentCounter.textContent = `${realCount}/${totalEst}`;
-      if (statSegments) statSegments.textContent = msg.data.cumulative_stats?.segments_processed || realCount;
+      updateStats(msg.data.cumulative_stats?.segments_processed || realCount);
       if (progressFill) progressFill.style.width = Math.min(95, (realCount / Math.max(1, totalEst)) * 100) + '%';
 
       updateLogicPanel();
@@ -2095,7 +2188,9 @@ function handleUploadWSMessage(msg) {
 
     case 'complete':
       currentMeetingId = msg.data.file_id || currentMeetingId;
-      showToast(`Complete: ${msg.data.segments_count || allSegments.filter(Boolean).length} segments`);
+      showToast(t('upload.complete', {
+        count: msg.data.segments_count || allSegments.filter(Boolean).length,
+      }));
       // If WS delivered segments but 'complete' has the final full list with audio, use those
       if (msg.data.segments && msg.data.segments.length > 0) {
         const wsCount = allSegments.filter(Boolean).length;
@@ -2112,11 +2207,12 @@ function handleUploadWSMessage(msg) {
           });
         }
       }
+      updateStats(allSegments.filter(Boolean).length);
       finishUploadUI('complete');
       break;
 
     case 'error':
-      showToast('Error: ' + (msg.data?.message || 'unknown'));
+      showToast(t('upload.error', { message: msg.data?.message || 'unknown' }));
       // Try HTTP fallback if WS delivered nothing
       if (!uploadWsDelivered && uploadHttpResult) {
         handleUploadHTTPResponse(uploadHttpResult);
@@ -2126,7 +2222,7 @@ function handleUploadWSMessage(msg) {
       break;
 
     case 'timeout':
-      showToast('Processing timeout');
+      showToast(t('upload.timeout'));
       if (!uploadWsDelivered && uploadHttpResult) {
         handleUploadHTTPResponse(uploadHttpResult);
       } else {
@@ -2138,13 +2234,12 @@ function handleUploadWSMessage(msg) {
 
 function finishUploadUI(status) {
   const btnUpload = $('btnUpload');
-  if (btnUpload) { btnUpload.textContent = 'Upload'; btnUpload.disabled = false; }
+  if (btnUpload) { btnUpload.textContent = t('controls.upload'); btnUpload.disabled = false; }
 
   if (status === 'complete') {
     updateConnectionStatus('completed');
     if (progressFill) progressFill.style.width = '100%';
-    if (overallConfBar) { overallConfBar.style.width = '85%'; overallConfBar.style.background = 'var(--accent-green)'; }
-    if (overallConfText) overallConfText.textContent = '85%';
+    updateStats(allSegments.filter(Boolean).length);
   } else {
     updateConnectionStatus('disconnected');
   }
@@ -2160,16 +2255,16 @@ function finishUploadUI(status) {
 
 const SETTINGS_TABS = {
   recognition: {
-    title: '识别与分段',
-    description: '配置实时与最终转写模型，以及文件语音切分参数',
+    titleKey: 'settings.recognition.tab',
+    descriptionKey: 'settings.recognition.description',
   },
   microphone: {
-    title: '麦克风',
-    description: '管理输入设备、实时断句策略和浏览器音频增强',
+    titleKey: 'settings.microphone.tab',
+    descriptionKey: 'settings.microphone.description',
   },
   hotwords: {
-    title: '热词与预设',
-    description: '维护自定义热词，或一键载入常见领域词库',
+    titleKey: 'settings.hotwords.tab',
+    descriptionKey: 'settings.hotwords.description',
   },
 };
 
@@ -2189,8 +2284,8 @@ function switchSettingsTab(tabId) {
   });
   const metadata = SETTINGS_TABS[tabId];
   const title = $('hotwordDialogTitle');
-  if (title) title.textContent = metadata.title;
-  if (settingsPageDescription) settingsPageDescription.textContent = metadata.description;
+  if (title) title.textContent = t(metadata.titleKey);
+  if (settingsPageDescription) settingsPageDescription.textContent = t(metadata.descriptionKey);
   const body = hotwordModal?.querySelector('.hotword-dialog-body');
   if (body) body.scrollTop = 0;
 }
@@ -2209,10 +2304,43 @@ function filterSettingsNavigation(query) {
   }
 }
 
+function refreshLocalizedInterface(language = null) {
+  if (language) i18n.setLanguage(language);
+  else i18n.apply();
+  if (languageSelect) languageSelect.value = i18n.language;
+  document.title = `${t('app.name')} - ${t('app.subtitle')}`;
+  updateConnectionStatus(currentConnectionState);
+  if (!currentMeetingId && !uploadFileId && allSegments.length === 0 && meetingTitleDisplay) {
+    meetingTitleDisplay.textContent = t('status.no_meeting');
+  }
+  if (audioStatusText && (audioManager.activeIndex == null || audioManager.activeIndex < 0)) {
+    audioStatusText.textContent = t('transcript.no_audio');
+  }
+  const btnStart = $('btnStart');
+  if (btnStart) btnStart.textContent = isPlaying ? t('controls.playing') : t('controls.demo');
+  const btnMic = $('btnMic');
+  if (btnMic) btnMic.textContent = isRecording ? t('controls.stop') : t('controls.mic');
+  const btnUpload = $('btnUpload');
+  if (btnUpload && !btnUpload.disabled) btnUpload.textContent = t('controls.upload');
+  const defaultMicOption = Array.from(microphoneDevice?.options || [])
+    .find(option => option.value === '');
+  if (defaultMicOption) defaultMicOption.textContent = t('settings.microphone.system_default');
+  if (appSettingsState?.models) renderModelProfiles(appSettingsState.models);
+  switchSettingsTab(activeSettingsTab);
+  renderDomainPresetButtons();
+  if (allSegments.filter(Boolean).length > 0) updateLogicPanel();
+}
+
 function renderDomainPresetButtons() {
   if (!domainPresetGrid || !window.DiTingHotwordSettings) return;
   domainPresetGrid.innerHTML = '';
   window.DiTingHotwordSettings.getDomainPresets().forEach(preset => {
+    const localizedName = t(`settings.domain.${preset.id}.name`, {}, preset.name);
+    const localizedDescription = t(
+      `settings.domain.${preset.id}.description`,
+      {},
+      preset.description,
+    );
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'domain-preset-card';
@@ -2223,14 +2351,14 @@ function renderDomainPresetButtons() {
     const heading = document.createElement('div');
     heading.className = 'domain-preset-card-head';
     const title = document.createElement('strong');
-    title.textContent = preset.name;
+    title.textContent = localizedName;
     const check = document.createElement('b');
     check.className = 'domain-preset-check';
     check.setAttribute('aria-hidden', 'true');
     check.textContent = '✓';
     heading.append(title, check);
     const description = document.createElement('span');
-    description.textContent = preset.description;
+    description.textContent = localizedDescription;
     const action = document.createElement('em');
     action.dataset.presetAction = 'true';
     button.append(heading, description, action);
@@ -2242,7 +2370,10 @@ function renderDomainPresetButtons() {
 
 function updateDomainPresetSelectionUi() {
   const presets = window.DiTingHotwordSettings?.getDomainPresets() || [];
-  const presetNames = new Map(presets.map(preset => [preset.id, preset.name]));
+  const presetNames = new Map(presets.map(preset => [
+    preset.id,
+    t(`settings.domain.${preset.id}.name`, {}, preset.name),
+  ]));
   domainPresetGrid?.querySelectorAll('[data-preset-id]').forEach(button => {
     const selected = selectedDomainPresetIds.has(button.dataset.presetId);
     button.classList.toggle('selected', selected);
@@ -2250,14 +2381,16 @@ function updateDomainPresetSelectionUi() {
     const action = button.querySelector('[data-preset-action]');
     if (action) {
       action.textContent = selected
-        ? `已选中 · 点击取消`
-        : `${button.dataset.wordCount} 个词 · 点击启用`;
+        ? t('settings.hotwords.preset_disable')
+        : t('settings.hotwords.preset_enable', { count: button.dataset.wordCount });
     }
   });
   const selectedNames = Array.from(selectedDomainPresetIds)
     .map(id => presetNames.get(id))
     .filter(Boolean);
-  if (domainSelectionNames) domainSelectionNames.textContent = selectedNames.join('、');
+  if (domainSelectionNames) {
+    domainSelectionNames.textContent = selectedNames.join(i18n.language === 'zh-CN' ? '、' : ', ');
+  }
   if (domainSelectionNotice) domainSelectionNotice.hidden = selectedNames.length === 0;
 }
 
@@ -2271,7 +2404,7 @@ function syncDomainPresetSelection() {
 
 function toggleHotwordDomainPreset(presetId) {
   if (!hotwordSettingsState || !window.DiTingHotwordSettings) {
-    setHotwordStatus('设置仍在加载，请稍后再试', true);
+    setHotwordStatus(t('settings.hotwords.loading'), true);
     return;
   }
   const selected = !selectedDomainPresetIds.has(presetId);
@@ -2286,10 +2419,11 @@ function toggleHotwordDomainPreset(presetId) {
   hotwordSettingsState = { ...hotwordSettingsState, words: result.words };
   if (selected && hotwordsEnabled) hotwordsEnabled.checked = true;
   renderHotwordRows();
+  const localizedName = t(`settings.domain.${presetId}.name`, {}, result.preset.name);
   setHotwordStatus(
     selected
-      ? `已选中“${result.preset.name}”：新增 ${result.added_count} 个热词，相关词条已勾选；保存后生效`
-      : `已取消“${result.preset.name}”：相关词条已取消勾选，共享热词仍保持启用；保存后生效`,
+      ? t('settings.hotwords.preset_selected', { name: localizedName, count: result.added_count })
+      : t('settings.hotwords.preset_deselected', { name: localizedName }),
   );
 }
 
@@ -2332,19 +2466,25 @@ function renderModelProfiles(models = {}) {
     if (!select) return;
     Array.from(select.options).forEach(option => {
       option.disabled = available.length > 0 && !available.includes(option.value);
-      option.textContent = option.textContent.replace(/ · 未部署$/, '')
-        + (option.disabled ? ' · 未部署' : '');
+      const baseLabel = t(option.dataset.i18n, {}, option.textContent.replace(/ · (未部署|Not deployed)$/, ''));
+      option.textContent = baseLabel
+        + (option.disabled ? ` · ${t('settings.model_not_deployed')}` : '');
     });
   });
   if (!modelProfileStatus) return;
   const live = models.live || {};
   const finalModel = models.final || {};
   if (!live.chunk_ms) {
-    modelProfileStatus.textContent = '模型仍在加载，保存后会应用到新会话。';
+    modelProfileStatus.textContent = t('settings.model_still_loading');
     return;
   }
-  const fallback = live.fallback || finalModel.fallback ? '（存在本地模型回退）' : '';
-  modelProfileStatus.textContent = `当前实时 ${live.chunk_ms} ms · 最终 ${finalModel.chunk_ms || live.chunk_ms} ms · ${models.file_vad_provider || 'Silero VAD'} ${fallback}`;
+  const fallback = live.fallback || finalModel.fallback ? t('settings.model_fallback') : '';
+  modelProfileStatus.textContent = t('settings.model_status', {
+    live: live.chunk_ms,
+    final: finalModel.chunk_ms || live.chunk_ms,
+    provider: models.file_vad_provider || 'Silero VAD',
+    fallback,
+  });
 }
 
 function collectRuntimeSettings() {
@@ -2382,11 +2522,11 @@ async function refreshMicrophoneDevices() {
   const selected = microphoneDevice.value || appSettingsState?.microphone?.device_id || '';
   const devices = (await navigator.mediaDevices.enumerateDevices())
     .filter(device => device.kind === 'audioinput');
-  microphoneDevice.innerHTML = '<option value="">系统默认麦克风</option>';
+  microphoneDevice.innerHTML = `<option value="">${t('settings.microphone.system_default')}</option>`;
   devices.forEach((device, index) => {
     const option = document.createElement('option');
     option.value = device.deviceId;
-    option.textContent = device.label || `麦克风 ${index + 1}`;
+    option.textContent = device.label || t('settings.microphone.generic', { count: index + 1 });
     microphoneDevice.appendChild(option);
   });
   microphoneDevice.value = devices.some(device => device.deviceId === selected) ? selected : '';
@@ -2401,13 +2541,13 @@ async function stopMicrophoneTest() {
   micTestAudioContext = null;
   if (micTestMeter) micTestMeter.style.width = '0%';
   const button = $('btnTestMic');
-  if (button) button.textContent = 'Test';
+  if (button) button.textContent = t('controls.test');
 }
 
 async function toggleMicrophoneTest() {
   if (micTestStream) {
     await stopMicrophoneTest();
-    if (micTestStatus) micTestStatus.textContent = '麦克风测试已停止';
+    if (micTestStatus) micTestStatus.textContent = t('settings.microphone.test_stopped');
     return;
   }
   const runtime = collectRuntimeSettings();
@@ -2430,15 +2570,18 @@ async function toggleMicrophoneTest() {
       const db = rms > 0 ? 20 * Math.log10(rms) : -96;
       const percent = Math.max(0, Math.min(100, (db + 60) * 1.7));
       if (micTestMeter) micTestMeter.style.width = `${percent.toFixed(1)}%`;
-      if (micTestStatus) micTestStatus.textContent = `输入 ${db.toFixed(1)} dBFS · ${micTestStream.getAudioTracks()[0]?.label || '麦克风'}`;
+      if (micTestStatus) micTestStatus.textContent = t('settings.microphone.input_level', {
+        db: db.toFixed(1),
+        device: micTestStream.getAudioTracks()[0]?.label || t('settings.microphone.tab'),
+      });
       micTestAnimationFrame = requestAnimationFrame(render);
     };
     const button = $('btnTestMic');
-    if (button) button.textContent = 'Stop';
+    if (button) button.textContent = t('controls.stop');
     render();
   } catch (error) {
     await stopMicrophoneTest();
-    if (micTestStatus) micTestStatus.textContent = `测试失败：${error.message}`;
+    if (micTestStatus) micTestStatus.textContent = t('settings.microphone.test_failed', { message: error.message });
   }
 }
 
@@ -2508,7 +2651,7 @@ function renderHotwordRows() {
   hotwordList.innerHTML = '';
   hotwordSettingsState.words.forEach(item => hotwordList.appendChild(createHotwordRow(item)));
   syncDomainPresetSelection();
-  setHotwordStatus(`${hotwordSettingsState.words.length} 个热词`);
+  setHotwordStatus(t('settings.hotwords.count', { count: hotwordSettingsState.words.length }));
 }
 
 async function openHotwordSettings() {
@@ -2518,7 +2661,7 @@ async function openHotwordSettings() {
   if (settingsSearch) settingsSearch.value = '';
   filterSettingsNavigation('');
   switchSettingsTab(activeSettingsTab);
-  setHotwordStatus('正在加载...');
+  setHotwordStatus(t('settings.loading'));
   try {
     const response = await fetch(`${API_BASE}/api/settings`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -2534,7 +2677,7 @@ async function openHotwordSettings() {
     renderHotwordRows();
   } catch (error) {
     console.error('[Hotwords] Load failed:', error);
-    setHotwordStatus(`加载失败：${error.message}`, true);
+    setHotwordStatus(t('settings.hotwords.load_failed', { message: error.message }), true);
   }
 }
 
@@ -2552,7 +2695,7 @@ function addHotwordToEditor() {
   const duplicate = Array.from(hotwordList.querySelectorAll('[data-field="text"]'))
     .some(element => element.value.trim().toLocaleLowerCase() === text.toLocaleLowerCase());
   if (duplicate) {
-    setHotwordStatus('这个热词已经存在', true);
+    setHotwordStatus(t('settings.hotwords.duplicate'), true);
     return;
   }
   const score = window.DiTingHotwordSettings.scoreForNewWord(
@@ -2562,7 +2705,7 @@ function addHotwordToEditor() {
   hotwordList.appendChild(createHotwordRow({ text, score, enabled: true }));
   input.value = '';
   syncDomainPresetSelection();
-  setHotwordStatus('已加入编辑列表，保存后生效');
+  setHotwordStatus(t('settings.hotwords.added'));
 }
 
 function collectHotwordRows() {
@@ -2586,7 +2729,7 @@ async function saveHotwordSettings() {
   const runtimePayload = collectRuntimeSettings();
   const payload = { ...runtimePayload, hotwords: hotwordPayload };
   if (saveButton) saveButton.disabled = true;
-  setHotwordStatus('正在保存并重建热词解码器...');
+  setHotwordStatus(t('settings.hotwords.saving'));
   try {
     const response = await fetch(`${API_BASE}/api/settings`, {
       method: 'PUT',
@@ -2601,13 +2744,14 @@ async function saveHotwordSettings() {
     renderRuntimeSettings(appSettingsState);
     renderHotwordRows();
     const activeCount = data.hotwords?.active_count ?? hotwordSettingsState.words.length;
-    setHotwordStatus(data.reloading_models
-      ? `已保存 ${activeCount} 个热词；正在后台加载所选模型`
-      : `已应用 ${activeCount} 个热词和麦克风参数；新会话生效`);
-    showToast(data.reloading_models ? 'Settings saved · model reload started' : 'Settings applied to new ASR sessions');
+    const savedMessage = data.reloading_models
+      ? t('settings.hotwords.saved_reloading', { count: activeCount })
+      : t('settings.hotwords.saved', { count: activeCount });
+    setHotwordStatus(savedMessage);
+    showToast(savedMessage);
   } catch (error) {
     console.error('[Hotwords] Save failed:', error);
-    setHotwordStatus(`保存失败：${error.message}`, true);
+    setHotwordStatus(t('settings.hotwords.save_failed', { message: error.message }), true);
   } finally {
     if (saveButton) saveButton.disabled = false;
   }
@@ -2661,10 +2805,12 @@ function setMicVisualizerState(state) {
   micOrbPanel.classList.toggle('listening', state === 'recording');
   micOrbPanel.classList.toggle('finalizing', state === 'finalizing');
   micOrbPanel.setAttribute('aria-hidden', active ? 'false' : 'true');
-  if (micOrbTitle) micOrbTitle.textContent = state === 'finalizing' ? '正在整理转写' : '正在听你说话';
+  if (micOrbTitle) micOrbTitle.textContent = state === 'finalizing'
+    ? t('mic.orb_finalizing')
+    : t('mic.orb_listening');
   if (micOrbSubtitle) micOrbSubtitle.textContent = state === 'finalizing'
-    ? '请稍候，正在生成最终文本'
-    : '音量越大，语音球越活跃';
+    ? t('mic.orb_finalizing_hint')
+    : t('mic.orb_hint');
   if (active) {
     if (micLevelAnimationFrame === null) {
       micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
@@ -2707,7 +2853,7 @@ async function toggleMic() {
 
   if (isRecording) {
     stopMicRecording();
-    if (btnMic) { btnMic.textContent = 'Mic'; btnMic.classList.remove('active'); }
+    if (btnMic) { btnMic.textContent = t('controls.mic'); btnMic.classList.remove('active'); }
     return;
   }
 
@@ -2743,43 +2889,43 @@ async function toggleMic() {
         }));
       } else if (msg.type === 'configured') {
         micStreamId = msg.data.stream_id || micStreamId;
-        setMicOrbMessage('正在听你说话', `实时识别已连接 · ${msg.data.vad}`);
+        setMicOrbMessage(t('mic.orb_listening'), t('mic.live_connected', { vad: msg.data.vad }));
         if (micStatusEl) {
-          micStatusEl.textContent = `Recording · ${msg.data.vad}`;
+          micStatusEl.textContent = t('mic.status_recording', { vad: msg.data.vad });
           micStatusEl.style.color = 'var(--accent-red)';
         }
       } else if (msg.type === 'live_result' && msg.data.text) {
         setMicOrbMessage(
-          msg.data.is_final ? '已识别一句话' : '正在实时转写',
-          msg.data.is_final ? '继续说话，语音球会持续响应' : '正在捕捉你的声音',
+          msg.data.is_final ? t('mic.sentence_ready') : t('mic.transcribing'),
+          msg.data.is_final ? t('mic.keep_talking') : t('mic.capturing'),
         );
         updateMicResult(msg.data);
       } else if (msg.type === 'finalizing') {
-        setMicOrbMessage('正在整理转写', '请稍候，正在生成最终文本');
+        setMicOrbMessage(t('mic.orb_finalizing'), t('mic.orb_finalizing_hint'));
         if (micStatusEl) {
-          micStatusEl.textContent = 'Finalizing canonical transcript...';
+          micStatusEl.textContent = t('mic.status_finalizing');
           micStatusEl.style.color = 'var(--accent-yellow)';
         }
       } else if (msg.type === 'final_transcript') {
         replaceMicTranscript(msg.data);
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
-        setMicOrbMessage('转写完成', `已接收 ${seconds} 秒音频`);
+        setMicOrbMessage(t('mic.transcript_complete'), t('mic.audio_received', { seconds }));
         if (micStatusEl) {
-          micStatusEl.textContent = 'Complete';
+          micStatusEl.textContent = t('mic.status_complete');
           micStatusEl.style.color = 'var(--accent-green)';
         }
-        showToast(`Recording stopped · ${seconds}s received`);
+        showToast(t('mic.recording_stopped', { seconds }));
         cleanupMicRecording();
       } else if (msg.type === 'error') {
-        setMicOrbMessage('实时识别异常', msg.message || '请停止后重试');
-        showToast(msg.message || 'Live recognition failed');
+        setMicOrbMessage(t('mic.live_error'), msg.message || t('mic.retry'));
+        showToast(msg.message || t('mic.live_failed'));
       }
     };
     micWs.onerror = (event) => {
       console.error('[Mic] WebSocket error:', event);
-      setMicOrbMessage('连接异常', '无法连接实时识别服务');
-      if (micStatusEl) { micStatusEl.textContent = 'Live error'; micStatusEl.style.color = 'var(--accent-red)'; }
+      setMicOrbMessage(t('mic.connection_error'), t('mic.service_unavailable'));
+      if (micStatusEl) { micStatusEl.textContent = t('mic.status_live_error'); micStatusEl.style.color = 'var(--accent-red)'; }
     };
     micWs.onclose = (event) => {
       console.log('[Mic] WebSocket closed:', event.code, event.reason || 'no reason');
@@ -2806,17 +2952,19 @@ async function toggleMic() {
     source.connect(micWorklet).connect(silent).connect(micAudioContext.destination);
     isRecording = true;
     setMicVisualizerState('recording');
-    if (btnMic) { btnMic.textContent = 'Stop'; btnMic.classList.add('active'); }
+    if (btnMic) { btnMic.textContent = t('controls.stop'); btnMic.classList.add('active'); }
     if (micStatusEl) {
       micStatusEl.textContent = `${micAudioContext.sampleRate}Hz → 16kHz`;
       micStatusEl.style.color = 'var(--accent-red)';
     }
-    showToast('Recording started · real-time ASR connected');
+    showToast(t('mic.recording_started'));
   } catch (err) {
     console.error('Mic error:', err);
-    const micError = err.name === 'NotAllowedError' ? 'Mic permission denied' : `Mic error: ${err.name || 'unknown'}`;
+    const micError = err.name === 'NotAllowedError'
+      ? t('mic.permission_denied')
+      : t('upload.error', { message: err.name || 'unknown' });
     if (micStatusEl) { micStatusEl.textContent = micError; micStatusEl.style.color = 'var(--accent-red)'; }
-    showToast(err.message || 'Cannot access microphone');
+    showToast(err.message || t('mic.access_failed'));
     cleanupMicRecording();
   }
 }
@@ -2827,7 +2975,7 @@ function stopMicRecording() {
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   micWorklet?.port.postMessage({ type: 'capture.stop' });
   if (micStatus) {
-    micStatus.textContent = 'Finalizing...';
+    micStatus.textContent = t('mic.status_finalizing_short');
     micStatus.style.color = 'var(--accent-yellow)';
   }
   setTimeout(() => {
@@ -2870,11 +3018,11 @@ function updateMicResult(data) {
     }
     const html = `<div class="segment no-audio" id="live-result" style="opacity:0.7;">
       <div class="segment-top">
-        <span class="segment-speaker" style="color:var(--accent-blue);">Live</span>
+        <span class="segment-speaker" style="color:var(--accent-blue);">${t('mic.live_label')}</span>
         <span class="segment-snr medium">SNR ${(data.snr_db||20).toFixed(0)}dB</span>
       </div>
       <div class="segment-waveform-placeholder"><div class="mini-wave">${Array.from({length: 28}, () => `<div class="mini-wave-bar" style="height:${Math.floor(Math.random()*10+2)}px;"></div>`).join('')}</div></div>
-      <div class="segment-text">${escapeHTML(data.text || '(listening...)')}</div>
+      <div class="segment-text">${escapeHTML(data.text || t('mic.listening_placeholder'))}</div>
     </div>`;
     transcriptBody.insertAdjacentHTML('beforeend', html);
   } else if (data.is_final && data.text) {
@@ -2909,7 +3057,7 @@ function replaceMicTranscript(data) {
     renderSegment(segment, index, false);
   });
   updateStats(allSegments.length);
-  showToast(`Canonical transcript ready: ${segments.length} segments`);
+  showToast(t('mic.canonical_ready', { count: segments.length }));
 }
 
 function toggleLogPanel() {
@@ -2958,7 +3106,7 @@ function resetAll() {
   audioManager.reset();
 
   const btnStart = $('btnStart');
-  if (btnStart) { btnStart.textContent = 'Demo'; btnStart.disabled = false; }
+  if (btnStart) { btnStart.textContent = t('controls.demo'); btnStart.disabled = false; }
 
   if (transcriptBody) {
     transcriptBody.innerHTML = '';
@@ -2966,12 +3114,12 @@ function resetAll() {
   if (emptyState) {
     emptyState.style.display = 'flex';
     const msgEl = emptyState.querySelector('div:nth-child(2)');
-    if (msgEl) msgEl.textContent = 'Waiting for meeting...';
+    if (msgEl) msgEl.textContent = t('transcript.waiting');
   }
 
-  if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">No data yet</div>';
-  if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">Waiting for input...</div>';
-  if (summaryPanel) summaryPanel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;">Summary will be generated after meeting processing...</div>';
+  if (logicPanel) logicPanel.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">${t('logic.no_data')}</div>`;
+  if (processingPanel) processingPanel.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">${t('processing.waiting')}</div>`;
+  if (summaryPanel) summaryPanel.innerHTML = `<div style="font-size:12px;color:var(--text-muted);text-align:center;">${t('summary.waiting')}</div>`;
 
   if (progressFill) progressFill.style.width = '0%';
   if (timeDisplay) timeDisplay.textContent = '--:--';
@@ -2982,8 +3130,8 @@ function resetAll() {
   if (statCorrections) statCorrections.textContent = '0';
   if (overallConfBar) overallConfBar.style.width = '0%';
   if (overallConfText) overallConfText.textContent = '--';
-  if (meetingTitleDisplay) meetingTitleDisplay.textContent = 'No meeting loaded';
-  if (connectionStatus) connectionStatus.textContent = 'Offline';
+  if (meetingTitleDisplay) meetingTitleDisplay.textContent = t('status.no_meeting');
+  updateConnectionStatus('disconnected');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2997,19 +3145,22 @@ async function checkBackendStatus() {
     const data = await resp.json();
     if (data.model_available) {
       const chunk = data.models?.live?.chunk_ms;
-      const speakerStatus = data.diarization?.available ? ' · Speakers Ready' : ' · Speakers Off';
-      xasrStatus.innerHTML = `X-ASR ${chunk ? `${chunk}ms` : 'Ready'}${speakerStatus}${data.loading ? ' · Reloading' : ''}`;
+      const modelStatus = t('status.xasr_ready', { chunk: chunk ? `${chunk} ms` : 'Ready' });
+      const speakerStatus = data.diarization?.available
+        ? t('status.speakers_ready')
+        : t('status.speakers_off');
+      xasrStatus.textContent = `${modelStatus} · ${speakerStatus}${data.loading ? ` · ${t('status.reloading')}` : ''}`;
       xasrStatus.style.color = data.loading ? 'var(--accent-yellow)' : 'var(--accent-green)';
     } else if (data.loading) {
-      xasrStatus.innerHTML = 'X-ASR Loading...';
+      xasrStatus.textContent = t('status.xasr_loading');
       xasrStatus.style.color = 'var(--accent-yellow)';
     } else {
-      xasrStatus.innerHTML = 'X-ASR Demo Mode';
+      xasrStatus.textContent = t('status.xasr_demo');
       xasrStatus.style.color = 'var(--accent-orange)';
     }
     updateConnectionStatus('connected');
   } catch (e) {
-    xasrStatus.innerHTML = 'Backend Offline';
+    xasrStatus.textContent = t('status.backend_offline');
     xasrStatus.style.color = 'var(--accent-red)';
     updateConnectionStatus('disconnected');
   }
@@ -3026,6 +3177,7 @@ async function checkBackendStatus() {
 // ═══════════════════════════════════════════════════════════
 
 function initApp() {
+  refreshLocalizedInterface();
   checkBackendStatus();
   connectLogStream();
 
@@ -3047,6 +3199,10 @@ function initApp() {
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
   if (btnLog) btnLog.addEventListener('click', toggleLogPanel);
   if (logPanelHeader) logPanelHeader.addEventListener('click', toggleLogPanel);
+  languageSelect?.addEventListener('change', event => {
+    refreshLocalizedInterface(event.target.value);
+    checkBackendStatus();
+  });
   settingsNavButtons.forEach(button => {
     button.addEventListener('click', () => switchSettingsTab(button.dataset.settingsTab));
   });
@@ -3065,7 +3221,6 @@ function initApp() {
   hotwordModal?.addEventListener('click', event => {
     if (event.target === hotwordModal) closeHotwordSettings();
   });
-  renderDomainPresetButtons();
 
   console.log('[DiTing] App initialized — all event listeners registered');
 }

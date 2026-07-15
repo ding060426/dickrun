@@ -27,3 +27,13 @@ _Avoid_: Owner, creator
 **Participant**:
 A Colleague selected by the Organizer for a Reservation. A Participant can see the Reservation on their calendar but cannot manage it.
 _Avoid_: Invitee, attendee
+
+## Verification
+
+After making changes to frontend code, run the full test suite:
+
+```powershell
+Get-ChildItem frontend\tests\*.test.js | ForEach-Object { Write-Output "--- $_ ---"; node $_ }
+```
+
+The `management-page-integration.test.js` is the most critical — it validates that `index.html` is syntactically valid JavaScript by extracting and compiling the entire inline module script via `new Function()`. Any syntax errors or missing dependencies will cause this test to fail.

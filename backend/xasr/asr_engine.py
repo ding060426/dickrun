@@ -97,12 +97,12 @@ def _energy_vad(
     sample_rate: int,
     frame_ms: int = 25,
     hop_ms: int = 10,
-    energy_threshold_ratio: float = 0.03,
-    min_speech_frames: int = 25,     # ~250ms min speech
-    min_silence_frames: int = 50,    # ~500ms min silence gap (merge short pauses)
-    pre_padding_ms: float = 300,     # padding before speech
-    post_padding_ms: float = 300,    # padding after speech
-    min_segment_duration: float = 2.0,  # merge segments shorter than this with neighbors
+    energy_threshold_ratio: float = 0.06,  # raised from 0.03 → filter background noise
+    min_speech_frames: int = 15,           # ~150ms min speech (was 25=250ms)
+    min_silence_frames: int = 30,          # ~300ms gap → sentence break (was 50=500ms)
+    pre_padding_ms: float = 200,           # reduced from 300ms
+    post_padding_ms: float = 200,          # reduced from 300ms
+    min_segment_duration: float = 0.8,     # allow shorter independent segments (was 2.0s)
 ) -> List[tuple]:
     """
     Detect speech segments using energy-based VAD.
@@ -236,6 +236,7 @@ class XASREngine:
         enable_hotword_correction: bool = True,
         enable_uncertainty: bool = True,
         enable_endpoint_detection: bool = True,
+        enable_text_postprocess: bool = True,
         model_dir: str = None,
         provider: str = "cpu",
         sample_rate: int = 16000,
@@ -254,6 +255,8 @@ class XASREngine:
             enable_hotword_correction: Enable hotword correction
             enable_uncertainty: Enable uncertainty estimation
             enable_endpoint_detection: Enable sherpa-onnx endpoint detection
+            enable_text_postprocess: Enable post-ASR text cleaning pipeline
+                (filler removal + punctuation restoration + sentence splitting)
             model_dir: Model directory
             provider: ONNX inference backend (cpu / cuda / coreml)
             sample_rate: Audio sample rate
@@ -267,6 +270,7 @@ class XASREngine:
         self.enable_hotword_correction = enable_hotword_correction
         self.enable_uncertainty = enable_uncertainty
         self.enable_endpoint_detection = enable_endpoint_detection
+        self.enable_text_postprocess = enable_text_postprocess
         self.speaker_id = speaker_id
         self._sample_rate = sample_rate
         self._num_threads = num_threads
@@ -378,7 +382,15 @@ class XASREngine:
         # 2. VAD segmentation
         if on_progress:
             on_progress("vad", 0.05)
-        segments = _energy_vad(data, sr)
+        segments = _energy_vad(
+            data, sr,
+            energy_threshold_ratio=0.06,   # filter out background hum & light breathing
+            min_speech_frames=15,          # ~150ms — catch short utterances, skip clicks
+            min_silence_frames=30,         # ~300ms — cut at natural pauses
+            pre_padding_ms=200,
+            post_padding_ms=200,
+            min_segment_duration=0.8,      # keep brief but meaningful phrases
+        )
         total_segments = len(segments)
         logger.info(f"VAD found {total_segments} speech segments")
 
@@ -680,6 +692,20 @@ class XASREngine:
             for hw in self.hotword_corrector.hotwords:
                 if hw in display_text:
                     terms.append(hw)
+
+        # 2.5 Text post-processing (filler removal + punctuation + sentence splitting)
+        # Only apply to final results — partial results are shown as-is for low latency
+        if self.enable_text_postprocess and is_final and display_text.strip():
+            from modules.text_post_processor import process_asr_text
+            postprocessed = process_asr_text(
+                display_text,
+                enable_filler_filter=True,
+                enable_punctuation=True,
+                enable_force_split=True,
+                enable_normalize=True,
+            )
+            if postprocessed.strip():
+                display_text = postprocessed
 
         # 3. Data points extraction
         data_points = self._extract_data_points(display_text)

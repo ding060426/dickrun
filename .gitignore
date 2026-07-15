@@ -3,6 +3,8 @@ Eval_Ali/
 
 # ── ONNX model files (>100MB each) ──
 backend/xasr/models/*.onnx
+backend/xasr/models/**/*.onnx
+backend/xasr/models/punct/
 
 # ── Audio/video files (large) ──
 *.mp3

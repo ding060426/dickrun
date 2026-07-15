@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Callable, Protocol
 
 import numpy as np
 
@@ -30,6 +30,12 @@ class DiarizationSegment:
         return max(0.0, self.end_sec - self.start_sec)
 
 
+@dataclass
+class DiarizationBackendResult:
+    timeline: list[DiarizationSegment]
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
 class DiarizationBackend(Protocol):
     provider_name: str
 
@@ -40,4 +46,5 @@ class DiarizationBackend(Protocol):
         audio: np.ndarray,
         sample_rate: int,
         num_speakers: int | None = None,
-    ) -> list[DiarizationSegment]: ...
+        on_progress: Callable[[str, float], None] | None = None,
+    ) -> DiarizationBackendResult | list[DiarizationSegment]: ...

@@ -121,6 +121,26 @@ PATCH /api/meetings/{meeting_id}/speakers/SPEAKER_00  {"name":"张三"}
 模型缺失或显式关闭时会安全降级为原来的纯 ASR，不会让文件上传失败。重叠语音第一版只标记和降低归属置信度，
 不会把混合语音伪装成已经分离的双路文本。
 
+超过 10 分钟的音频默认启用静音感知分块：目标块长 5 分钟、最大 8 分钟、前后保留 2 秒上下文，最多两个
+worker 并行执行说话人分析。每个块先生成本地说话人，再通过 3D-Speaker 声纹做全局聚类，因此不会直接把
+不同块中的 `SPEAKER_00` 当成同一个人。X-ASR 仍保留整段连续识别上下文，不随 diarization 分块。
+前端处理状态会显示 `diarization 2/6` 之类的块级进度。
+
+长音频参数可通过环境变量调整：
+
+```text
+DITING_DIARIZATION_CHUNKING=true
+DITING_DIARIZATION_LONG_AUDIO_SEC=600
+DITING_DIARIZATION_TARGET_CHUNK_SEC=300
+DITING_DIARIZATION_MAX_CHUNK_SEC=480
+DITING_DIARIZATION_CHUNK_OVERLAP_SEC=2
+DITING_DIARIZATION_MAX_WORKERS=2
+DITING_DIARIZATION_WORKER_THREADS=2
+DITING_SPEAKER_STITCH_THRESHOLD=0.75
+```
+
+单块失败会使用全新 worker 重试；分块或跨块声纹统一仍失败时回退到整段说话人分析，整段也失败才降级为纯 ASR。
+
 ### 6. 实时麦克风转写
 
 打开前端后点击顶部 `Mic`，允许浏览器使用麦克风即可。浏览器通过

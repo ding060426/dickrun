@@ -14,7 +14,11 @@ from .alignment import (
     boundary_intervals,
     deduplicate_boundary,
 )
-from .contracts import DiarizationBackend, DiarizationSegment
+from .contracts import (
+    DiarizationBackend,
+    DiarizationBackendResult,
+    DiarizationSegment,
+)
 
 
 logger = logging.getLogger("diarization")
@@ -29,6 +33,7 @@ class DiarizationRun:
     provider: str = "disabled"
     reason: str = ""
     boundary_redecoded_segments: int = 0
+    backend_metadata: dict[str, object] = field(default_factory=dict)
 
     @property
     def speakers(self) -> list[dict]:
@@ -53,7 +58,7 @@ class DiarizationRun:
         ]
 
     def metadata(self) -> dict:
-        return {
+        metadata = {
             "enabled": self.enabled,
             "applied": self.applied,
             "provider": self.provider,
@@ -62,6 +67,8 @@ class DiarizationRun:
             "timeline_segments": len(self.timeline),
             "boundary_redecoded_segments": self.boundary_redecoded_segments,
         }
+        metadata.update(self.backend_metadata)
+        return metadata
 
 
 class OfflineMeetingPipeline:
@@ -133,11 +140,51 @@ class OfflineMeetingPipeline:
 
         if on_progress:
             on_progress("diarization", 0.05)
-        timeline = self.backend.diarize(
-            audio.samples,
-            audio.sample_rate,
-            num_speakers=num_speakers,
-        )
+
+        def diarization_progress(stage: str, fraction: float) -> None:
+            if on_progress:
+                bounded = max(0.0, min(1.0, float(fraction)))
+                on_progress(stage, 0.05 + 0.30 * bounded)
+
+        try:
+            backend_outcome = self.backend.diarize(
+                audio.samples,
+                audio.sample_rate,
+                num_speakers=num_speakers,
+                on_progress=diarization_progress,
+            )
+        except Exception as error:
+            logger.exception(
+                "Diarization failed at runtime; preserving ASR-only output"
+            )
+            if on_progress:
+                on_progress("asr (diarization fallback)", 0.35)
+
+            def fallback_asr_progress(stage: str, fraction: float) -> None:
+                if on_progress:
+                    on_progress(stage, 0.35 + 0.55 * fraction)
+
+            results = engine.process_file(
+                str(file_path),
+                on_segment=on_segment,
+                on_progress=fallback_asr_progress,
+                audio_buffer=audio,
+            )
+            if on_progress:
+                on_progress("done", 1.0)
+            return DiarizationRun(
+                results=results,
+                enabled=True,
+                applied=False,
+                provider=provider,
+                reason=f"runtime error: {error}",
+            )
+        if isinstance(backend_outcome, DiarizationBackendResult):
+            timeline = backend_outcome.timeline
+            backend_metadata = backend_outcome.metadata
+        else:
+            timeline = backend_outcome
+            backend_metadata = {}
         if on_progress:
             on_progress("asr", 0.35)
 
@@ -175,6 +222,7 @@ class OfflineMeetingPipeline:
             applied=True,
             provider=provider,
             boundary_redecoded_segments=boundary_redecoded,
+            backend_metadata=backend_metadata,
         )
 
     def _boundary_redecode(

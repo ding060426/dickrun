@@ -48,7 +48,13 @@ from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
 from upload_storage import UploadTooLargeError, save_upload_to_temp
 from xasr.hotword_config import HotwordConfigStore
 from xasr.runtime_config import RuntimeConfigStore
-from diarization import OfflineMeetingPipeline, SherpaDiarizationBackend
+from diarization import (
+    ChunkedDiarizationBackend,
+    ChunkedDiarizationConfig,
+    OfflineMeetingPipeline,
+    SherpaDiarizationBackend,
+    SherpaSpeakerEmbedder,
+)
 from diarization.registry import MeetingRegistry
 from build_info import API_REVISION
 
@@ -59,6 +65,7 @@ logger = get_logger("main")
 try:
     from xasr.asr_engine import XASREngine, ASRResult
     from xasr.engine_pool import AsrEnginePool
+    from xasr.file_vad import SileroFileVad
     from xasr.live_audio import (
         LiveAudioProfile,
         LiveAudioProtocolError,
@@ -112,7 +119,7 @@ RUNTIME_CONFIG_PATH = Path(
 hotword_config_store = None
 runtime_config_store = RuntimeConfigStore(RUNTIME_CONFIG_PATH)
 DIARIZATION_MODEL_DIR = Path(BACKEND_DIR) / "diarization" / "models"
-diarization_backend = SherpaDiarizationBackend(
+base_diarization_backend = SherpaDiarizationBackend(
     os.getenv(
         "DITING_DIARIZATION_SEGMENTATION_MODEL",
         str(DIARIZATION_MODEL_DIR / "pyannote-segmentation-3.0.int8.onnx"),
@@ -124,6 +131,47 @@ diarization_backend = SherpaDiarizationBackend(
     threshold=float(os.getenv("DITING_DIARIZATION_THRESHOLD", "0.8")),
     num_threads=int(os.getenv("DITING_DIARIZATION_THREADS", "4")),
     min_turn_sec=float(os.getenv("DITING_DIARIZATION_MIN_TURN_SEC", "0.5")),
+)
+diarization_chunk_config = ChunkedDiarizationConfig(
+    enabled=os.getenv("DITING_DIARIZATION_CHUNKING", "true").lower()
+    not in {"0", "false", "no", "off"},
+    long_audio_threshold_sec=float(
+        os.getenv("DITING_DIARIZATION_LONG_AUDIO_SEC", "600")
+    ),
+    target_chunk_sec=float(
+        os.getenv("DITING_DIARIZATION_TARGET_CHUNK_SEC", "300")
+    ),
+    max_chunk_sec=float(os.getenv("DITING_DIARIZATION_MAX_CHUNK_SEC", "480")),
+    overlap_sec=float(os.getenv("DITING_DIARIZATION_CHUNK_OVERLAP_SEC", "2")),
+    silence_search_sec=float(
+        os.getenv("DITING_DIARIZATION_SILENCE_SEARCH_SEC", "15")
+    ),
+    skip_silence_sec=float(
+        os.getenv("DITING_DIARIZATION_SKIP_SILENCE_SEC", "20")
+    ),
+    max_workers=int(os.getenv("DITING_DIARIZATION_MAX_WORKERS", "2")),
+    worker_threads=int(os.getenv("DITING_DIARIZATION_WORKER_THREADS", "2")),
+    stitch_threshold=float(os.getenv("DITING_SPEAKER_STITCH_THRESHOLD", "0.75")),
+)
+diarization_speech_detector = None
+diarization_vad_model = Path(BACKEND_DIR) / "xasr" / "models" / "silero_vad.onnx"
+if HAS_XASR and diarization_vad_model.is_file():
+    diarization_speech_detector = SileroFileVad(
+        diarization_vad_model,
+        num_threads=1,
+    )
+diarization_speaker_embedder = SherpaSpeakerEmbedder(
+    base_diarization_backend.embedding_model,
+    num_threads=1,
+)
+diarization_backend = ChunkedDiarizationBackend(
+    base_diarization_backend,
+    worker_factory=lambda: base_diarization_backend.spawn(
+        num_threads=diarization_chunk_config.worker_threads
+    ),
+    speech_detector=diarization_speech_detector,
+    speaker_embedder=diarization_speaker_embedder,
+    config=diarization_chunk_config,
 )
 meeting_pipeline = OfflineMeetingPipeline(diarization_backend)
 meeting_registry = MeetingRegistry()

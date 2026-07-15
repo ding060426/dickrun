@@ -6,6 +6,7 @@ import importlib.util
 import os
 import threading
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 
@@ -37,6 +38,17 @@ class SherpaDiarizationBackend:
         self._diarizer_key: int | None = None
         self._diarizer = None
 
+    def spawn(self, *, num_threads: int | None = None) -> "SherpaDiarizationBackend":
+        """Create an independent worker; sherpa diarizers cannot share stream state."""
+
+        return SherpaDiarizationBackend(
+            self.segmentation_model,
+            self.embedding_model,
+            threshold=self.threshold,
+            num_threads=num_threads or self.num_threads,
+            min_turn_sec=self.min_turn_sec,
+        )
+
     def availability(self) -> tuple[bool, str]:
         if importlib.util.find_spec("sherpa_onnx") is None:
             return False, "sherpa-onnx is not installed"
@@ -54,6 +66,7 @@ class SherpaDiarizationBackend:
         audio: np.ndarray,
         sample_rate: int,
         num_speakers: int | None = None,
+        on_progress: Callable[[str, float], None] | None = None,
     ) -> list[DiarizationSegment]:
         available, reason = self.availability()
         if not available:
@@ -65,6 +78,8 @@ class SherpaDiarizationBackend:
 
         cluster_count = int(num_speakers) if num_speakers is not None else -1
         samples = np.ascontiguousarray(audio, dtype=np.float32).reshape(-1)
+        if on_progress:
+            on_progress("diarization", 0.0)
         with self._lock:
             if self._diarizer is None or self._diarizer_key != cluster_count:
                 self._diarizer = self._create_diarizer(cluster_count)
@@ -81,6 +96,8 @@ class SherpaDiarizationBackend:
             for item in raw_result.sort_by_start_time()
             if float(item.end) > float(item.start)
         ]
+        if on_progress:
+            on_progress("diarization", 1.0)
         return smooth_timeline(segments, merge_gap_sec=self.min_turn_sec)
 
     def _create_diarizer(self, cluster_count: int):
@@ -109,3 +126,63 @@ class SherpaDiarizationBackend:
         if not config.validate():
             raise RuntimeError("invalid sherpa-onnx diarization configuration")
         return sherpa_onnx.OfflineSpeakerDiarization(config)
+
+
+class SherpaSpeakerEmbedder:
+    """Extract normalized 3D-Speaker embeddings for cross-chunk stitching."""
+
+    def __init__(
+        self,
+        model: str | Path,
+        *,
+        num_threads: int = 1,
+    ) -> None:
+        self.model = Path(model)
+        self.num_threads = max(1, int(num_threads))
+        self._lock = threading.Lock()
+        self._extractor = None
+
+    def availability(self) -> tuple[bool, str]:
+        if importlib.util.find_spec("sherpa_onnx") is None:
+            return False, "sherpa-onnx is not installed"
+        if not self.model.is_file():
+            return False, f"missing speaker embedding model: {self.model}"
+        return True, f"threads={self.num_threads}"
+
+    def extract(self, audio: np.ndarray, sample_rate: int) -> np.ndarray:
+        available, reason = self.availability()
+        if not available:
+            raise RuntimeError(reason)
+        samples = np.ascontiguousarray(audio, dtype=np.float32).reshape(-1)
+        if not len(samples):
+            raise ValueError("speaker embedding requires non-empty audio")
+
+        with self._lock:
+            extractor = self._get_extractor()
+            stream = extractor.create_stream()
+            stream.accept_waveform(sample_rate, samples)
+            stream.input_finished()
+            if not extractor.is_ready(stream):
+                raise ValueError(
+                    f"speaker embedding needs more audio than {len(samples) / sample_rate:.2f}s"
+                )
+            embedding = np.asarray(extractor.compute(stream), dtype=np.float32)
+
+        norm = float(np.linalg.norm(embedding))
+        if not len(embedding) or not np.all(np.isfinite(embedding)) or norm <= 1e-8:
+            raise RuntimeError("speaker embedding model returned an invalid vector")
+        return embedding / norm
+
+    def _get_extractor(self):
+        if self._extractor is None:
+            import sherpa_onnx
+
+            config = sherpa_onnx.SpeakerEmbeddingExtractorConfig(
+                model=str(self.model),
+                num_threads=self.num_threads,
+                provider="cpu",
+            )
+            if not config.validate():
+                raise RuntimeError("invalid speaker embedding configuration")
+            self._extractor = sherpa_onnx.SpeakerEmbeddingExtractor(config)
+        return self._extractor

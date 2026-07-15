@@ -24,7 +24,7 @@ class _Backend:
     def availability(self):
         return True, "ready"
 
-    def diarize(self, audio, sample_rate, num_speakers=None):
+    def diarize(self, audio, sample_rate, num_speakers=None, on_progress=None):
         return [
             DiarizationSegment(0, 1, "SPEAKER_00", 0.9),
             DiarizationSegment(1, 2, "SPEAKER_01", 0.8),

@@ -1,5 +1,5 @@
 """
-谛听 DiTing - 标点恢复模型模块
+谛听 会悟 - 标点恢复模型模块
 ============================================================================
 基于 sherpa-onnx OfflinePunctuation (CT-Transformer) 的标点恢复。
 
@@ -213,7 +213,7 @@ def download_punctuation_model(target_dir: str = None) -> bool:
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="DiTing Punctuation Model Manager")
+    parser = argparse.ArgumentParser(description="会悟 Punctuation Model Manager")
     parser.add_argument("--download", action="store_true",
                         help="Download punctuation model")
     parser.add_argument("--dir", default=None,

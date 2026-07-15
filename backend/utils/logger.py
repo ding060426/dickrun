@@ -1,5 +1,5 @@
 """
-谛听 DiTing - Centralized Logging System
+谛听 会悟 - Centralized Logging System
 ==========================================================================
 Provides structured logging to console, file, and a ring buffer for
 WebSocket streaming. Supports log levels and module-scoped loggers.
@@ -164,7 +164,7 @@ def init_logging(
     # Log startup banner
     logger = logging.getLogger("diting")
     logger.info("=" * 60)
-    logger.info("  DiTing Logging System Initialized")
+    logger.info("  会悟 Logging System Initialized")
     logger.info(f"  Log directory: {log_dir}")
     logger.info(f"  Console level: {console_level} | File level: {file_level}")
     logger.info("=" * 60)

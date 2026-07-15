@@ -1,1 +1,1 @@
-"""DiTing utility modules."""
+"""会悟 utility modules."""

@@ -7,7 +7,7 @@
   const DEFAULT_LANGUAGE = 'zh-CN';
   const MESSAGES = Object.freeze({
     'zh-CN': Object.freeze({
-      'app.name': 'DiTing v4.5',
+      'app.name': '会悟 v4.5',
       'app.subtitle': '智能会议语音认知系统',
       'status.no_meeting': '未加载会议',
       'status.checking': '检查中...',
@@ -201,7 +201,7 @@
       'upload.complete': '完成：{count} 个片段',
     }),
     'en-US': Object.freeze({
-      'app.name': 'DiTing v4.5',
+      'app.name': '会悟 v4.5',
       'app.subtitle': 'Smart Meeting Speech Cognitive System',
       'status.no_meeting': 'No meeting loaded',
       'status.checking': 'Checking...',

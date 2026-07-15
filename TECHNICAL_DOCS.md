@@ -1,4 +1,4 @@
-# 谛听 (DiTing) v3.0 — 技术文档
+# 谛听 (会悟) v3.0 — 技术文档
 
 > **Smart Meeting Speech Cognitive System**
 > 基于 X-ASR (sherpa-onnx zipformer2) 的智能会议语音认知系统
@@ -24,7 +24,7 @@
 
 ## 1. 系统概览
 
-DiTing v3.0 是一个面向真实会议场景的端到端语音转写与认知增强系统。用户上传会议音频（mp3/wav/flac），系统自动完成：
+会悟 v3.0 是一个面向真实会议场景的端到端语音转写与认知增强系统。用户上传会议音频（mp3/wav/flac），系统自动完成：
 
 ```
 原始音频 → VAD 语音检测 → X-ASR 流式转写 → 文本后处理 → 波形可视化
@@ -731,7 +731,7 @@ engine = XASREngine(decoding_method="modified_beam_search")
 
 | 标签 | 含义 |
 |------|------|
-| `[DiTing]` | 通用日志 |
+| `[会悟]` | 通用日志 |
 | `[Audio]` | 音频播放 |
 | `[Upload]` | 上传流程 |
 
@@ -799,4 +799,4 @@ tail -f backend/logs/diting.log
 
 ---
 
-> **文档版本**: v3.0 | **更新日期**: 2026-07-15 | **作者**: DiTing Team
+> **文档版本**: v3.0 | **更新日期**: 2026-07-15 | **作者**: 会悟 Team

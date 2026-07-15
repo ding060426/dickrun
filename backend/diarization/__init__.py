@@ -1,4 +1,4 @@
-"""Offline speaker diarization and ASR alignment for DiTing."""
+"""Offline speaker diarization and ASR alignment for 会悟."""
 
 from .chunked_backend import ChunkedDiarizationBackend, ChunkedDiarizationConfig
 from .contracts import DiarizationBackendResult, DiarizationSegment, SpeechRegion

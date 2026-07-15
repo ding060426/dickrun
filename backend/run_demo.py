@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-谛听 DiTing - Standalone Demo Runner
+谛听 会悟 - Standalone Demo Runner
 ==========================================================================
 Processes an audio file end-to-end using X-ASR with full logging,
 saving results to JSON and a human-readable transcript.
@@ -89,7 +89,7 @@ def process_audio_file(
     """
     logger = get_logger("demo_runner")
     logger.info("=" * 70)
-    logger.info("  DiTing Demo Runner - End-to-End Audio Processing")
+    logger.info("  会悟 Demo Runner - End-to-End Audio Processing")
     logger.info("=" * 70)
 
     # Validate input
@@ -235,7 +235,7 @@ def process_audio_file(
     # Human-readable transcript
     txt_path = os.path.join(output_dir, f"{base_name}_transcript.txt")
     with open(txt_path, 'w', encoding='utf-8') as f:
-        f.write(f"谛听 DiTing - Meeting Transcript\n")
+        f.write(f"谛听 会悟 - Meeting Transcript\n")
         f.write(f"File: {file_name}\n")
         f.write(f"Processed: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"Stats: {stats['total_utterances']} utterances, "
@@ -264,7 +264,7 @@ def process_audio_file(
     # Stats file
     stats_path = os.path.join(output_dir, f"{base_name}_stats.txt")
     with open(stats_path, 'w', encoding='utf-8') as f:
-        f.write("DiTing Demo Runner - Processing Statistics\n")
+        f.write("会悟 Demo Runner - Processing Statistics\n")
         f.write("=" * 50 + "\n")
         for key, val in stats.items():
             f.write(f"  {key}: {val}\n")
@@ -317,7 +317,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="DiTing Demo Runner - Process audio with X-ASR",
+        description="会悟 Demo Runner - Process audio with X-ASR",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

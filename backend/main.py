@@ -1,5 +1,5 @@
 """
-谛听 (DiTing) - Smart Meeting Speech Cognitive System
+谛听 (会悟) - Smart Meeting Speech Cognitive System
 Backend Server v2.0 (2026-07-15)
 ==========================================================================
 Changelog:
@@ -244,7 +244,7 @@ def _schedule_xasr_reload() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: fire-and-forget model loading."""
-    logger.info("Starting DiTing backend server...")
+    logger.info("Starting 会悟 backend server...")
     try:
         db.init_db()
         logger.info("Meeting management store ready: %s", db.__name__)
@@ -252,11 +252,11 @@ async def lifespan(app: FastAPI):
         logger.error("Meeting management store initialization failed: %s", error)
     _schedule_xasr_reload()
     yield
-    logger.info("Shutting down DiTing backend...")
+    logger.info("Shutting down 会悟 backend...")
     PROCESSING_EXECUTOR.shutdown(wait=False, cancel_futures=True)
 
 app = FastAPI(
-    title="DiTing - Smart Meeting Speech Cognitive System",
+    title="会悟 - Smart Meeting Speech Cognitive System",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -310,7 +310,7 @@ async def health():
     diarization_status = meeting_pipeline.status()
     return {
         "status": "ok",
-        "service": "DiTing v2.0",
+        "service": "会悟 v2.0",
         "api_revision": API_REVISION,
         "xasr_available": HAS_XASR and xasr_engine is not None and xasr_engine.is_model_available,
         "xasr_loading": xasr_loading,
@@ -1334,7 +1334,7 @@ async def ws_live(websocket: WebSocket):
             "protocol": "pcm_s16le/16000/mono",
             "protocol_version": 2,
             "binary_frame": "DTP2 + uint32-le sequence + pcm_s16le",
-            "message": f"DiTing ready ({backend_type}); send configure then binary PCM",
+            "message": f"会悟 ready ({backend_type}); send configure then binary PCM",
         })
 
         if engine and engine.is_model_available:
@@ -1610,7 +1610,7 @@ async def serve_spa():
 if __name__ == "__main__":
     import uvicorn
     print("=" * 60)
-    print("  DiTing v2.0 - Smart Meeting Speech Cognitive System")
+    print("  会悟 v2.0 - Smart Meeting Speech Cognitive System")
     print("  Backend: http://localhost:8765")
     print("  API Docs: http://localhost:8765/docs")
     print("  Logs: backend/logs/diting.log")

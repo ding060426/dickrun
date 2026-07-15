@@ -1,5 +1,5 @@
 """
-X-ASR Engine - DiTing Smart Meeting Speech Cognitive System
+X-ASR Engine - 会悟 Smart Meeting Speech Cognitive System
 ==========================================================================
 Wraps sherpa-onnx streaming ASR with cognitive enhancement pipeline.
 

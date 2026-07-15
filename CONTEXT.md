@@ -1,11 +1,11 @@
-# DiTing Meeting Management
+# 会悟 Meeting Management
 
-This context describes the people and scheduled meetings shared by authenticated DiTing users.
+This context describes the people and scheduled meetings shared by authenticated 会悟 users.
 
 ## Language
 
 **User**:
-An authenticated person with a DiTing account.
+An authenticated person with a 会悟 account.
 _Avoid_: Account holder, member
 
 **Profile**:

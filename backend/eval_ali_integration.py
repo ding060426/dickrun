@@ -1,8 +1,8 @@
 """
-谛听 DiTing - Eval_Ali Dataset Integration Module
+谛听 会悟 - Eval_Ali Dataset Integration Module
 ==========================================================================
 Integrates the AliMeeting Eval dataset and AliMeeting4MUG dataset
-to improve DiTing's ASR quality and cognitive enhancement.
+to improve 会悟's ASR quality and cognitive enhancement.
 
 Capabilities:
   1. Parse TextGrid annotations for ground-truth transcriptions

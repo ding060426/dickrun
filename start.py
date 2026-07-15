@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DiTing - One-click startup script v2.0
+会悟 - One-click startup script v2.0
 Starts backend API (with X-ASR engine) and frontend page.
 
 Usage:
@@ -36,7 +36,7 @@ FRONTEND_URL = f"http://localhost:{FRONTEND_PORT}/?apiPort={BACKEND_PORT}"
 def is_compatible_backend(health_info):
     """Return true only for the backend contract this frontend expects."""
 
-    if not str(health_info.get("service", "")).startswith("DiTing"):
+    if not str(health_info.get("service", "")).startswith("会悟"):
         return False
     try:
         return int(health_info.get("api_revision", -1)) >= API_REVISION
@@ -57,7 +57,7 @@ def check_xasr_models():
             missing.append(f)
 
     if missing:
-        print(f"[DiTing] WARNING: X-ASR models incomplete")
+        print(f"[会悟] WARNING: X-ASR models incomplete")
         print(f"          Found: {existing if existing else '(none)'}")
         print(f"          Missing: {missing}")
         print(f"          Model dir: {XASR_MODELS_DIR}")
@@ -65,13 +65,13 @@ def check_xasr_models():
         print()
     else:
         total_mb = sum((XASR_MODELS_DIR / f).stat().st_size for f in required) / (1024*1024)
-        print(f"[DiTing] OK: X-ASR models ready ({total_mb:.0f}MB)")
+        print(f"[会悟] OK: X-ASR models ready ({total_mb:.0f}MB)")
         print()
 
 
 def start_backend():
     """Start FastAPI backend."""
-    print("[DiTing] Starting backend service (with X-ASR engine v2.0)...")
+    print("[会悟] Starting backend service (with X-ASR engine v2.0)...")
     os.chdir(BACKEND_DIR)
 
     env = os.environ.copy()
@@ -103,21 +103,21 @@ def start_backend():
                     proc.terminate()
                 raise RuntimeError(
                     f"Port {BACKEND_PORT} is occupied by an old or incompatible "
-                    "DiTing backend. Stop the earlier process, then start again."
+                    "会悟 backend. Stop the earlier process, then start again."
                 )
-            print(f"[DiTing] Backend ready -> {BACKEND_URL}")
-            print(f"[DiTing] API Docs  -> {BACKEND_URL}/docs")
-            print(f"[DiTing] Logs     -> backend/logs/diting.log")
+            print(f"[会悟] Backend ready -> {BACKEND_URL}")
+            print(f"[会悟] API Docs  -> {BACKEND_URL}/docs")
+            print(f"[会悟] Logs     -> backend/logs/diting.log")
 
             # Check X-ASR status
             try:
                 status = urllib.request.urlopen(f"{BACKEND_URL}/api/xasr/status")
                 xasr_info = json.loads(status.read().decode())
                 if xasr_info.get("available") and xasr_info.get("model_available"):
-                    print(f"[DiTing] X-ASR Engine: READY ({xasr_info.get('model_dir', '')})")
-                    print(f"[DiTing] Features: endpoint_detection={xasr_info.get('endpoint_detection', False)}")
+                    print(f"[会悟] X-ASR Engine: READY ({xasr_info.get('model_dir', '')})")
+                    print(f"[会悟] Features: endpoint_detection={xasr_info.get('endpoint_detection', False)}")
                 else:
-                    print(f"[DiTing] X-ASR Engine: Demo mode (loading={xasr_info.get('loading', False)})")
+                    print(f"[会悟] X-ASR Engine: Demo mode (loading={xasr_info.get('loading', False)})")
             except Exception:
                 pass
             return proc
@@ -126,13 +126,13 @@ def start_backend():
         except Exception:
             time.sleep(1.0)
 
-    print("[DiTing] WARNING: Backend start timeout (60s)")
+    print("[会悟] WARNING: Backend start timeout (60s)")
     return proc
 
 
 def start_frontend_server():
     """Start frontend static file server."""
-    print("[DiTing] Starting frontend page service...")
+    print("[会悟] Starting frontend page service...")
     os.chdir(FRONTEND_DIR)
 
     class Handler(http.server.SimpleHTTPRequestHandler):
@@ -143,13 +143,13 @@ def start_frontend_server():
     server = socketserver.TCPServer((FRONTEND_HOST, FRONTEND_PORT), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    print(f"[DiTing] Frontend ready -> {FRONTEND_URL}")
+    print(f"[会悟] Frontend ready -> {FRONTEND_URL}")
     return server
 
 
 def main():
     print("=" * 62)
-    print("  DiTing v2.0 - Smart Meeting Speech Cognitive System")
+    print("  会悟 v2.0 - Smart Meeting Speech Cognitive System")
     print("  Environment x Hotwords x Logic Validation")
     print("  ASR Engine: X-ASR (sherpa-onnx zipformer2)")
     print("=" * 62)
@@ -166,7 +166,7 @@ def main():
 
     print()
     print("=" * 62)
-    print("  DiTing system is ready!")
+    print("  会悟 system is ready!")
     print()
     print(f"  Backend API:   {BACKEND_URL}")
     print(f"  API Docs:      {BACKEND_URL}/docs")
@@ -193,10 +193,10 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n[DiTing] Stopping services...")
+        print("\n[会悟] Stopping services...")
         backend_proc.terminate()
         frontend_server.shutdown()
-        print("[DiTing] All services stopped.")
+        print("[会悟] All services stopped.")
 
 
 if __name__ == "__main__":

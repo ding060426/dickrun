@@ -1,4 +1,4 @@
-# 谛听 (DiTing) v3.0 — Smart Meeting Speech Cognitive System
+# 谛听 (会悟) v3.0 — Smart Meeting Speech Cognitive System
 
 基于 X-ASR (sherpa-onnx zipformer2) 的智能会议语音认知系统。支持音频文件上传、实时转写、热词修正、逻辑校验、音频波形可视化。
 
@@ -101,7 +101,7 @@ python start.py
 - API 文档: [http://localhost:8765/docs](http://localhost:8765/docs)
 
 如果模型未就绪，上传接口会明确返回错误，不会再用预置样例冒充真实转写。
-启动器会校验后端 API revision；如果 `8765` 被旧版 DiTing 占用，会明确报错并要求先关闭旧进程，
+启动器会校验后端 API revision；如果 `8765` 被旧版 会悟 占用，会明确报错并要求先关闭旧进程，
 不会再把旧服务误判为本次启动成功。
 
 ### 5. 会议管理与转写结果

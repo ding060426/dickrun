@@ -33,6 +33,31 @@ BACKEND_URL = f"http://localhost:{BACKEND_PORT}"
 FRONTEND_URL = f"http://localhost:{FRONTEND_PORT}/?apiPort={BACKEND_PORT}"
 
 
+def resolve_backend_python(root_dir=ROOT_DIR, environ=None, current_python=None):
+    """Choose the interpreter used by the backend service."""
+
+    environ = os.environ if environ is None else environ
+    current_python = sys.executable if current_python is None else current_python
+    configured = str(environ.get("DITING_BACKEND_PYTHON", "")).strip()
+    if configured:
+        configured_path = Path(configured).expanduser()
+        if not configured_path.is_file():
+            raise RuntimeError(
+                "DITING_BACKEND_PYTHON does not point to an existing file: "
+                f"{configured_path}"
+            )
+        return str(configured_path)
+
+    candidates = (
+        Path(root_dir) / ".venv-qwen3" / "Scripts" / "python.exe",
+        Path(root_dir) / ".venv-qwen3" / "bin" / "python",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return str(current_python)
+
+
 def is_compatible_backend(health_info):
     """Return true only for the backend contract this frontend expects."""
 
@@ -71,6 +96,8 @@ def check_xasr_models():
 
 def start_backend():
     """Start FastAPI backend."""
+    backend_python = resolve_backend_python()
+    print(f"[backend] Python: {backend_python}")
     print("[会悟] Starting backend service (with X-ASR engine v2.0)...")
     os.chdir(BACKEND_DIR)
 
@@ -80,7 +107,7 @@ def start_backend():
 
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "uvicorn", "main:app",
+            backend_python, "-m", "uvicorn", "main:app",
             "--host", BACKEND_HOST, "--port", str(BACKEND_PORT),
         ],
         env=env,

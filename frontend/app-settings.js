@@ -4,6 +4,9 @@
   if (root) root.DiTingAppSettings = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createAppSettings() {
   const ASR_PROFILES = ['low-latency', 'balanced', 'meeting', 'quality'];
+  const ASR_PROVIDERS = ['xasr', 'qwen3'];
+  const QWEN3_DEVICES = ['auto', 'cuda:0', 'cpu'];
+  const QWEN3_DTYPES = ['auto', 'bfloat16', 'float16', 'float32'];
   const LIVE_PROFILES = ['meeting', 'dictation', 'oncall'];
 
   function number(value, fallback, minimum, maximum, integer = false) {
@@ -24,6 +27,10 @@
     const microphone = source.microphone || {};
     return {
       recognition: {
+        asr_provider: choice(recognition.asr_provider, ASR_PROVIDERS, 'xasr'),
+        qwen3_model_path: String(recognition.qwen3_model_path || '').trim().slice(0, 1024),
+        qwen3_device: choice(recognition.qwen3_device, QWEN3_DEVICES, 'auto'),
+        qwen3_dtype: choice(recognition.qwen3_dtype, QWEN3_DTYPES, 'auto'),
         live_asr_profile: choice(recognition.live_asr_profile, ASR_PROFILES, 'meeting'),
         final_asr_profile: choice(recognition.final_asr_profile, ASR_PROFILES, 'meeting'),
         final_transcription_enabled: recognition.final_transcription_enabled !== false,
@@ -67,6 +74,7 @@
 
   return {
     ASR_PROFILES,
+    ASR_PROVIDERS,
     buildMediaConstraints,
     normalizeAppSettings,
     number,

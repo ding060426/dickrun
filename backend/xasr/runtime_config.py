@@ -10,9 +10,16 @@ from pathlib import Path
 
 
 ASR_PROFILES = ("low-latency", "balanced", "meeting", "quality")
+ASR_PROVIDERS = ("xasr", "qwen3")
+QWEN3_DEVICES = ("auto", "cuda:0", "cpu")
+QWEN3_DTYPES = ("auto", "bfloat16", "float16", "float32")
 
 DEFAULT_RUNTIME_SETTINGS = {
     "recognition": {
+        "asr_provider": "xasr",
+        "qwen3_model_path": "",
+        "qwen3_device": "auto",
+        "qwen3_dtype": "auto",
         "live_asr_profile": "meeting",
         "final_asr_profile": "meeting",
         "final_transcription_enabled": True,
@@ -96,6 +103,24 @@ class RuntimeConfigStore:
         microphone_default = defaults["microphone"]
 
         recognition = {
+            "asr_provider": _choice(
+                recognition_source.get("asr_provider"),
+                ASR_PROVIDERS,
+                recognition_default["asr_provider"],
+            ),
+            "qwen3_model_path": str(
+                recognition_source.get("qwen3_model_path", "") or ""
+            ).strip()[:1024],
+            "qwen3_device": _choice(
+                recognition_source.get("qwen3_device"),
+                QWEN3_DEVICES,
+                recognition_default["qwen3_device"],
+            ),
+            "qwen3_dtype": _choice(
+                recognition_source.get("qwen3_dtype"),
+                QWEN3_DTYPES,
+                recognition_default["qwen3_dtype"],
+            ),
             "live_asr_profile": _choice(
                 recognition_source.get("live_asr_profile"),
                 ASR_PROFILES,

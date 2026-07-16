@@ -59,5 +59,50 @@
     };
   }
 
-  return { buildAnalysisPayload, buildUploadUrl, resolveBackend };
+  function buildRecordPayload({
+    recordId,
+    meetingId,
+    title,
+    sourceType = 'manual',
+    sourceFilename = '',
+    sourceMimeType = '',
+    sourceSizeBytes = 0,
+    segments = [],
+    speakers = [],
+  }) {
+    const normalizedSegments = segments.filter(Boolean).map((segment, position) => ({
+      ...segment,
+      index: Number(segment.index ?? segment.segment_index ?? position + 1),
+      text: segment.display_text || segment.text || '',
+      raw_text: segment.raw_text || '',
+      start_sec: Number(segment.start_sec ?? segment.start ?? 0),
+      end_sec: Number(segment.end_sec ?? segment.end ?? 0),
+      speaker_id: segment.speaker_id || '',
+      speaker_name: segment.speaker_name || segment.speaker || '',
+      audio_wav_base64: segment.audio_wav_base64 || null,
+    }));
+    const fullText = normalizedSegments.map((segment) => {
+      const speaker = segment.speaker_name || segment.speaker_id || '未区分说话人';
+      return segment.text ? `[${speaker}] ${segment.text}` : '';
+    }).filter(Boolean).join('\n');
+    const durationSec = normalizedSegments.reduce(
+      (maximum, segment) => Math.max(maximum, segment.end_sec),
+      0,
+    );
+    return {
+      id: recordId || undefined,
+      meeting_id: meetingId || undefined,
+      title: title || '未命名会议记录',
+      source_type: sourceType,
+      source_filename: sourceFilename,
+      source_mime_type: sourceMimeType,
+      source_size_bytes: Number(sourceSizeBytes) || 0,
+      full_text: fullText,
+      duration_sec: durationSec,
+      speakers,
+      segments: normalizedSegments,
+    };
+  }
+
+  return { buildAnalysisPayload, buildRecordPayload, buildUploadUrl, resolveBackend };
 });

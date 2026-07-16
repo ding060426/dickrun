@@ -12,6 +12,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 import main
 from modules import meeting_db
+from modules import record_store
 
 
 class ManagementApiTests(unittest.IsolatedAsyncioTestCase):
@@ -21,16 +22,22 @@ class ManagementApiTests(unittest.IsolatedAsyncioTestCase):
         os.unlink(self.db_path)
         self.original_data_dir = meeting_db.DATA_DIR
         self.original_db_path = meeting_db.DB_PATH
+        self.original_record_db_path = record_store.DB_PATH
         meeting_db.DATA_DIR = Path(self.db_path).parent
         meeting_db.DB_PATH = Path(self.db_path)
+        record_store.DB_PATH = Path(f"{self.db_path}.records")
         meeting_db.init_db()
+        record_store.init_db()
         main.db = meeting_db
 
     def tearDown(self):
         meeting_db.DATA_DIR = self.original_data_dir
         meeting_db.DB_PATH = self.original_db_path
+        record_store.DB_PATH = self.original_record_db_path
         if os.path.exists(self.db_path):
             os.unlink(self.db_path)
+        if os.path.exists(f"{self.db_path}.records"):
+            os.unlink(f"{self.db_path}.records")
 
     async def test_user_can_attach_a_transcription_to_a_managed_meeting(self):
         registered = await main.auth_register(
@@ -130,6 +137,43 @@ class ManagementApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(current["user"]["email"], "profile@example.com")
         self.assertEqual(current["user"]["phone"], "13800138000")
         self.assertEqual(current["user"]["avatar_data_url"], avatar)
+
+    async def test_user_can_save_search_and_download_a_local_meeting_record(self):
+        await main.auth_register({"username": "recorder", "password": "secret123"})
+        login = await main.auth_login({"username": "recorder", "password": "secret123"})
+        authorization = f"Bearer {login['token']}"
+
+        saved = await main.api_create_record(
+            {
+                "title": "产品周会",
+                "source_type": "upload",
+                "source_filename": "weekly.wav",
+                "speakers": [{"id": "SPEAKER_00", "name": "张三"}],
+                "segments": [
+                    {
+                        "speaker_id": "SPEAKER_00",
+                        "speaker_name": "张三",
+                        "text": "确认下周发布",
+                        "start_sec": 0,
+                        "end_sec": 2,
+                        "audio_wav_base64": "UklGRg==",
+                    }
+                ],
+            },
+            authorization,
+        )
+        record_id = saved["record"]["id"]
+
+        listed = await main.api_list_records("发布", 50, 0, authorization)
+        self.assertEqual(listed["total"], 1)
+        loaded = await main.api_get_record(record_id, authorization)
+        self.assertEqual(loaded["record"]["segments"][0]["speaker_name"], "张三")
+        text_response = await main.api_download_record_text(record_id, authorization)
+        self.assertIn("确认下周发布", text_response.body.decode("utf-8"))
+
+        paths = {route.path for route in main.app.routes}
+        self.assertIn("/api/records", paths)
+        self.assertIn("/api/records/{record_id}/text", paths)
 
     async def test_user_cannot_promote_or_disable_their_own_account(self):
         registered = await main.auth_register(

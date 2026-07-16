@@ -18,6 +18,10 @@ class RuntimeConfigStoreTests(unittest.TestCase):
 
         self.assertEqual(settings["recognition"]["live_asr_profile"], "meeting")
         self.assertEqual(settings["recognition"]["final_asr_profile"], "meeting")
+        self.assertEqual(settings["recognition"]["asr_provider"], "xasr")
+        self.assertEqual(settings["recognition"]["qwen3_model_path"], "")
+        self.assertEqual(settings["recognition"]["qwen3_device"], "auto")
+        self.assertEqual(settings["recognition"]["qwen3_dtype"], "auto")
         self.assertEqual(settings["recognition"]["file_vad_provider"], "silero")
         self.assertFalse(settings["microphone"]["vad_gating"])
 
@@ -26,6 +30,10 @@ class RuntimeConfigStoreTests(unittest.TestCase):
             store = RuntimeConfigStore(Path(root) / "settings.json")
             settings = store.save({
                 "recognition": {
+                    "asr_provider": "qwen3",
+                    "qwen3_model_path": "Qwen/Qwen3-ASR-0.6B",
+                    "qwen3_device": "cuda:0",
+                    "qwen3_dtype": "bfloat16",
                     "live_asr_profile": "quality",
                     "final_asr_profile": "invalid",
                     "file_vad_threshold": 8,
@@ -42,6 +50,10 @@ class RuntimeConfigStoreTests(unittest.TestCase):
         self.assertEqual(settings, reloaded)
         self.assertEqual(settings["recognition"]["live_asr_profile"], "quality")
         self.assertEqual(settings["recognition"]["final_asr_profile"], "meeting")
+        self.assertEqual(settings["recognition"]["asr_provider"], "qwen3")
+        self.assertEqual(settings["recognition"]["qwen3_model_path"], "Qwen/Qwen3-ASR-0.6B")
+        self.assertEqual(settings["recognition"]["qwen3_device"], "cuda:0")
+        self.assertEqual(settings["recognition"]["qwen3_dtype"], "bfloat16")
         self.assertEqual(settings["recognition"]["file_vad_threshold"], 0.95)
         self.assertEqual(settings["microphone"]["endpoint_grace_ms"], 5000)
         self.assertEqual(settings["microphone"]["pre_roll_ms"], 0)

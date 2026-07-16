@@ -32,6 +32,28 @@ assert LiveAudioSession.SAMPLE_RATE == 16000
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
+    def test_main_can_import_when_xasr_engine_is_unavailable(self):
+        code = f"""
+import builtins
+import sys
+sys.path.insert(0, {str(BACKEND_DIR)!r})
+real_import = builtins.__import__
+def guarded_import(name, *args, **kwargs):
+    if name == 'xasr.asr_engine':
+        raise ModuleNotFoundError('X-ASR engine intentionally unavailable')
+    return real_import(name, *args, **kwargs)
+builtins.__import__ = guarded_import
+import main
+assert main.HAS_XASR is False
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

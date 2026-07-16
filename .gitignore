@@ -23,6 +23,9 @@ backend/logs/
 backend/data/hotwords.json
 backend/data/settings.json
 backend/data/diting.db
+backend/data/diting.db-*
+backend/data/records.db
+backend/data/records.db-*
 *.log
 
 # ── Demo output ──
@@ -32,6 +35,7 @@ asr_output.txt
 # ── Environment ──
 venv/
 .venv/
+.venv-qwen3/
 env/
 .env
 backend/.env
@@ -59,3 +63,4 @@ backend/xasr/model_downloads/
 
 # PDF inspection and other local scratch artifacts
 tmp/
+.cache/

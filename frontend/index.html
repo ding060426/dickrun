@@ -700,6 +700,39 @@ body {
 .management-tab { flex: 1; }
 .management-section { display: none; }
 .management-section.active { display: block; }
+.records-panel {
+  position: fixed; inset: 56px 0 0; z-index: 190; display: none;
+  flex-direction: column; background: var(--bg-secondary);
+}
+.records-panel.visible { display: flex; }
+.records-toolbar {
+  display: flex; gap: 8px; padding: 10px 12px; align-items: center;
+  border-bottom: 1px solid var(--border); background: var(--bg-tertiary);
+}
+.records-toolbar input, .record-title-input {
+  min-width: 0; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--bg-primary); color: var(--text-primary); padding: 6px 9px;
+}
+.records-toolbar input { flex: 1; }
+.record-title-input { width: min(240px, 24vw); font-size: 11px; }
+.records-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, 360px) 1fr; }
+.records-list { overflow-y: auto; padding: 12px; border-right: 1px solid var(--border); }
+.record-card {
+  padding: 10px; margin-bottom: 8px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--bg-primary); cursor: pointer;
+}
+.record-card:hover { border-color: var(--accent-blue); }
+.record-card-title { color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.record-card-meta { margin-top: 4px; color: var(--text-muted); font-size: 10px; }
+.record-card-preview { margin-top: 7px; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.record-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+.record-detail { overflow-y: auto; padding: 18px; }
+.record-detail pre { white-space: pre-wrap; line-height: 1.7; color: var(--text-secondary); font: 12px/1.7 inherit; }
+@media (max-width: 760px) {
+  .records-layout { grid-template-columns: 1fr; }
+  .record-detail { display: none; }
+  .record-title-input { width: 130px; }
+}
 .entity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .entity-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 5px 8px; font-size: 10px; }
 .entity-card .title { font-weight: 600; color: var(--text-primary); font-size: 11px; }
@@ -981,22 +1014,36 @@ body {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(5, 7, 12, 0.7);
+  background: rgba(43, 22, 78, 0.28);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 1200;
 }
 .hotword-modal.visible { display: flex; }
 .hotword-dialog {
+  --settings-accent: #7c3aed;
+  --settings-accent-strong: #6d28d9;
+  --settings-accent-soft: #f3e8ff;
+  --bg-primary: #faf8ff;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f5f0ff;
+  --bg-card: #ffffff;
+  --text-primary: #241536;
+  --text-secondary: #5f4b73;
+  --text-muted: #766489;
+  --text-dim: #9b8aaa;
+  --border: #e8def2;
+  --border-active: #c4a7e7;
   width: min(1180px, calc(100vw - 48px));
   height: min(820px, calc(100vh - 48px));
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--border-active);
-  border-radius: 16px;
-  background: rgba(24, 27, 36, 0.98);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  border: 1px solid #d9c7ee;
+  border-radius: 20px;
+  background: #ffffff;
+  color: var(--text-primary);
+  box-shadow: 0 28px 90px rgba(70, 35, 110, 0.24);
 }
 .settings-sidebar {
   min-width: 0;
@@ -1005,7 +1052,7 @@ body {
   flex-direction: column;
   gap: 14px;
   border-right: 1px solid var(--border);
-  background: rgba(20, 24, 31, 0.98);
+  background: linear-gradient(180deg, #fbf8ff 0%, #f5efff 100%);
 }
 .settings-sidebar-title {
   display: flex;
@@ -1018,10 +1065,10 @@ body {
   height: 30px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--border-active);
+  border: 1px solid #c8a8eb;
   border-radius: 9px;
-  color: var(--accent-blue);
-  background: rgba(65, 137, 230, 0.1);
+  color: var(--settings-accent);
+  background: var(--settings-accent-soft);
   font-size: 12px;
   font-weight: 800;
 }
@@ -1037,7 +1084,7 @@ body {
   color: var(--text-primary);
   font: inherit;
 }
-.settings-search:focus { border-color: var(--accent-blue); }
+.settings-search:focus { border-color: var(--settings-accent); box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.11); }
 .settings-nav-label {
   padding: 0 8px;
   color: var(--text-dim);
@@ -1062,11 +1109,11 @@ body {
   font: inherit;
   transition: 140ms ease;
 }
-.settings-nav-button:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.035); }
+.settings-nav-button:hover { color: var(--settings-accent-strong); background: rgba(124, 58, 237, 0.07); }
 .settings-nav-button.active {
-  border-color: rgba(65, 137, 230, 0.25);
-  color: var(--text-primary);
-  background: rgba(65, 137, 230, 0.12);
+  border-color: rgba(124, 58, 237, 0.22);
+  color: var(--settings-accent-strong);
+  background: rgba(124, 58, 237, 0.11);
 }
 .settings-nav-icon {
   width: 30px;
@@ -1075,12 +1122,12 @@ body {
   place-items: center;
   flex: 0 0 auto;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
+  background: #eee7f7;
   color: var(--text-muted);
   font-size: 9px;
   font-weight: 800;
 }
-.settings-nav-button.active .settings-nav-icon { color: var(--accent-blue); background: rgba(65, 137, 230, 0.16); }
+.settings-nav-button.active .settings-nav-icon { color: var(--settings-accent); background: #e9d9ff; }
 .settings-workspace { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .hotword-dialog-header,
 .hotword-dialog-footer {
@@ -1092,6 +1139,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .hotword-dialog-footer { border-top: 1px solid var(--border); border-bottom: 0; }
+.hotword-dialog-header, .hotword-dialog-footer { background: rgba(255, 255, 255, 0.94); }
 .hotword-dialog-body { flex: 1; min-height: 0; padding: 24px 28px; overflow-y: auto; }
 .settings-page-heading { margin-bottom: 20px; }
 .settings-page-heading h2 { margin: 0; color: var(--text-primary); font-size: 22px; }
@@ -1116,17 +1164,83 @@ body {
   color: var(--text-muted);
 }
 .settings-field.wide { grid-column: 1 / -1; }
+.hotword-dialog .hotword-input {
+  border-color: #dfd2eb;
+  background: #ffffff;
+  color: var(--text-primary);
+}
+.hotword-dialog .hotword-input:focus {
+  border-color: var(--settings-accent);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+.hotword-dialog input[type="checkbox"] { accent-color: var(--settings-accent); }
+.hotword-dialog .btn-primary { border-color: var(--settings-accent); background: var(--settings-accent); }
+.hotword-dialog .btn-primary:hover { border-color: var(--settings-accent-strong); background: var(--settings-accent-strong); }
+.hotword-dialog .btn-secondary { border-color: #ded1eb; background: #ffffff; color: #5b476e; }
+.hotword-dialog .btn-secondary:hover { border-color: #b99adc; color: var(--settings-accent-strong); background: #faf7ff; }
 .settings-inline { display: flex; align-items: center; gap: 8px; }
 .settings-inline > *:first-child { flex: 1; }
 .settings-model-status {
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 7px;
-  background: rgba(65, 137, 230, 0.08);
+  border: 1px solid #e3d5f2;
+  background: #faf6ff;
   color: var(--text-secondary);
   font-size: 10px;
   line-height: 1.5;
 }
+.asr-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.asr-provider-card {
+  min-height: 96px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  border: 1px solid #e2d6ee;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: 150ms ease;
+}
+.asr-provider-card:hover { border-color: #b896dc; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(85, 45, 125, 0.09); }
+.asr-provider-card.active {
+  border-color: var(--settings-accent);
+  background: linear-gradient(145deg, #ffffff 0%, #f5edff 100%);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+}
+.asr-provider-card strong { font-size: 13px; }
+.asr-provider-card small { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.asr-provider-badge {
+  margin-top: auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f0e6fc;
+  color: #6d28d9;
+  font-size: 9px;
+  font-weight: 700;
+}
+.asr-provider-badge.unavailable { background: #f4f0f7; color: #806f8e; }
+.qwen3-settings {
+  display: none;
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid #e5d8f2;
+  border-radius: 11px;
+  background: #fbf8ff;
+}
+.qwen3-settings.visible { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.qwen3-settings .wide { grid-column: 1 / -1; }
+.qwen3-settings-note { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.55; }
 .mic-test-meter { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-primary); }
 .mic-test-meter > span { display: block; width: 0; height: 100%; background: var(--accent-green); transition: width 80ms linear; }
 .hotword-setting-grid {
@@ -1143,6 +1257,7 @@ body {
 }
 .hotword-setting-card label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
 .hotword-score-controls { display: grid; grid-template-columns: 1fr 70px; gap: 8px; margin-top: 9px; }
+.hotword-dialog input[type="range"] { accent-color: var(--settings-accent); }
 .hotword-input {
   width: 100%;
   min-width: 0;
@@ -1154,7 +1269,7 @@ body {
   color: var(--text-primary);
   font: inherit;
 }
-.hotword-input:focus { border-color: var(--accent-blue); }
+.hotword-input:focus { border-color: var(--settings-accent); box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.09); }
 .hotword-list-header,
 .hotword-row {
   display: grid;
@@ -1166,12 +1281,12 @@ body {
 .hotword-list { display: flex; flex-direction: column; gap: 6px; max-height: 310px; overflow-y: auto; }
 .hotword-row {
   padding: 7px;
-  border: 1px solid var(--border);
+  border: 1px solid #eadcff;
   border-radius: 8px;
-  background: rgba(15, 17, 23, 0.48);
+  background: #fbfaff;
 }
 .hotword-row.disabled { opacity: 0.55; }
-.hotword-remove { padding: 5px 0; color: var(--accent-red); }
+.hotword-remove { padding: 5px 0; color: var(--settings-accent-strong); }
 .hotword-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
 .hotword-note { margin-top: 10px; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
 .hotword-save-status { min-height: 16px; font-size: 10px; color: var(--text-muted); }
@@ -1180,7 +1295,7 @@ body {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(65, 137, 230, 0.045);
+  background: rgba(124, 58, 237, 0.035);
 }
 .domain-preset-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .domain-preset-heading strong { display: block; color: var(--text-primary); font-size: 12px; }
@@ -1198,16 +1313,16 @@ body {
   font: inherit;
   transition: 140ms ease;
 }
-.domain-preset-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
+.domain-preset-card:hover { border-color: var(--settings-accent); transform: translateY(-1px); }
 .domain-preset-card.selected {
-  border-color: var(--accent-blue);
-  background: rgba(65, 137, 230, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(65, 137, 230, 0.18);
+  border-color: var(--settings-accent);
+  background: rgba(124, 58, 237, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.16);
 }
 .domain-preset-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .domain-preset-card strong { display: block; color: var(--text-primary); font-size: 11px; }
 .domain-preset-card span { display: block; min-height: 28px; margin-top: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
-.domain-preset-card em { display: block; margin-top: 7px; color: var(--accent-blue); font-size: 9px; font-style: normal; }
+.domain-preset-card em { display: block; margin-top: 7px; color: var(--settings-accent); font-size: 9px; font-style: normal; }
 .domain-preset-check {
   display: grid;
   width: 17px;
@@ -1219,19 +1334,19 @@ body {
   color: transparent;
   font-size: 10px;
 }
-.domain-preset-card.selected .domain-preset-check { border-color: var(--accent-blue); background: var(--accent-blue); color: white; }
+.domain-preset-card.selected .domain-preset-check { border-color: var(--settings-accent); background: var(--settings-accent); color: white; }
 .domain-selection-notice {
   margin-top: 10px;
   padding: 9px 10px;
-  border: 1px solid rgba(65, 137, 230, 0.35);
+  border: 1px solid rgba(124, 58, 237, 0.28);
   border-radius: 8px;
-  background: rgba(65, 137, 230, 0.09);
+  background: rgba(124, 58, 237, 0.08);
   color: var(--text-secondary);
   font-size: 10px;
   line-height: 1.5;
 }
 .domain-selection-notice[hidden] { display: none; }
-.domain-selection-notice strong { color: var(--accent-blue); }
+.domain-selection-notice strong { color: var(--settings-accent-strong); }
 .domain-selection-notice small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 9px; }
 .diarization-upload-options {
   display: flex;
@@ -1264,6 +1379,8 @@ body {
 }
 @media (max-width: 620px) {
   .hotword-setting-grid, .settings-grid { grid-template-columns: 1fr; }
+  .asr-provider-grid { grid-template-columns: 1fr; }
+  .qwen3-settings.visible { grid-template-columns: 1fr; }
   .domain-preset-grid { grid-template-columns: 1fr 1fr; }
   .hotword-list-header,
   .hotword-row { grid-template-columns: 30px minmax(120px, 1fr) 72px 34px; }
@@ -1306,7 +1423,7 @@ body {
     <nav class="topbar-nav" aria-label="模块导航">
       <button class="topbar-nav-item" data-module="meeting">会议转写</button>
       <button class="topbar-nav-item" data-module="reservation">会议预约</button>
-      <button class="topbar-nav-item" data-module="analysis">会议分析</button>
+      <button class="topbar-nav-item" data-module="analysis">记录管理</button>
       <button class="topbar-nav-item" data-module="users">用户管理</button>
     </nav>
   </div>
@@ -1428,8 +1545,8 @@ body {
       </div>
       <div class="module-card" data-module="analysis">
         <div class="icon">析</div>
-        <div class="name">会议分析 <span class="card-arrow">→</span></div>
-        <div class="desc">历史会议分析结果、转写记录与统计报表</div>
+        <div class="name">记录管理 <span class="card-arrow">→</span></div>
+        <div class="desc">查看、搜索和继续整理本地保存的会议转写与分段音频</div>
       </div>
       <div class="module-card" data-module="users">
         <div class="icon">管</div>
@@ -1451,7 +1568,7 @@ body {
 <nav class="module-nav" id="moduleNav">
   <button class="module-nav-item" data-module="meeting">会议转写</button>
   <button class="module-nav-item" data-module="reservation">会议预约</button>
-  <button class="module-nav-item" data-module="analysis">会议分析</button>
+  <button class="module-nav-item" data-module="analysis">记录管理</button>
   <button class="module-nav-item" data-module="users">用户管理</button>
 </nav>
 <div id="mainApp"><!-- ═══════════════════════════════════════════════════════════ -->
@@ -1552,12 +1669,17 @@ body {
 <!-- Controls Bar                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="controls-bar">
+  <button class="btn btn-secondary" id="btnNewRecord">新建记录</button>
+  <input class="record-title-input" id="recordTitleInput" maxlength="240" placeholder="记录标题">
+  <button class="btn btn-primary" id="btnSaveRecord">保存记录</button>
+  <button class="btn btn-secondary" id="btnRecords">记录管理</button>
+  <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnReset">重置</button>
   <span style="color:var(--text-muted);margin:0 4px;">|</span>
   <button class="btn btn-secondary" id="btnMic">录音</button>
   <button class="btn btn-secondary" id="btnUpload">上传</button>
   <input type="file" id="fileUpload" accept="audio/*" style="display:none">
-    <button class="btn btn-secondary" id="btnHotwords" data-i18n="controls.settings">璁剧疆</button>
+  <button class="btn btn-secondary" id="btnHotwords" data-i18n="controls.settings">设置</button>
   <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);" title="离线上传时自动区分说话人">
     <input type="checkbox" id="enableDiarization" checked> 说话人分离
   </label>
@@ -1657,152 +1779,204 @@ body {
 </div>
 
 
+<div class="records-panel" id="recordsPanel" aria-hidden="true">
+  <div class="management-header">
+    <strong>会议记录管理</strong>
+    <button class="btn btn-secondary" id="btnCloseRecords">关闭</button>
+  </div>
+  <div class="records-toolbar">
+    <input id="recordSearchInput" type="search" placeholder="搜索标题、文件名或转写全文">
+    <button class="btn btn-primary" id="btnSearchRecords">搜索</button>
+    <button class="btn btn-secondary" id="btnRefreshRecords">刷新</button>
+  </div>
+  <div class="records-layout">
+    <div class="records-list" id="recordsList"><div class="entity-card">暂无记录</div></div>
+    <div class="record-detail" id="recordDetail">
+      <div style="color:var(--text-muted);font-size:12px;">选择一条记录可查看全文、载入分段音频或导出纯文本。</div>
+    </div>
+  </div>
+</div>
+
+
 <div class="hotword-modal" id="hotwordModal" aria-hidden="true">
   <section class="hotword-dialog" role="dialog" aria-modal="true" aria-labelledby="hotwordDialogTitle">
-    <aside class="settings-sidebar" data-i18n-aria-label="settings.search_aria" aria-label="璁剧疆鍒嗙被">
+    <aside class="settings-sidebar" data-i18n-aria-label="settings.search_aria" aria-label="设置分类">
       <div class="settings-sidebar-title">
-        <span class="settings-sidebar-mark">DT</span>
-        <div><strong data-i18n="settings.sidebar_title">璁剧疆</strong><small data-i18n="settings.sidebar_subtitle">璇嗗埆銆佽澶囦笌棰嗗煙鐑瘝</small></div>
+        <span class="settings-sidebar-mark">会</span>
+        <div><strong data-i18n="settings.sidebar_title">设置</strong><small data-i18n="settings.sidebar_subtitle">识别、设备与领域热词</small></div>
       </div>
-      <input class="settings-search" id="settingsSearch" type="search" data-i18n-placeholder="settings.search_placeholder" placeholder="鎼滅储璁剧疆..." data-i18n-aria-label="settings.search_aria" aria-label="鎼滅储璁剧疆鍒嗙被">
-      <div class="settings-nav-label" data-i18n="settings.category">璇煶璇嗗埆</div>
-      <nav class="settings-nav" id="settingsNav" role="tablist" data-i18n-aria-label="settings.search_aria" aria-label="璁剧疆鍒嗙被">
-        <button class="settings-nav-button active" id="settingsTabRecognition" type="button" role="tab" data-settings-tab="recognition" data-settings-search="璇嗗埆 妯″瀷 鏂囦欢 鍒嗘 VAD Silero" aria-controls="settingsPanelRecognition" aria-selected="true">
-          <span class="settings-nav-icon">ASR</span><span data-i18n="settings.recognition.tab">璇嗗埆涓庡垎娈?/span>
+      <input class="settings-search" id="settingsSearch" type="search" data-i18n-placeholder="settings.search_placeholder" placeholder="搜索设置..." data-i18n-aria-label="settings.search_aria" aria-label="搜索设置分类">
+      <div class="settings-nav-label" data-i18n="settings.category">语音识别</div>
+      <nav class="settings-nav" id="settingsNav" role="tablist" data-i18n-aria-label="settings.search_aria" aria-label="设置分类">
+        <button class="settings-nav-button active" id="settingsTabRecognition" type="button" role="tab" data-settings-tab="recognition" data-settings-search="识别 模型 文件 分段 VAD Silero" aria-controls="settingsPanelRecognition" aria-selected="true">
+          <span class="settings-nav-icon">ASR</span><span data-i18n="settings.recognition.tab">识别与分段</span>
         </button>
-        <button class="settings-nav-button" id="settingsTabMicrophone" type="button" role="tab" data-settings-tab="microphone" data-settings-search="楹﹀厠椋?璁惧 寤惰繜 鍥炲０ 鍣０ 澧炵泭 VAD" aria-controls="settingsPanelMicrophone" aria-selected="false" tabindex="-1">
-          <span class="settings-nav-icon">MIC</span><span data-i18n="settings.microphone.tab">楹﹀厠椋?/span>
+        <button class="settings-nav-button" id="settingsTabMicrophone" type="button" role="tab" data-settings-tab="microphone" data-settings-search="麦克风 设备 延迟 回声 噪声 增益 VAD" aria-controls="settingsPanelMicrophone" aria-selected="false" tabindex="-1">
+          <span class="settings-nav-icon">MIC</span><span data-i18n="settings.microphone.tab">麦克风</span>
         </button>
-        <button class="settings-nav-button" id="settingsTabHotwords" type="button" role="tab" data-settings-tab="hotwords" data-settings-search="鐑瘝 棰嗗煙 棰勮 鎷奸煶 鏉冮噸 涓撲笟璇? aria-controls="settingsPanelHotwords" aria-selected="false" tabindex="-1">
-          <span class="settings-nav-icon">Aa</span><span data-i18n="settings.hotwords.tab">鐑瘝涓庨璁?/span>
+        <button class="settings-nav-button" id="settingsTabHotwords" type="button" role="tab" data-settings-tab="hotwords" data-settings-search="热词 领域 预设 拼音 权重 专业词" aria-controls="settingsPanelHotwords" aria-selected="false" tabindex="-1">
+          <span class="settings-nav-icon">Aa</span><span data-i18n="settings.hotwords.tab">热词与预设</span>
         </button>
       </nav>
     </aside>
     <div class="settings-workspace">
     <div class="hotword-dialog-header">
       <div>
-        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">璇嗗埆涓庡垎娈?/div>
-        <div id="settingsPageDescription" style="font-size:10px;color:var(--text-muted);">閰嶇疆瀹炴椂涓庢渶缁堣浆鍐欐ā鍨嬶紝浠ュ強鏂囦欢璇煶鍒囧垎鍙傛暟</div>
+        <div id="hotwordDialogTitle" style="font-size:14px;font-weight:700;">识别与分段</div>
+        <div id="settingsPageDescription" style="font-size:10px;color:var(--text-muted);">配置实时与最终转写模型，以及文件语音切分参数</div>
       </div>
-      <button class="btn btn-secondary" id="btnCloseHotwords" data-i18n-aria-label="controls.close" aria-label="鍏抽棴璁剧疆" data-i18n="controls.close">鍏抽棴</button>
+      <button class="btn btn-secondary" id="btnCloseHotwords" data-i18n-aria-label="controls.close" aria-label="关闭设置" data-i18n="controls.close">关闭</button>
     </div>
     <div class="hotword-dialog-body">
       <div class="settings-panel settings-section active" id="settingsPanelRecognition" role="tabpanel" data-settings-panel="recognition" aria-labelledby="settingsTabRecognition" aria-hidden="false">
         <div class="settings-page-heading">
-          <h2 data-i18n="settings.recognition.tab">璇嗗埆涓庡垎娈?/h2>
-          <p data-i18n="settings.recognition.intro">閫夋嫨閫傚悎瀹炴椂棰勮鍜屾渶缁堣浆鍐欑殑鏈湴妯″瀷锛屽苟璋冩暣闀块煶棰戠殑 VAD 鍒囧垎鏂瑰紡銆?/p>
+          <h2 data-i18n="settings.recognition.tab">识别与分段</h2>
+          <p data-i18n="settings.recognition.intro">选择适合实时预览和最终转写的本地模型，并调整长音频的 VAD 切分方式。</p>
         </div>
-        <div class="settings-section-title" data-i18n="settings.recognition.section">璇嗗埆妯″瀷涓庢枃浠跺垏鍒?/div>
+        <div class="settings-section-title" data-i18n="settings.recognition.section">识别模型与文件切分</div>
+        <div class="asr-provider-grid" role="group" data-i18n-aria-label="settings.provider.label" aria-label="最终转写引擎">
+          <button class="asr-provider-card active" id="asrProviderXasr" type="button" aria-pressed="true">
+            <strong data-i18n="settings.provider.xasr">X-ASR</strong>
+            <small data-i18n="settings.provider.xasr_hint">本地 ONNX，低延迟，支持实时预览与文件转写</small>
+            <span class="asr-provider-badge" id="xasrProviderBadge" data-i18n="settings.provider.available">可用</span>
+          </button>
+          <button class="asr-provider-card" id="asrProviderQwen3" type="button" aria-pressed="false">
+            <strong data-i18n="settings.provider.qwen3">Qwen3-ASR</strong>
+            <small data-i18n="settings.provider.qwen3_hint">用于文件和录音结束后的高质量最终转写</small>
+            <span class="asr-provider-badge unavailable" id="qwen3ProviderBadge" data-i18n="settings.provider.checking">检测中</span>
+          </button>
+        </div>
         <div class="settings-grid">
-          <label class="settings-field"><span data-i18n="settings.recognition.live_model">瀹炴椂棰勮妯″瀷</span>
+          <div class="qwen3-settings" id="qwen3Settings" aria-hidden="true">
+            <label class="settings-field wide"><span data-i18n="settings.provider.model_path">Qwen3 模型路径或模型 ID</span>
+              <input class="hotword-input" id="qwen3ModelPath" type="text" placeholder="Qwen/Qwen3-ASR-0.6B">
+            </label>
+            <label class="settings-field"><span data-i18n="settings.provider.device">运行设备</span>
+              <select class="hotword-input" id="qwen3Device">
+                <option value="auto" data-i18n="settings.provider.auto">自动</option>
+                <option value="cuda:0">CUDA 0</option>
+                <option value="cpu">CPU</option>
+              </select>
+            </label>
+            <label class="settings-field"><span data-i18n="settings.provider.dtype">计算精度</span>
+              <select class="hotword-input" id="qwen3Dtype">
+                <option value="auto" data-i18n="settings.provider.auto">自动</option>
+                <option value="bfloat16">bfloat16</option>
+                <option value="float16">float16</option>
+                <option value="float32">float32</option>
+              </select>
+            </label>
+            <p class="qwen3-settings-note wide" id="qwen3ProviderNote" data-i18n="settings.provider.live_note">Qwen3 负责文件与最终转写；实时预览继续使用 X-ASR。</p>
+          </div>
+          <label class="settings-field"><span data-i18n="settings.recognition.live_model">实时预览模型</span>
             <select class="hotword-input" id="liveAsrProfile">
-              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms 路 鏈€浣庡欢杩?/option>
-              <option value="balanced" data-i18n="settings.profile.balanced">480 ms 路 骞宠　</option>
-              <option value="meeting" data-i18n="settings.profile.meeting">960 ms 路 浼氳榛樿</option>
-              <option value="quality" data-i18n="settings.profile.quality">1920 ms 路 楂樼簿搴?/option>
+              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms · 最低延迟</option>
+              <option value="balanced" data-i18n="settings.profile.balanced">480 ms · 平衡</option>
+              <option value="meeting" data-i18n="settings.profile.meeting">960 ms · 会议默认</option>
+              <option value="quality" data-i18n="settings.profile.quality">1920 ms · 高精度</option>
             </select>
           </label>
-          <label class="settings-field"><span data-i18n="settings.recognition.final_model">鏈€缁堣浆鍐欐ā鍨?/span>
+          <label class="settings-field"><span data-i18n="settings.recognition.final_model">最终转写模型</span>
             <select class="hotword-input" id="finalAsrProfile">
-              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms 路 鏈€浣庡欢杩?/option>
-              <option value="balanced" data-i18n="settings.profile.balanced">480 ms 路 骞宠　</option>
-              <option value="meeting" data-i18n="settings.profile.meeting">960 ms 路 浼氳榛樿</option>
-              <option value="quality" data-i18n="settings.profile.quality">1920 ms 路 楂樼簿搴?/option>
+              <option value="low-latency" data-i18n="settings.profile.low_latency">160 ms · 最低延迟</option>
+              <option value="balanced" data-i18n="settings.profile.balanced">480 ms · 平衡</option>
+              <option value="meeting" data-i18n="settings.profile.meeting">960 ms · 会议默认</option>
+              <option value="quality" data-i18n="settings.profile.quality">1920 ms · 高精度</option>
             </select>
           </label>
-          <label class="settings-field wide"><span data-i18n="settings.recognition.final_pass">鏈€缁堝畬鏁存枃浠朵簩娆¤瘑鍒?/span><input type="checkbox" id="finalTranscriptionEnabled"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.threshold">Silero 闃堝€?/span><input class="hotword-input" id="fileVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_silence">鏈€鐭潤闊筹紙绉掞級</span><input class="hotword-input" id="fileVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_speech">鏈€鐭闊筹紙绉掞級</span><input class="hotword-input" id="fileVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.pre_padding">鍙ラ缂撳啿锛坢s锛?/span><input class="hotword-input" id="fileVadPrePadding" type="number" min="0" max="2000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.post_padding">鍙ュ熬缂撳啿锛坢s锛?/span><input class="hotword-input" id="fileVadPostPadding" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field wide"><span data-i18n="settings.recognition.final_pass">最终完整文件二次识别</span><input type="checkbox" id="finalTranscriptionEnabled"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.threshold">Silero 阈值</span><input class="hotword-input" id="fileVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_silence">最短静音（秒）</span><input class="hotword-input" id="fileVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_speech">最短语音（秒）</span><input class="hotword-input" id="fileVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.pre_padding">句首缓冲（ms）</span><input class="hotword-input" id="fileVadPrePadding" type="number" min="0" max="2000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.post_padding">句尾缓冲（ms）</span><input class="hotword-input" id="fileVadPostPadding" type="number" min="0" max="3000" step="50"></label>
         </div>
-        <div class="settings-model-status" id="modelProfileStatus" data-i18n="settings.model_loading">姝ｅ湪璇诲彇鏈湴妯″瀷...</div>
+        <div class="settings-model-status" id="modelProfileStatus" data-i18n="settings.model_loading">正在读取本地模型...</div>
       </div>
 
       <div class="settings-panel settings-section" id="settingsPanelMicrophone" role="tabpanel" data-settings-panel="microphone" aria-labelledby="settingsTabMicrophone" aria-hidden="true">
         <div class="settings-page-heading">
-          <h2 data-i18n="settings.microphone.tab">楹﹀厠椋?/h2>
-          <p data-i18n="settings.microphone.intro">绠＄悊杈撳叆璁惧銆佸疄鏃舵柇鍙ョ瓥鐣ュ拰娴忚鍣ㄤ晶闊抽澧炲己閫夐」銆?/p>
+          <h2 data-i18n="settings.microphone.tab">麦克风</h2>
+          <p data-i18n="settings.microphone.intro">管理输入设备、实时断句策略和浏览器侧音频增强选项。</p>
         </div>
-        <div class="settings-section-title" data-i18n="settings.microphone.section">楹﹀厠椋庤澶囦笌寤惰繜</div>
+        <div class="settings-section-title" data-i18n="settings.microphone.section">麦克风设备与延迟</div>
         <div class="settings-grid">
-          <label class="settings-field wide"><span data-i18n="settings.microphone.input">杈撳叆璁惧</span>
+          <label class="settings-field wide"><span data-i18n="settings.microphone.input">输入设备</span>
             <div class="settings-inline">
-              <select class="hotword-input" id="microphoneDevice"><option value="" data-i18n="settings.microphone.system_default">绯荤粺榛樿楹﹀厠椋?/option></select>
-              <button class="btn btn-secondary" type="button" id="btnRefreshMics" data-i18n="controls.refresh">鍒锋柊</button>
-              <button class="btn btn-secondary" type="button" id="btnTestMic" data-i18n="controls.test">娴嬭瘯</button>
+              <select class="hotword-input" id="microphoneDevice"><option value="" data-i18n="settings.microphone.system_default">系统默认麦克风</option></select>
+              <button class="btn btn-secondary" type="button" id="btnRefreshMics" data-i18n="controls.refresh">刷新</button>
+              <button class="btn btn-secondary" type="button" id="btnTestMic" data-i18n="controls.test">测试</button>
             </div>
           </label>
           <div class="settings-field wide">
-            <span id="micTestStatus" data-i18n="settings.microphone.not_tested">灏氭湭娴嬭瘯楹﹀厠椋?/span>
+            <span id="micTestStatus" data-i18n="settings.microphone.not_tested">尚未测试麦克风</span>
             <div class="mic-test-meter"><span id="micTestMeter"></span></div>
           </div>
-          <label class="settings-field"><span data-i18n="settings.microphone.profile">瀹炴椂鍒囧彞妗ｄ綅</span>
+          <label class="settings-field"><span data-i18n="settings.microphone.profile">实时切句档位</span>
             <select class="hotword-input" id="microphoneLiveProfile">
-              <option value="meeting" data-i18n="settings.microphone.meeting">浼氳</option><option value="dictation" data-i18n="settings.microphone.dictation">鍚啓</option><option value="oncall" data-i18n="settings.microphone.oncall">鎸佺画寰呮満</option>
+              <option value="meeting" data-i18n="settings.microphone.meeting">会议</option><option value="dictation" data-i18n="settings.microphone.dictation">听写</option><option value="oncall" data-i18n="settings.microphone.oncall">持续待机</option>
             </select>
           </label>
-          <label class="settings-field"><span data-i18n="settings.microphone.vad_gating">VAD 闂ㄦ帶闊抽锛堝皬澹扮幆澧冨缓璁叧闂級</span><input type="checkbox" id="microphoneVadGating"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.pre_roll">鍙ラ棰勭暀锛坢s锛?/span><input class="hotword-input" id="microphonePreRoll" type="number" min="0" max="3000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.endpoint_grace">鏂彞绛夊緟锛坢s锛?/span><input class="hotword-input" id="microphoneEndpointGrace" type="number" min="0" max="5000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.tail_pad">灏鹃儴闈欓煶锛坢s锛?/span><input class="hotword-input" id="microphoneTailPad" type="number" min="0" max="3000" step="50"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.vad_threshold">瀹炴椂 VAD 闃堝€?/span><input class="hotword-input" id="microphoneVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_silence">鏈€鐭潤闊筹紙绉掞級</span><input class="hotword-input" id="microphoneVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.vad.min_speech">鏈€鐭闊筹紙绉掞級</span><input class="hotword-input" id="microphoneVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.echo">鍥炲０娑堥櫎</span><input type="checkbox" id="microphoneEchoCancellation"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.noise">鍣０鎶戝埗</span><input type="checkbox" id="microphoneNoiseSuppression"></label>
-          <label class="settings-field"><span data-i18n="settings.microphone.gain">鑷姩澧炵泭</span><input type="checkbox" id="microphoneAutoGain"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.vad_gating">VAD 门控音频（小声环境建议关闭）</span><input type="checkbox" id="microphoneVadGating"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.pre_roll">句首预留（ms）</span><input class="hotword-input" id="microphonePreRoll" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.endpoint_grace">断句等待（ms）</span><input class="hotword-input" id="microphoneEndpointGrace" type="number" min="0" max="5000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.tail_pad">尾部静音（ms）</span><input class="hotword-input" id="microphoneTailPad" type="number" min="0" max="3000" step="50"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.vad_threshold">实时 VAD 阈值</span><input class="hotword-input" id="microphoneVadThreshold" type="number" min="0.05" max="0.95" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_silence">最短静音（秒）</span><input class="hotword-input" id="microphoneVadMinSilence" type="number" min="0.1" max="3" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.vad.min_speech">最短语音（秒）</span><input class="hotword-input" id="microphoneVadMinSpeech" type="number" min="0.05" max="2" step="0.05"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.echo">回声消除</span><input type="checkbox" id="microphoneEchoCancellation"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.noise">噪声抑制</span><input type="checkbox" id="microphoneNoiseSuppression"></label>
+          <label class="settings-field"><span data-i18n="settings.microphone.gain">自动增益</span><input type="checkbox" id="microphoneAutoGain"></label>
         </div>
       </div>
 
       <div class="settings-panel settings-section" id="settingsPanelHotwords" role="tabpanel" data-settings-panel="hotwords" aria-labelledby="settingsTabHotwords" aria-hidden="true">
         <div class="settings-page-heading">
-          <h2 data-i18n="settings.hotwords.heading">鐑瘝涓庨鍩熼璁?/h2>
-          <p data-i18n="settings.hotwords.intro">鍙悓鏃堕€夋嫨澶氫釜棰嗗煙鎴栫淮鎶よ嚜瀹氫箟璇嶆潯銆傞鍩熼璁句笉浼氳鐩栧凡鏈夌儹璇嶇殑鏉冮噸銆?/p>
+          <h2 data-i18n="settings.hotwords.heading">热词与领域预设</h2>
+          <p data-i18n="settings.hotwords.intro">可同时选择多个领域或维护自定义词条。领域预设不会覆盖已有热词的权重。</p>
         </div>
         <div class="domain-preset-section">
           <div class="domain-preset-heading">
-            <div><strong data-i18n="settings.hotwords.presets">棰嗗煙棰勮锛堝彲澶氶€夛級</strong><span data-i18n="settings.hotwords.preset_hint">鐐瑰嚮閫変腑锛屽啀娆＄偣鍑诲彇娑堬紱寤鸿鍙惎鐢ㄥ綋鍓嶄細璁浉鍏崇殑 1鈥? 涓鍩?/span></div>
+            <div><strong data-i18n="settings.hotwords.presets">领域预设（可多选）</strong><span data-i18n="settings.hotwords.preset_hint">点击选中，再次点击取消；建议只启用当前会议相关的 1-2 个领域</span></div>
           </div>
           <div class="domain-preset-grid" id="domainPresetGrid"></div>
           <div class="domain-selection-notice" id="domainSelectionNotice" role="status" hidden>
-            <div><strong data-i18n="settings.hotwords.selected">宸查€夐鍩燂細</strong><span id="domainSelectionNames"></span></div>
-            <small data-i18n="settings.hotwords.selected_hint">瀵瑰簲鐑瘝宸插湪涓嬫柟鑷姩鍕鹃€夛紱鍙栨秷棰嗗煙鍚庯紝璇嶆潯浼氫繚鐣欎絾鍙栨秷鍕鹃€夈€傜偣鍑讳繚瀛樺悗搴旂敤鍒版柊璇嗗埆浼氳瘽銆?/small>
+            <div><strong data-i18n="settings.hotwords.selected">已选领域：</strong><span id="domainSelectionNames"></span></div>
+            <small data-i18n="settings.hotwords.selected_hint">对应热词已在下方自动勾选；取消领域后，词条会保留但取消勾选。点击保存后应用到新识别会话。</small>
           </div>
         </div>
-        <div class="settings-section-title" data-i18n="settings.hotwords.section">鐑瘝涓庢ā绯婃嫾闊?/div>
-      <div class="hotword-setting-grid">
-        <div class="hotword-setting-card">
-          <label><span data-i18n="settings.hotwords.enable">鍚敤瑙ｇ爜鐑瘝澧炲己</span><input type="checkbox" id="hotwordsEnabled"></label>
-          <div class="hotword-note" data-i18n="settings.hotwords.enable_note">鍚敤 modified beam search锛屽苟灏嗘瘡涓儹璇嶇殑鏉冮噸娉ㄥ叆 X-ASR 瑙ｇ爜鍣ㄣ€?/div>
-        </div>
-        <div class="hotword-setting-card">
-          <label><span data-i18n="settings.hotwords.fuzzy">鍚敤妯＄硦鎷奸煶绾犻敊</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
-          <div class="hotword-note" data-i18n="settings.hotwords.fuzzy_note">鏀寔骞崇繕鑸屻€乶/l 鍜屽墠鍚庨蓟闊筹紱鍙鐞嗚嚦灏戜袱涓眽瀛楃殑涓枃鐑瘝銆?/div>
-        </div>
-        <div class="hotword-setting-card" style="grid-column:1/-1;">
-          <label><span data-i18n="settings.hotwords.default_score">鏂扮儹璇嶉粯璁ゆ潈閲?/span><span id="defaultScoreLabel">5.0</span></label>
-          <div class="hotword-score-controls">
-            <input type="range" id="defaultHotwordScore" min="0.5" max="12" step="0.5" value="5">
-            <input class="hotword-input" type="number" id="defaultHotwordScoreNumber" min="0.1" max="20" step="0.5" value="5">
+        <div class="settings-section-title" data-i18n="settings.hotwords.section">热词与模糊拼音</div>
+        <div class="hotword-setting-grid">
+          <div class="hotword-setting-card">
+            <label><span data-i18n="settings.hotwords.enable">启用解码热词增强</span><input type="checkbox" id="hotwordsEnabled"></label>
+            <div class="hotword-note" data-i18n="settings.hotwords.enable_note">启用 modified beam search，并将每个热词的权重注入 X-ASR 解码器。</div>
+          </div>
+          <div class="hotword-setting-card">
+            <label><span data-i18n="settings.hotwords.fuzzy">启用模糊拼音纠错</span><input type="checkbox" id="fuzzyPinyinEnabled"></label>
+            <div class="hotword-note" data-i18n="settings.hotwords.fuzzy_note">支持平翘舌、n/l 和前后鼻音；只处理至少两个汉字的中文热词。</div>
+          </div>
+          <div class="hotword-setting-card" style="grid-column:1/-1;">
+            <label><span data-i18n="settings.hotwords.default_score">新热词默认权重</span><span id="defaultScoreLabel">5.0</span></label>
+            <div class="hotword-score-controls">
+              <input type="range" id="defaultHotwordScore" min="0.5" max="12" step="0.5" value="5">
+              <input class="hotword-input" type="number" id="defaultHotwordScoreNumber" min="0.1" max="20" step="0.5" value="5">
+            </div>
           </div>
         </div>
-      </div>
-      <div class="hotword-list-header"><span data-i18n="settings.hotwords.enabled">鍚敤</span><span data-i18n="settings.hotwords.spelling">鏍囧噯鍐欐硶</span><span data-i18n="settings.hotwords.score">鏉冮噸</span><span></span></div>
-      <div class="hotword-list" id="hotwordList"></div>
-      <div class="hotword-add">
-        <input class="hotword-input" id="newHotwordInput" data-i18n-placeholder="settings.hotwords.add_placeholder" placeholder="杈撳叆涓撲笟璇嶃€佷汉鍚嶆垨缂╁啓锛屼緥濡?璐炬壃娓?/ OpenAI">
-        <button class="btn btn-secondary" id="btnAddHotword" data-i18n="controls.add">娣诲姞</button>
-      </div>
-      <div class="hotword-note" data-i18n="settings.hotwords.note">鑻辨枃榛樿闄愬埗涓?2.5锛岄伩鍏嶈繃搴﹀亸缃紱浣犱粛鍙负鍗曚釜璇嶆樉寮忚皟鏁淬€備腑鏂囧悓闊虫浛鎹㈤噰鐢ㄦ渶闀胯瘝浼樺厛锛屽崟瀛椾笉浼氬弬涓庢ā绯婂尮閰嶃€?/div>
+        <div class="hotword-list-header"><span data-i18n="settings.hotwords.enabled">启用</span><span data-i18n="settings.hotwords.spelling">标准写法</span><span data-i18n="settings.hotwords.score">权重</span><span></span></div>
+        <div class="hotword-list" id="hotwordList"></div>
+        <div class="hotword-add">
+          <input class="hotword-input" id="newHotwordInput" data-i18n-placeholder="settings.hotwords.add_placeholder" placeholder="输入专业词、人名或缩写，例如 贾扬清 / OpenAI">
+          <button class="btn btn-secondary" id="btnAddHotword" data-i18n="controls.add">添加</button>
+        </div>
+        <div class="hotword-note" data-i18n="settings.hotwords.note">英文默认限制为 2.5，避免过度偏置；你仍可为单个词显式调整。中文同音替换采用最长词优先，单字不会参与模糊匹配。</div>
       </div>
     </div>
     <div class="hotword-dialog-footer">
       <div class="hotword-save-status" id="hotwordSaveStatus"></div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary" id="btnCancelHotwords" data-i18n="controls.cancel">鍙栨秷</button>
-        <button class="btn btn-primary" id="btnSaveHotwords" data-i18n="controls.save_apply">淇濆瓨骞跺簲鐢?/button>
+        <button class="btn btn-secondary" id="btnCancelHotwords" data-i18n="controls.cancel">取消</button>
+        <button class="btn btn-primary" id="btnSaveHotwords" data-i18n="controls.save_apply">保存并应用</button>
       </div>
     </div>
     </div>
@@ -1852,6 +2026,7 @@ body {
 
 const {
   buildAnalysisPayload,
+  buildRecordPayload,
   buildUploadUrl,
   resolveBackend,
 } = globalThis.DiTingManagementTranscription;
@@ -1915,6 +2090,7 @@ const loginForm = $('loginForm');
 const loginError = $('loginError');
 const currentUserDisplay = $('currentUserDisplay');
 const managementPanel = $('managementPanel');
+const recordsPanel = $('recordsPanel');
 const moduleOverlay = $('moduleOverlay');
 const mainApp = $('mainApp');
 const hotwordModal = $('hotwordModal');
@@ -1926,6 +2102,11 @@ const defaultHotwordScoreNumber = $('defaultHotwordScoreNumber');
 const defaultScoreLabel = $('defaultScoreLabel');
 const hotwordSaveStatus = $('hotwordSaveStatus');
 const modelProfileStatus = $('modelProfileStatus');
+const asrProviderXasr = $('asrProviderXasr');
+const asrProviderQwen3 = $('asrProviderQwen3');
+const qwen3Settings = $('qwen3Settings');
+const qwen3ProviderBadge = $('qwen3ProviderBadge');
+const qwen3ProviderNote = $('qwen3ProviderNote');
 const microphoneDevice = $('microphoneDevice');
 const micTestStatus = $('micTestStatus');
 const micTestMeter = $('micTestMeter');
@@ -1964,6 +2145,11 @@ let uploadFileId = null;
 let uploadHttpResult = null;   // fallback: HTTP response when WS doesn't deliver
 let uploadWsDelivered = false; // whether WS delivered any segments
 let currentMeetingId = null;
+let currentRecordId = null;
+let currentRecordSource = {
+  sourceType: 'manual', sourceFilename: '', sourceMimeType: '', sourceSizeBytes: 0,
+};
+let currentRecordSpeakers = [];
 
 // Live mic
 let micStream = null;
@@ -1977,6 +2163,7 @@ let micStopTimer = null;
 let micSegmentStartIndex = 0;
 let hotwordSettingsState = null;
 let appSettingsState = null;
+let selectedAsrProvider = 'xasr';
 let selectedDomainPresetIds = new Set();
 let currentConnectionState = 'disconnected';
 let micTestStream = null;
@@ -1984,7 +2171,7 @@ let micTestAudioContext = null;
 let micTestAnimationFrame = null;
 let activeSettingsTab = 'recognition';
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// AudioPlaybackManager (wavesurfer.js based)
+// ── AudioPlaybackManager (wavesurfer.js based) ───────────────
 let micDisplayLevel = 0;
 let micLevelLastUpdate = 0;
 let micLevelAnimationFrame = null;
@@ -2185,6 +2372,7 @@ function showLogin() {
 }
 
 function showHome() {
+  closeRecordsPanel();
   if (loginOverlay) loginOverlay.classList.remove('visible');
   if (moduleOverlay) moduleOverlay.classList.remove('visible');
   if (mainApp) mainApp.classList.remove('active');
@@ -2258,6 +2446,7 @@ function selectModule(name) {
 }
 
 function ensureMeetingViewVisible() {
+  closeRecordsPanel();
   if (managementPanel) {
     managementPanel.classList.remove('visible');
     managementPanel.removeAttribute('style');
@@ -2269,6 +2458,7 @@ function ensureMeetingViewVisible() {
 }
 
 function showReservationView() {
+  closeRecordsPanel();
   document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
   const mainContainer = document.querySelector('.main-container');
   const controlsBar = document.querySelector('.controls-bar');
@@ -2283,20 +2473,11 @@ function showReservationView() {
 }
 
 function showAnalysisView() {
-  document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
-  const mainContainer = document.querySelector('.main-container');
-  const controlsBar = document.querySelector('.controls-bar');
-  if (mainContainer) mainContainer.style.display = 'none';
-  if (controlsBar) controlsBar.style.display = 'none';
-  if (managementPanel) {
-    managementPanel.classList.add('visible');
-    managementPanel.style.cssText = 'position:fixed;top:56px;right:0;bottom:0;left:0;z-index:100;display:flex;flex-direction:column;background:var(--bg-secondary);border:none;max-height:none;width:auto;';
-  }
-  switchManagementSection('analysisSection');
-  refreshManagementData();
+  ensureMeetingViewVisible();
+  openRecordsPanel();
 }
-
 function showUsersView() {
+  closeRecordsPanel();
   document.querySelectorAll('.management-section').forEach(el => el.classList.remove('active'));
   const mainContainer = document.querySelector('.main-container');
   const controlsBar = document.querySelector('.controls-bar');
@@ -2814,6 +2995,193 @@ async function joinMeeting() {
 }
 
 // ── Meeting Analysis ──────────────────────────────────────────
+
+function recordSourceLabel(sourceType) {
+  return ({ microphone: '麦克风', upload: '上传文件', manual: '手动整理' })[sourceType] || sourceType || '未知来源';
+}
+
+function recordTitleFallback() {
+  const timestamp = new Date().toLocaleString('zh-CN', { hour12: false });
+  return `会议记录 ${timestamp}`;
+}
+
+function setRecordTitle(title) {
+  const value = String(title || '').trim();
+  const input = $('recordTitleInput');
+  if (input) input.value = value;
+  if (meetingTitleDisplay && value) meetingTitleDisplay.textContent = value;
+}
+
+function newMeetingRecord() {
+  if (isRecording) {
+    showToast('请先停止当前录音，再新建记录。');
+    return;
+  }
+  resetAll();
+  const title = recordTitleFallback();
+  setRecordTitle(title);
+  showToast('已新建空白会议记录');
+}
+
+async function saveCurrentRecord() {
+  const segments = allSegments.filter(Boolean);
+  if (!segments.length) {
+    showToast('没有可保存的转写分段，请先录音或上传音频。');
+    return;
+  }
+  const title = $('recordTitleInput')?.value.trim()
+    || meetingTitleDisplay?.textContent?.trim()
+    || recordTitleFallback();
+  const payload = buildRecordPayload({
+    recordId: currentRecordId,
+    meetingId: currentMeetingId,
+    title,
+    ...currentRecordSource,
+    segments,
+    speakers: currentRecordSpeakers,
+  });
+  const button = $('btnSaveRecord');
+  if (button) button.disabled = true;
+  try {
+    const data = await apiFetch(
+      currentRecordId ? `/api/records/${encodeURIComponent(currentRecordId)}` : '/api/records',
+      { method: currentRecordId ? 'PUT' : 'POST', body: JSON.stringify(payload) },
+    );
+    currentRecordId = data.record.id;
+    setRecordTitle(data.record.title);
+    showToast(`记录已保存：${data.record.segments_count} 个分段`);
+    if (recordsPanel?.classList.contains('visible')) await loadRecords();
+  } catch (error) {
+    showToast('记录保存失败：' + error.message);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function openRecordsPanel() {
+  if (!recordsPanel) return;
+  recordsPanel.classList.add('visible');
+  recordsPanel.setAttribute('aria-hidden', 'false');
+  loadRecords($('recordSearchInput')?.value || '');
+}
+
+function closeRecordsPanel() {
+  if (!recordsPanel) return;
+  recordsPanel.classList.remove('visible');
+  recordsPanel.setAttribute('aria-hidden', 'true');
+}
+
+function renderRecordDetail(record) {
+  const detail = $('recordDetail');
+  if (!detail) return;
+  const speakerCount = Array.isArray(record.speakers) ? record.speakers.length : 0;
+  detail.innerHTML = `
+    <h3 style="margin:0 0 8px;color:var(--text-primary);">${escapeHTML(record.title)}</h3>
+    <div class="record-card-meta">${escapeHTML(recordSourceLabel(record.source_type))} · ${record.segments_count || 0} 段 · ${Number(record.duration_sec || 0).toFixed(1)} 秒 · ${speakerCount} 位说话人</div>
+    <div class="record-card-actions">
+      <button class="btn btn-primary" id="btnLoadSelectedRecord">载入转写界面</button>
+      <button class="btn btn-secondary" id="btnDownloadSelectedRecord">导出纯文本</button>
+    </div>
+    <pre>${escapeHTML(record.full_text || '暂无纯文本内容')}</pre>`;
+  $('btnLoadSelectedRecord')?.addEventListener('click', () => applyMeetingRecord(record));
+  $('btnDownloadSelectedRecord')?.addEventListener('click', () => downloadRecordText(record.id));
+}
+
+async function loadRecords(q = '') {
+  const list = $('recordsList');
+  if (!list) return;
+  list.innerHTML = '<div class="entity-card">正在读取本地记录...</div>';
+  try {
+    const query = q ? `?q=${encodeURIComponent(q)}` : '';
+    const data = await apiFetch(`/api/records${query}`);
+    if (!data.items?.length) {
+      list.innerHTML = '<div class="entity-card">暂无匹配的会议记录</div>';
+      return;
+    }
+    list.innerHTML = data.items.map(record => `
+      <article class="record-card" data-record-id="${escapeHTML(record.id)}">
+        <div class="record-card-title">${escapeHTML(record.title)}</div>
+        <div class="record-card-meta">${escapeHTML(recordSourceLabel(record.source_type))} · ${record.segments_count || 0} 段 · ${Number(record.duration_sec || 0).toFixed(1)} 秒</div>
+        <div class="record-card-preview">${escapeHTML(record.full_text_preview || '暂无转写文本')}</div>
+        <div class="record-card-actions">
+          <button class="btn btn-secondary record-view" type="button">查看</button>
+          <button class="btn btn-danger record-delete" type="button">删除</button>
+        </div>
+      </article>`).join('');
+    list.querySelectorAll('.record-card').forEach(card => {
+      card.addEventListener('click', event => {
+        if (event.target.closest('.record-delete')) return deleteMeetingRecord(card.dataset.recordId);
+        viewMeetingRecord(card.dataset.recordId);
+      });
+    });
+  } catch (error) {
+    list.innerHTML = `<div class="entity-card">记录读取失败：${escapeHTML(error.message)}</div>`;
+  }
+}
+
+async function viewMeetingRecord(recordId) {
+  try {
+    const data = await apiFetch(`/api/records/${encodeURIComponent(recordId)}`);
+    renderRecordDetail(data.record);
+  } catch (error) {
+    showToast('记录读取失败：' + error.message);
+  }
+}
+
+function applyMeetingRecord(record) {
+  currentRecordId = record.id;
+  currentMeetingId = record.meeting_id || record.id;
+  currentRecordSource = {
+    sourceType: record.source_type || 'manual',
+    sourceFilename: record.source_filename || '',
+    sourceMimeType: record.source_mime_type || '',
+    sourceSizeBytes: record.source_size_bytes || 0,
+  };
+  currentRecordSpeakers = record.speakers || [];
+  allSegments = (record.segments || []).map((segment, index) => ({
+    ...segment,
+    index: segment.index || index + 1,
+    quality_label: segment.quality_label || 'high',
+    corrections: segment.corrections || [],
+    logic_flags: segment.logic_flags || [],
+    uncertain_spans: segment.uncertain_spans || [],
+  }));
+  setRecordTitle(record.title);
+  rerenderTranscript();
+  updateStats(allSegments.length);
+  closeRecordsPanel();
+  showToast('历史记录已载入，可继续整理并保存');
+}
+
+async function deleteMeetingRecord(recordId) {
+  if (!window.confirm('确定删除这条本地会议记录吗？')) return;
+  try {
+    await apiFetch(`/api/records/${encodeURIComponent(recordId)}`, { method: 'DELETE' });
+    if (currentRecordId === recordId) currentRecordId = null;
+    await loadRecords($('recordSearchInput')?.value || '');
+    showToast('记录已删除');
+  } catch (error) {
+    showToast('删除失败：' + error.message);
+  }
+}
+
+async function downloadRecordText(recordId) {
+  try {
+    const response = await fetch(`${API_BASE}/api/records/${encodeURIComponent(recordId)}/text`, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `meeting-${recordId}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    showToast('纯文本导出失败：' + error.message);
+  }
+}
 
 async function loadAnalyses() {
   const list = $('analysesList');
@@ -3454,6 +3822,7 @@ function handleUploadHTTPResponse(result) {
     console.log('[Upload] Rendering from HTTP response:', result.segments.length, 'segments');
     uploadWsDelivered = true;  // prevent double processing
     currentMeetingId = result.file_id || currentMeetingId;
+    currentRecordSpeakers = result.speakers || [];
     allSegments = result.segments;
     if (transcriptBody) transcriptBody.innerHTML = '';
     result.segments.forEach((seg, i) => renderSegment(seg, i, false));
@@ -3485,8 +3854,17 @@ async function handleFileUpload(event) {
   resetAll();
   allSegments = [];
   currentMeetingId = fileId;
+  currentRecordId = null;
+  currentRecordSource = {
+    sourceType: 'upload',
+    sourceFilename: file.name,
+    sourceMimeType: file.type || 'audio/*',
+    sourceSizeBytes: file.size || 0,
+  };
+  currentRecordSpeakers = [];
   showToast(`上传: ${file.name}`);
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
+  if ($('recordTitleInput')) $('recordTitleInput').value = file.name;
 
   // Show uploading state
   if (transcriptBody) transcriptBody.innerHTML = '';
@@ -3669,6 +4047,7 @@ function handleUploadWSMessage(msg) {
 
     case 'complete':
       currentMeetingId = msg.data.file_id || currentMeetingId;
+      currentRecordSpeakers = msg.data.speakers || currentRecordSpeakers;
       showToast(`完成: ${msg.data.segments_count || allSegments.filter(Boolean).length} 个分段`);
       // If WS delivered segments but 'complete' has the final full list with audio, use those
       if (msg.data.segments && msg.data.segments.length > 0) {
@@ -3713,77 +4092,6 @@ function finishUploadUI(status) {
   if (uploadWs) { uploadWs.close(); uploadWs = null; }
   const fileInput = $('fileUpload');
   if (fileInput) fileInput.value = '';
-}
-
-// ═══════════════════════════════════════════════════════════
-// Live Mic Recording
-// ═══════════════════════════════════════════════════════════
-
-function updateMicLevel(rms, peak) {
-  if (!window.DiTingMicLevel) return;
-  micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
-  micLevelLastUpdate = performance.now();
-}
-
-function renderMicLevel(timestamp) {
-  if (!micOrbPanel?.classList.contains('visible') || !window.DiTingMicLevel) {
-    micLevelAnimationFrame = null;
-    return;
-  }
-  if (timestamp - micLevelLastUpdate > 100) {
-    micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
-  }
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const phase = reduceMotion ? 0 : timestamp / 180;
-  const scales = window.DiTingMicLevel.buildBarScales(
-    micDisplayLevel,
-    phase,
-    micLevelBars.length,
-  );
-  micLevelBars.forEach((bar, index) => {
-    bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
-  });
-  const orb = window.DiTingMicLevel.buildOrbStyle(micDisplayLevel);
-  if (micOrbWrap) {
-    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-ring-opacity', orb.ringOpacity.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-shadow', `${orb.shadow.toFixed(1)}px`);
-    micOrbWrap.style.setProperty('--orb-blur', `${orb.blur.toFixed(1)}px`);
-    micOrbWrap.style.setProperty('--orb-glow-opacity', orb.glowOpacity.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-core-shadow', `${orb.coreShadow.toFixed(1)}px`);
-  }
-  micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
-}
-
-function setMicVisualizerState(state) {
-  if (!micOrbPanel) return;
-  const active = state === 'recording' || state === 'finalizing';
-  micOrbPanel.classList.toggle('visible', active);
-  micOrbPanel.classList.toggle('listening', state === 'recording');
-  micOrbPanel.classList.toggle('finalizing', state === 'finalizing');
-  micOrbPanel.setAttribute('aria-hidden', active ? 'false' : 'true');
-  if (active) {
-    if (micLevelAnimationFrame === null) {
-      micLevelAnimationFrame = requestAnimationFrame(renderMicLevel);
-    }
-    return;
-  }
-  if (micLevelAnimationFrame !== null) cancelAnimationFrame(micLevelAnimationFrame);
-  micLevelAnimationFrame = null;
-  micDisplayLevel = 0;
-  micLevelLastUpdate = 0;
-  micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
-  const orb = window.DiTingMicLevel?.buildOrbStyle(0);
-  if (micOrbWrap && orb) {
-    micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
-    micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
-  }
-}
-
-function setMicOrbMessage(title, subtitle) {
-  if (micOrbTitle && title) micOrbTitle.textContent = title;
-  if (micOrbSubtitle && subtitle) micOrbSubtitle.textContent = subtitle;
 }
 
 const SETTINGS_TABS = {
@@ -3967,11 +4275,42 @@ function setSettingValue(id, value, checkbox = false) {
   else element.value = String(value ?? '');
 }
 
+function setAsrProviderUI(provider, models = appSettingsState?.models || {}) {
+  selectedAsrProvider = provider === 'qwen3' ? 'qwen3' : 'xasr';
+  const qwenSelected = selectedAsrProvider === 'qwen3';
+  asrProviderXasr?.classList.toggle('active', !qwenSelected);
+  asrProviderQwen3?.classList.toggle('active', qwenSelected);
+  asrProviderXasr?.setAttribute('aria-pressed', String(!qwenSelected));
+  asrProviderQwen3?.setAttribute('aria-pressed', String(qwenSelected));
+  qwen3Settings?.classList.toggle('visible', qwenSelected);
+  qwen3Settings?.setAttribute('aria-hidden', String(!qwenSelected));
+  const finalProfile = $('finalAsrProfile');
+  if (finalProfile) finalProfile.disabled = qwenSelected;
+
+  const qwenStatus = models.providers?.qwen3 || {};
+  const qwenAvailable = qwenStatus.available === true;
+  if (qwen3ProviderBadge) {
+    qwen3ProviderBadge.classList.toggle('unavailable', !qwenAvailable);
+    qwen3ProviderBadge.textContent = t(
+      qwenAvailable ? 'settings.provider.available' : 'settings.provider.unavailable',
+    );
+  }
+  if (qwen3ProviderNote) {
+    const reasonKey = `settings.provider.${qwenStatus.reason || ''}`;
+    qwen3ProviderNote.textContent = qwenSelected && !qwenAvailable && qwenStatus.reason
+      ? t(reasonKey, {}, t('settings.provider.fallback'))
+      : t('settings.provider.live_note');
+  }
+}
+
 function renderRuntimeSettings(settings) {
   const recognition = settings.recognition;
   const microphone = settings.microphone;
   setSettingValue('liveAsrProfile', recognition.live_asr_profile);
   setSettingValue('finalAsrProfile', recognition.final_asr_profile);
+  setSettingValue('qwen3ModelPath', recognition.qwen3_model_path);
+  setSettingValue('qwen3Device', recognition.qwen3_device);
+  setSettingValue('qwen3Dtype', recognition.qwen3_dtype);
   setSettingValue('finalTranscriptionEnabled', recognition.final_transcription_enabled, true);
   setSettingValue('fileVadThreshold', recognition.file_vad_threshold);
   setSettingValue('fileVadMinSilence', recognition.file_vad_min_silence);
@@ -3990,6 +4329,7 @@ function renderRuntimeSettings(settings) {
   setSettingValue('microphoneNoiseSuppression', microphone.noise_suppression, true);
   setSettingValue('microphoneAutoGain', microphone.auto_gain_control, true);
   renderModelProfiles(settings.models);
+  setAsrProviderUI(recognition.asr_provider, settings.models);
 }
 
 function renderModelProfiles(models = {}) {
@@ -3999,9 +4339,13 @@ function renderModelProfiles(models = {}) {
     if (!select) return;
     Array.from(select.options).forEach(option => {
       option.disabled = available.length > 0 && !available.includes(option.value);
-      const baseLabel = t(option.dataset.i18n, {}, option.textContent.replace(/ 路 (鏈儴缃瞸Not deployed)$/, ''));
+      const baseLabel = t(
+        option.dataset.i18n,
+        {},
+        option.textContent.replace(/\s*[·路]\s*(未部署|Not deployed)$/, ''),
+      );
       option.textContent = baseLabel
-        + (option.disabled ? ` 路 ${t('settings.model_not_deployed')}` : '');
+        + (option.disabled ? ` · ${t('settings.model_not_deployed')}` : '');
     });
   });
   if (!modelProfileStatus) return;
@@ -4012,11 +4356,19 @@ function renderModelProfiles(models = {}) {
     return;
   }
   const fallback = live.fallback || finalModel.fallback ? t('settings.model_fallback') : '';
+  if (models.effective_provider === 'qwen3') {
+    modelProfileStatus.textContent = t('settings.model_status_qwen', {
+      live: live.chunk_ms,
+      provider: models.file_vad_provider || 'Qwen3-ASR',
+    });
+    return;
+  }
+  const providerFallback = models.provider_fallback ? t('settings.provider.fallback') : '';
   modelProfileStatus.textContent = t('settings.model_status', {
     live: live.chunk_ms,
     final: finalModel.chunk_ms || live.chunk_ms,
     provider: models.file_vad_provider || 'Silero VAD',
-    fallback,
+    fallback: [fallback, providerFallback].filter(Boolean).join(' '),
   });
 }
 
@@ -4024,6 +4376,10 @@ function collectRuntimeSettings() {
   if (!window.DiTingAppSettings) return null;
   return window.DiTingAppSettings.normalizeAppSettings({
     recognition: {
+      asr_provider: selectedAsrProvider,
+      qwen3_model_path: $('qwen3ModelPath')?.value,
+      qwen3_device: $('qwen3Device')?.value,
+      qwen3_dtype: $('qwen3Dtype')?.value,
       live_asr_profile: $('liveAsrProfile')?.value,
       final_asr_profile: $('finalAsrProfile')?.value,
       final_transcription_enabled: $('finalTranscriptionEnabled')?.checked !== false,
@@ -4141,7 +4497,7 @@ function createHotwordRow(item) {
   enabled.type = 'checkbox';
   enabled.checked = item.enabled !== false;
   enabled.dataset.field = 'enabled';
-  enabled.setAttribute('aria-label', `鍚敤 ${item.text}`);
+  enabled.setAttribute('aria-label', t('settings.hotwords.enable_word', { word: item.text }));
   enabled.addEventListener('change', () => {
     row.classList.toggle('disabled', !enabled.checked);
     syncDomainPresetSelection();
@@ -4152,7 +4508,7 @@ function createHotwordRow(item) {
   textInput.value = item.text;
   textInput.maxLength = 80;
   textInput.dataset.field = 'text';
-  textInput.setAttribute('aria-label', '鐑瘝鏍囧噯鍐欐硶');
+  textInput.setAttribute('aria-label', t('settings.hotwords.spelling'));
   textInput.addEventListener('input', syncDomainPresetSelection);
 
   const scoreInput = document.createElement('input');
@@ -4163,13 +4519,13 @@ function createHotwordRow(item) {
   scoreInput.step = '0.5';
   scoreInput.value = String(item.score);
   scoreInput.dataset.field = 'score';
-  scoreInput.setAttribute('aria-label', `${item.text} 鏉冮噸`);
+  scoreInput.setAttribute('aria-label', t('settings.hotwords.score_word', { word: item.text }));
 
   const remove = document.createElement('button');
   remove.className = 'btn btn-secondary hotword-remove';
   remove.type = 'button';
-  remove.textContent = '脳';
-  remove.setAttribute('aria-label', `鍒犻櫎 ${item.text}`);
+  remove.textContent = '×';
+  remove.setAttribute('aria-label', t('settings.hotwords.delete_word', { word: item.text }));
   remove.addEventListener('click', () => {
     row.remove();
     syncDomainPresetSelection();
@@ -4290,8 +4646,7 @@ async function saveHotwordSettings() {
   }
 }
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// Live Mic Recording
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
+// ── Live Mic Recording ───────────────────────────────────────
 function updateMicLevel(rms, peak) {
   if (!window.DiTingMicLevel) return;
   micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
@@ -4391,17 +4746,26 @@ async function toggleMic() {
     if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
       throw new Error('当前浏览器不支持 AudioWorklet 麦克风采集');
     }
+    const runtimeSettings = await ensureAppSettingsLoaded();
+    const microphoneSettings = runtimeSettings?.microphone || {};
     micSequence = 0;
     micStreamId = window.crypto?.randomUUID?.() || `mic-${Date.now()}`;
+    if (!allSegments.filter(Boolean).length) {
+      currentRecordId = null;
+      currentMeetingId = micStreamId;
+      currentRecordSource = {
+        sourceType: 'microphone',
+        sourceFilename: `${micStreamId}.wav`,
+        sourceMimeType: 'audio/wav',
+        sourceSizeBytes: 0,
+      };
+      currentRecordSpeakers = [];
+      setRecordTitle(recordTitleFallback());
+    }
     micSegmentStartIndex = allSegments.length;
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+    micStream = await navigator.mediaDevices.getUserMedia(
+      window.DiTingAppSettings.buildMediaConstraints(microphoneSettings),
+    );
     micAudioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     if (micAudioContext.state === 'suspended') await micAudioContext.resume();
     await micAudioContext.audioWorklet.addModule('./audio-worklet.js');
@@ -4418,7 +4782,7 @@ async function toggleMic() {
           sample_format: 'pcm_s16le',
           browser_sample_rate: micAudioContext?.sampleRate,
           protocol_version: 2,
-          profile: 'meeting',
+          profile: microphoneSettings.live_profile || 'meeting',
           stream_id: micStreamId,
         }));
       } else if (msg.type === 'configured') {
@@ -4565,6 +4929,7 @@ function replaceMicTranscript(data) {
   const segments = Array.isArray(data?.segments) ? data.segments : [];
   if (!segments.length) return;
   currentMeetingId = data.stream_id || currentMeetingId;
+  currentRecordSpeakers = data.speakers || currentRecordSpeakers;
   document.getElementById('live-result')?.remove();
   allSegments.splice(micSegmentStartIndex);
   allSegments.push(...segments);
@@ -4742,6 +5107,11 @@ function connectLogStream() {
 function resetAll() {
   allSegments = [];
   currentMeetingId = null;
+  currentRecordId = null;
+  currentRecordSource = {
+    sourceType: 'manual', sourceFilename: '', sourceMimeType: '', sourceSizeBytes: 0,
+  };
+  currentRecordSpeakers = [];
   audioManager.reset();
 
   if (transcriptBody) {
@@ -4760,6 +5130,7 @@ function resetAll() {
   if (progressFill) progressFill.style.width = '0%';
   if (timeDisplay) timeDisplay.textContent = '--:--';
   if (segmentCounter) segmentCounter.textContent = '0/0';
+  if ($('recordTitleInput')) $('recordTitleInput').value = '';
   if (statSegments) statSegments.textContent = '0';
   if (statLogicFlags) statLogicFlags.textContent = '0';
   if (statCorrections) statCorrections.textContent = '0';
@@ -4812,6 +5183,9 @@ function initApp() {
 
   // Button wiring
   const btnReset = $('btnReset');
+  const btnNewRecord = $('btnNewRecord');
+  const btnSaveRecord = $('btnSaveRecord');
+  const btnRecords = $('btnRecords');
   const btnMic = $('btnMic');
   const btnUpload = $('btnUpload');
   const fileUpload = $('fileUpload');
@@ -4819,6 +5193,18 @@ function initApp() {
   const logPanelHeader = $('logPanelHeader');
 
   if (btnReset) btnReset.addEventListener('click', resetAll);
+  if (btnNewRecord) btnNewRecord.addEventListener('click', newMeetingRecord);
+  if (btnSaveRecord) btnSaveRecord.addEventListener('click', saveCurrentRecord);
+  if (btnRecords) btnRecords.addEventListener('click', openRecordsPanel);
+  if ($('btnCloseRecords')) $('btnCloseRecords').addEventListener('click', closeRecordsPanel);
+  if ($('btnRefreshRecords')) $('btnRefreshRecords').addEventListener('click', () => loadRecords());
+  if ($('btnSearchRecords')) $('btnSearchRecords').addEventListener('click', () => loadRecords($('recordSearchInput')?.value || ''));
+  if ($('recordSearchInput')) $('recordSearchInput').addEventListener('keydown', event => {
+    if (event.key === 'Enter') loadRecords(event.target.value || '');
+  });
+  if ($('recordTitleInput')) $('recordTitleInput').addEventListener('input', event => {
+    if (meetingTitleDisplay) meetingTitleDisplay.textContent = event.target.value || '未命名会议记录';
+  });
   if (btnMic) btnMic.addEventListener('click', toggleMic);
   if (btnUpload) btnUpload.addEventListener('click', () => { if (fileUpload) fileUpload.click(); });
   if (fileUpload) fileUpload.addEventListener('change', handleFileUpload);
@@ -4852,8 +5238,11 @@ function initApp() {
   if ($('btnCloseHotwords')) $('btnCloseHotwords').addEventListener('click', closeHotwordSettings);
   if ($('btnCancelHotwords')) $('btnCancelHotwords').addEventListener('click', closeHotwordSettings);
   if ($('btnSaveHotwords')) $('btnSaveHotwords').addEventListener('click', saveHotwordSettings);
+  if (asrProviderXasr) asrProviderXasr.addEventListener('click', () => setAsrProviderUI('xasr'));
+  if (asrProviderQwen3) asrProviderQwen3.addEventListener('click', () => setAsrProviderUI('qwen3'));
   if ($('btnRefreshMics')) $('btnRefreshMics').addEventListener('click', refreshMicrophoneDevices);
   if ($('btnTestMic')) $('btnTestMic').addEventListener('click', toggleMicrophoneTest);
+  if ($('btnHotwords')) $('btnHotwords').addEventListener('click', openHotwordSettings);
   if ($('btnAddHotword')) $('btnAddHotword').addEventListener('click', addHotwordToEditor);
   if (hotwordModal) hotwordModal.addEventListener('click', event => {
     if (event.target === hotwordModal) closeHotwordSettings();
@@ -4934,6 +5323,11 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyL' && e.ctrlKey) {
     e.preventDefault();
     toggleLogPanel();
+  }
+  if (e.code === 'KeyH' && e.ctrlKey) {
+    e.preventDefault();
+    if (recordsPanel?.classList.contains('visible')) closeRecordsPanel();
+    else openRecordsPanel();
   }
 });
 </script>

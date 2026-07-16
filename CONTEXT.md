@@ -36,4 +36,8 @@ After making changes to frontend code, run the full test suite:
 Get-ChildItem frontend\tests\*.test.js | ForEach-Object { Write-Output "--- $_ ---"; node $_ }
 ```
 
-The `management-page-integration.test.js` is the most critical — it validates that `index.html` is syntactically valid JavaScript by extracting and compiling the entire inline module script via `new Function()`. Any syntax errors or missing dependencies will cause this test to fail.
+The `management-page-integration.test.js` validates that `index.html` is syntactically valid JavaScript by extracting and compiling the entire inline module script via `new Function()`.
+
+The `page-runtime-smoke.test.js` is the most critical interaction guard. It loads the frontend helper scripts, stubs a browser-like environment, and executes the inline module script through `initApp()`. Runtime errors that would make the page non-interactive should fail this test.
+
+Run backend tests only after local Python dependencies are installed. In this workspace, backend collection currently requires `soundfile` and `httpx2`.

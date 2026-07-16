@@ -9,6 +9,8 @@ Changelog:
   - Added log streaming endpoint for frontend debugging
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import os
@@ -39,7 +41,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 # ── Paths ───────────────────────────────────────────────────────
@@ -61,6 +63,7 @@ from diarization import (
 from diarization.registry import MeetingRegistry
 from build_info import API_REVISION
 from modules.management_store import select_management_store
+from modules import record_store
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -101,8 +104,8 @@ except ImportError as e:
 # Lifespan: Load X-ASR in background
 # ===========================================================================
 
-xasr_engine: Optional[XASREngine] = None
-final_xasr_engine: Optional[XASREngine] = None
+xasr_engine: Optional["XASREngine"] = None
+final_xasr_engine: Optional["XASREngine"] = None
 xasr_pool: Optional[object] = None
 xasr_loading: bool = False
 _xasr_reload_lock = threading.Lock()
@@ -181,6 +184,11 @@ diarization_backend = ChunkedDiarizationBackend(
 meeting_pipeline = OfflineMeetingPipeline(diarization_backend)
 meeting_registry = MeetingRegistry()
 
+
+def _asr_engine_label(engine) -> str:
+    """Return the provider label shown to upload and recording clients."""
+    return str(getattr(engine, "engine_name", "X-ASR (sherpa-onnx zipformer2 v2.0)"))
+
 def _load_xasr_engine():
     """Build and atomically publish the configured live/final ASR runtimes."""
     global xasr_engine, final_xasr_engine, xasr_pool, xasr_loading
@@ -250,6 +258,11 @@ async def lifespan(app: FastAPI):
         logger.info("Meeting management store ready: %s", db.__name__)
     except Exception as error:
         logger.error("Meeting management store initialization failed: %s", error)
+    try:
+        record_store.init_db()
+        logger.info("Local meeting record store ready: %s", record_store.DB_PATH)
+    except Exception as error:
+        logger.error("Local meeting record store initialization failed: %s", error)
     _schedule_xasr_reload()
     yield
     logger.info("Shutting down 会悟 backend...")
@@ -684,6 +697,103 @@ async def api_delete_analysis(
     return {"ok": True}
 
 
+def _owned_record(record_id: str, user: dict) -> dict:
+    record = record_store.get_record(record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    if (
+        record.get("created_by")
+        and record["created_by"] != user["id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return record
+
+
+@app.post("/api/records")
+async def api_create_record(
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    payload = {**data, "created_by": user["id"]}
+    payload.pop("id", None)
+    try:
+        return {"record": record_store.save_record(payload, include_segments=False)}
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/records")
+async def api_list_records(
+    q: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    owner_id = None if user.get("role") == "admin" else user["id"]
+    return record_store.list_records(
+        user_id=owner_id,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/api/records/{record_id}/text")
+async def api_download_record_text(
+    record_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    record = _owned_record(record_id, user)
+    return PlainTextResponse(
+        record.get("full_text") or "",
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="meeting-{record_id}.txt"'
+        },
+    )
+
+
+@app.get("/api/records/{record_id}")
+async def api_get_record(
+    record_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    return {"record": _owned_record(record_id, user)}
+
+
+@app.put("/api/records/{record_id}")
+async def api_update_record(
+    record_id: str,
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    payload = {**data, "created_by": user["id"]}
+    return {
+        "record": record_store.save_record(
+            payload,
+            record_id=record_id,
+            include_segments=False,
+        )
+    }
+
+
+@app.delete("/api/records/{record_id}")
+async def api_delete_record(
+    record_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    return {"ok": record_store.delete_record(record_id)}
+
+
 @app.get("/api/xasr/status")
 async def get_xasr_status():
     """Get X-ASR engine status with detail."""
@@ -991,6 +1101,19 @@ def _live_result_to_dict(result: ASRResult) -> dict:
         "is_partial": bool(result.is_partial),
         "is_final": bool(result.is_final),
     })
+    if result.is_final and result.audio_data is not None and len(result.audio_data) > 0:
+        payload["audio_wav_base64"] = _numpy_to_wav_base64(result.audio_data, 16000)
+    return payload
+
+
+def _result_to_dict_with_audio(result: ASRResult, index: int) -> dict:
+    payload = _result_to_dict(result, index)
+    payload["audio_wav_base64"] = None
+    if result.audio_data is not None and len(result.audio_data) > 0:
+        try:
+            payload["audio_wav_base64"] = _numpy_to_wav_base64(result.audio_data, 16000)
+        except Exception as error:
+            logger.warning("Audio encoding failed for segment %s: %s", index, error)
     return payload
 
 
@@ -1034,22 +1157,14 @@ async def upload_audio(
                         "message": f"Processing {file.filename} ({file_size_mb:.1f}MB)...",
                         "filename": file.filename,
                         "file_id": file_id,
-                        "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                        "engine": _asr_engine_label(processing_engine),
                     }
                 })
 
                 loop = asyncio.get_event_loop()
 
                 def on_segment(result, idx, total):
-                    seg_data = _result_to_dict(result, idx)
-                    # Encode raw audio to base64 WAV for frontend waveform
-                    audio_b64 = None
-                    if result.audio_data is not None and len(result.audio_data) > 0:
-                        try:
-                            audio_b64 = _numpy_to_wav_base64(result.audio_data, 16000)
-                        except Exception as enc_err:
-                            logger.warning(f"Audio encoding failed for segment {idx}: {enc_err}")
-                    seg_data["audio_wav_base64"] = audio_b64
+                    seg_data = _result_to_dict_with_audio(result, idx)
 
                     asyncio.run_coroutine_threadsafe(
                         queue.put({
@@ -1087,15 +1202,7 @@ async def upload_audio(
                         # Build final segments list with audio
                         final_segments = []
                         for i, r in enumerate(results):
-                            seg = _result_to_dict(r, i + 1)
-                            audio_b64 = None
-                            if r.audio_data is not None and len(r.audio_data) > 0:
-                                try:
-                                    audio_b64 = _numpy_to_wav_base64(r.audio_data, 16000)
-                                except Exception as enc_err:
-                                    logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
-                            seg["audio_wav_base64"] = audio_b64
-                            final_segments.append(seg)
+                            final_segments.append(_result_to_dict_with_audio(r, i + 1))
                         meeting_registry.register(
                             file_id,
                             filename=file.filename,
@@ -1109,7 +1216,7 @@ async def upload_audio(
                                     "file_id": file_id,
                                     "filename": file.filename,
                                     "status": "completed",
-                                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                                    "engine": _asr_engine_label(processing_engine),
                                     "segments_count": len(results),
                                     "segments": final_segments,
                                     "speakers": run.speakers,
@@ -1126,8 +1233,9 @@ async def upload_audio(
                             loop
                         )
                     finally:
-                        if processing_engine.logic_validator:
-                            processing_engine.logic_validator.reset()
+                        logic_validator = getattr(processing_engine, "logic_validator", None)
+                        if logic_validator:
+                            logic_validator.reset()
                         try:
                             os.unlink(tmp_path)
                         except Exception:
@@ -1140,7 +1248,7 @@ async def upload_audio(
                     "filename": file.filename,
                     "status": "processing",
                     "size_mb": round(file_size_mb, 2),
-                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                    "engine": _asr_engine_label(processing_engine),
                     "diarization_requested": enable_diarization,
                     "num_speakers": num_speakers,
                 }
@@ -1161,16 +1269,7 @@ async def upload_audio(
                 results = run.results
                 segments = []
                 for i, r in enumerate(results):
-                    seg = _result_to_dict(r, i + 1)
-                    # Also encode audio for synchronous path
-                    audio_b64 = None
-                    if r.audio_data is not None and len(r.audio_data) > 0:
-                        try:
-                            audio_b64 = _numpy_to_wav_base64(r.audio_data, 16000)
-                        except Exception as enc_err:
-                            logger.warning(f"Audio encoding failed for segment {i}: {enc_err}")
-                    seg["audio_wav_base64"] = audio_b64
-                    segments.append(seg)
+                    segments.append(_result_to_dict_with_audio(r, i + 1))
                 meeting_registry.register(
                     file_id,
                     filename=file.filename,
@@ -1181,15 +1280,16 @@ async def upload_audio(
                     os.unlink(tmp_path)
                 except Exception:
                     pass
-                if processing_engine.logic_validator:
-                    processing_engine.logic_validator.reset()
+                logic_validator = getattr(processing_engine, "logic_validator", None)
+                if logic_validator:
+                    logic_validator.reset()
 
                 logger.info(f"Done: {len(segments)} segments from {file.filename}")
                 return {
                     "file_id": file_id,
                     "filename": file.filename,
                     "status": "completed",
-                    "engine": "X-ASR (sherpa-onnx zipformer2 v2.0)",
+                    "engine": _asr_engine_label(processing_engine),
                     "segments_count": len(segments),
                     "segments": segments,
                     "speakers": run.speakers,
@@ -1448,7 +1548,7 @@ async def ws_live(websocket: WebSocket):
                             )
                             canonical_results = canonical_run.results
                             canonical_segments = [
-                                _result_to_dict(result, index + 1)
+                                _result_to_dict_with_audio(result, index + 1)
                                 for index, result in enumerate(canonical_results)
                             ]
                             meeting_registry.register(

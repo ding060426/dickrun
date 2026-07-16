@@ -8,6 +8,10 @@ const {
 
 const settings = normalizeAppSettings({
   recognition: {
+    asr_provider: 'qwen3',
+    qwen3_model_path: 'Qwen/Qwen3-ASR-0.6B',
+    qwen3_device: 'cuda:0',
+    qwen3_dtype: 'bfloat16',
     live_asr_profile: 'quality',
     final_asr_profile: 'invalid',
     file_vad_threshold: 4,
@@ -23,6 +27,10 @@ const settings = normalizeAppSettings({
 
 assert.equal(settings.recognition.live_asr_profile, 'quality');
 assert.equal(settings.recognition.final_asr_profile, 'meeting');
+assert.equal(settings.recognition.asr_provider, 'qwen3');
+assert.equal(settings.recognition.qwen3_model_path, 'Qwen/Qwen3-ASR-0.6B');
+assert.equal(settings.recognition.qwen3_device, 'cuda:0');
+assert.equal(settings.recognition.qwen3_dtype, 'bfloat16');
 assert.equal(settings.recognition.file_vad_threshold, 0.95);
 assert.equal(settings.microphone.endpoint_grace_ms, 5000);
 

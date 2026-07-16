@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .asr_engine import XASREngine
 from .config import ASR_CHUNK_PROFILES
+from .qwen3_engine import Qwen3AsrEngine
 
 
 PROFILE_FALLBACK_ORDER = ("meeting", "balanced", "low-latency", "quality")
@@ -35,9 +36,17 @@ def resolve_deployed_profile(requested: str, available: list[str]) -> str | None
 class AsrEnginePool:
     """Own the process-level live and canonical recognizer runtimes."""
 
-    def __init__(self, model_dir: str | Path, *, engine_factory=XASREngine, base_options=None):
+    def __init__(
+        self,
+        model_dir: str | Path,
+        *,
+        engine_factory=XASREngine,
+        qwen_engine_factory=Qwen3AsrEngine,
+        base_options=None,
+    ):
         self.model_dir = Path(model_dir)
         self.engine_factory = engine_factory
+        self.qwen_engine_factory = qwen_engine_factory
         self.base_options = dict(base_options or {})
         self._lock = threading.RLock()
         self.live_engine = None
@@ -48,6 +57,7 @@ class AsrEnginePool:
         available = deployed_profiles(self.model_dir)
         requested_live = str(recognition.get("live_asr_profile", "meeting"))
         requested_final = str(recognition.get("final_asr_profile", "meeting"))
+        selected_provider = str(recognition.get("asr_provider", "xasr")).lower()
         effective_live = resolve_deployed_profile(requested_live, available)
         effective_final = resolve_deployed_profile(requested_final, available)
         if effective_live is None:
@@ -57,14 +67,58 @@ class AsrEnginePool:
 
         common = self._engine_options(recognition, hotwords)
         live = self.engine_factory(asr_profile=effective_live, **common).warmup()
+        xasr_final = live
+        effective_xasr_final = effective_live
+
+        def ensure_xasr_final():
+            nonlocal xasr_final, effective_xasr_final
+            if effective_final != effective_live and xasr_final is live:
+                xasr_final = self.engine_factory(
+                    asr_profile=effective_final,
+                    **common,
+                ).warmup()
+                effective_xasr_final = effective_final
+            return xasr_final
+
+        qwen_availability = self.qwen_engine_factory.availability(
+            recognition.get("qwen3_model_path", "")
+        )
         final = live
-        if effective_final != effective_live:
-            final = self.engine_factory(asr_profile=effective_final, **common).warmup()
+        effective_provider = "xasr"
+        provider_reason = ""
+        if selected_provider == "qwen3":
+            if qwen_availability.get("available"):
+                try:
+                    qwen_options = self._qwen_options(recognition, hotwords)
+                    final = self.qwen_engine_factory(**qwen_options).warmup()
+                    effective_provider = "qwen3"
+                except Exception as exc:
+                    qwen_availability = {
+                        "available": False,
+                        "reason": "initialization_failed",
+                        "detail": str(exc),
+                    }
+                    provider_reason = "initialization_failed"
+            else:
+                provider_reason = str(qwen_availability.get("reason", "unavailable"))
+            if effective_provider != "qwen3":
+                final = ensure_xasr_final()
+        else:
+            final = ensure_xasr_final()
 
         status = {
             "available_profiles": available,
+            "selected_provider": selected_provider,
+            "effective_provider": effective_provider,
+            "live_provider": "xasr",
+            "provider_fallback": selected_provider != effective_provider,
+            "provider_reason": provider_reason,
+            "providers": {
+                "xasr": {"available": True, "reason": ""},
+                "qwen3": dict(qwen_availability),
+            },
             "live": self._profile_status(requested_live, effective_live),
-            "final": self._profile_status(requested_final, effective_final),
+            "final": self._profile_status(requested_final, effective_xasr_final),
             "shared_runtime": live is final,
             "file_vad_provider": getattr(final, "file_vad_provider", "silero"),
         }
@@ -104,6 +158,10 @@ class AsrEnginePool:
                 "available_profiles": list(self._status.get("available_profiles", [])),
                 "live": dict(self._status.get("live", {})),
                 "final": dict(self._status.get("final", {})),
+                "providers": {
+                    name: dict(details)
+                    for name, details in self._status.get("providers", {}).items()
+                },
             }
 
     def _engine_options(self, recognition: dict, hotwords: dict) -> dict:
@@ -124,6 +182,17 @@ class AsrEnginePool:
             "enable_hotword_correction": hotwords.get("enabled", True),
             "enable_fuzzy_pinyin": hotwords.get("fuzzy_pinyin_enabled", True),
             "file_vad_options": file_vad_options,
+        }
+
+    def _qwen_options(self, recognition: dict, hotwords: dict) -> dict:
+        words, scores = self._hotword_inputs(hotwords)
+        return {
+            "model_path": recognition.get("qwen3_model_path", ""),
+            "device": recognition.get("qwen3_device", "auto"),
+            "dtype": recognition.get("qwen3_dtype", "auto"),
+            "hotwords": words,
+            "hotword_scores": scores,
+            "enable_hotword_correction": hotwords.get("enabled", True),
         }
 
     @staticmethod
@@ -153,6 +222,15 @@ class AsrEnginePool:
     def _empty_status() -> dict:
         return {
             "available_profiles": [],
+            "selected_provider": "xasr",
+            "effective_provider": "xasr",
+            "live_provider": "xasr",
+            "provider_fallback": False,
+            "provider_reason": "",
+            "providers": {
+                "xasr": {"available": False, "reason": "not_loaded"},
+                "qwen3": Qwen3AsrEngine.availability(""),
+            },
             "live": {},
             "final": {},
             "shared_runtime": False,

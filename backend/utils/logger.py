@@ -1,5 +1,5 @@
 """
-谛听 会悟 - Centralized Logging System
+会悟 - Centralized Logging System
 ==========================================================================
 Provides structured logging to console, file, and a ring buffer for
 WebSocket streaming. Supports log levels and module-scoped loggers.

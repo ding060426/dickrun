@@ -1,5 +1,5 @@
 """
-谛听 (会悟) - Smart Meeting Speech Cognitive System
+会悟 - Smart Meeting Speech Cognitive System
 Backend Server v2.0 (2026-07-15)
 ==========================================================================
 Changelog:

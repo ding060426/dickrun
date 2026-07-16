@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-谛听 会悟 - Standalone Demo Runner
+会悟 - Standalone Demo Runner
 ==========================================================================
 Processes an audio file end-to-end using X-ASR with full logging,
 saving results to JSON and a human-readable transcript.
@@ -235,7 +235,7 @@ def process_audio_file(
     # Human-readable transcript
     txt_path = os.path.join(output_dir, f"{base_name}_transcript.txt")
     with open(txt_path, 'w', encoding='utf-8') as f:
-        f.write(f"谛听 会悟 - Meeting Transcript\n")
+        f.write("会悟 - Meeting Transcript\n")
         f.write(f"File: {file_name}\n")
         f.write(f"Processed: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"Stats: {stats['total_utterances']} utterances, "

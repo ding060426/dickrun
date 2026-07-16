@@ -1,99 +1,99 @@
-# 谛听 (会悟) v3.0 — Smart Meeting Speech Cognitive System
+# 会悟 v3.0 — 智能会议语音认知系统
 
-基于 X-ASR (sherpa-onnx zipformer2) 与可选 Qwen3-ASR 的智能会议语音认知系统。支持音频文件上传、实时转写、热词修正、会议摘要、文字流程图和音频波形可视化。
+会悟是一套面向真实会议场景的本地优先语音认知产品。它把会议预约、多人录音、实时转写、会后精转、说话人日志、记录管理和大模型摘要连接为一条可追溯工作流，帮助团队把“开过的会”转化为可检索、可复盘、可执行的知识资产。
 
-## 系统架构
+> 正式产品名统一为“会悟”。仓库中仍保留 `DITING_*` 环境变量、`diting.db`、`diting.log`、`DiTing*` 前端命名空间等历史兼容标识，以保证已有配置、数据库和浏览器数据能够继续使用；这些标识不再代表对外品牌。
 
+## 产品定位
+
+会悟面向课程研讨、项目例会、需求评审、访谈调研、远程协作和政企内网会议等场景，重点解决四类问题：
+
+- 会中信息易遗漏：提供低延迟麦克风预览、文件转写和真实音频波形反馈。
+- 多人内容难归属：通过说话人分离、换人边界重识别和标签重命名形成结构化发言日志。
+- 会后整理成本高：保存原始录音、分段文本与认知元数据，并按内容动态生成摘要。
+- 数据与模型不可控：核心语音链路可完全本地运行，X-ASR 与 Qwen3-ASR 可按设备能力切换。
+
+## 核心工作流
+
+```text
+登录 / 预约会议
+        ↓
+麦克风实时录音或上传文件
+        ↓
+16 kHz 单声道统一时间轴
+        ├─ 实时链路：AudioWorklet → DTP2 WebSocket → Silero VAD → X-ASR 预览
+        └─ 最终链路：完整 WAV → X-ASR 或 Qwen3-ASR → 说话人分离 → 文本增强
+        ↓
+保存会议记录、分段音频、说话人和质量信息
+        ↓
+DSv4 / Qwen / OpenAI 兼容模型生成动态摘要与 Mermaid 文字流程图
 ```
-frontend/          ← 前端 (wavesurfer.js + AudioWorklet + WebSocket)
-  audio-worklet.js ← 浏览器采集、真实采样率到 16 kHz 的连续降采样
+
+系统刻意区分“实时预览”和“最终稿”：实时链路优先保证反馈速度；停止录音后再使用完整 WAV 和设置中选择的最终识别引擎生成 canonical transcript。若 Qwen3-ASR 加载或推理失败，后端会记录原因并回退 X-ASR，不会丢失录音。
+
+## 主要创新
+
+- **双阶段识别**：低延迟 X-ASR 负责会中反馈，X-ASR/Qwen3-ASR 负责会后最终稿，兼顾交互速度和模型能力。
+- **统一音频时间轴**：ASR、VAD、说话人分离和波形均复用同一份 16 kHz 单声道音频，减少跨模块时间戳漂移。
+- **边界感知的多人转写**：说话人分析与连续 ASR 双轨执行，只在换人边界对必要片段局部重识别，避免逐段重置造成吞字。
+- **动态会议摘要**：无内容的章节自动省略，后续序号连续重排；文字模型只生成结构化节点，由本地代码渲染 Mermaid/Markdown，不调用图像接口。
+- **本地优先与可降级**：模型、记录、热词和设置均可本地保存；可选能力不可用时提供明确状态和安全回退。
+
+## 项目结构
+
+```text
+frontend/
+  index.html                  单页产品界面：转写、预约、记录、用户与设置
+  audio-worklet.js            浏览器采集与连续降采样
 backend/
-  audio_buffer.py  ← ASR/VAD/diarization 共用的 16 kHz 单声道时间轴
-  main.py          ← FastAPI 后端 (HTTP + WebSocket API)
-  diarization/
-    pipeline.py    ← 双轨分析、换人边界重识别与时间轴对齐
-    sherpa_backend.py ← pyannote segmentation + 3D-Speaker 本地推理
+  main.py                     FastAPI HTTP / WebSocket 入口
+  audio_buffer.py             统一音频时间轴
   xasr/
-    asr_engine.py  ← X-ASR 引擎 (VAD + 端点检测 + 转写)
-    qwen3_engine.py ← Qwen3-ASR 文件/最终转写适配器
-    engine_pool.py ← X-ASR 实时预览与最终转写模型切换
-    live_audio.py  ← 实时 PCM 校验 + Silero VAD + ASR 会话边界
-    models/        ← ONNX 模型 (需自行下载)
+    asr_engine.py             X-ASR 流式识别
+    qwen3_engine.py           Qwen3-ASR 最终转写适配器
+    engine_pool.py            最终识别模型选择与回退
+    live_audio.py             麦克风 PCM、VAD 与端点状态机
+  diarization/                pyannote segmentation + 3D-Speaker
   modules/
-    audio_processor.py  ← SNR/RT60 估算 + 热词修正 + 逻辑校验 + 不确定性估计
-    llm_client.py       ← OpenAI ChatCompletions 兼容客户端
-    llm_models.py       ← DSv4/Qwen/OpenAI 文字模型目录与能力路由
-    summary_service.py  ← 会议摘要、Mermaid/Markdown 文字图生成
-  utils/
-    logger.py      ← 统一日志系统 (控制台 + 文件 + 环形缓冲)
+    audio_processor.py        SNR、热词、逻辑校验与不确定性
+    llm_client.py             OpenAI Chat Completions 兼容客户端
+    llm_models.py             DSv4/Qwen/OpenAI 模型目录与能力路由
+    summary_service.py        动态摘要与文字流程图
+    meeting_db.py / record_store.py / summary_store.py
+                              用户、预约、记录、摘要和设置持久化
+docs/
+  会悟智能会议语音认知系统实验报告.docx
 ```
+
+更完整的接口、存储、协议和故障排查见 [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)，会议记录生命周期见 [MEETING_RECORDS.md](MEETING_RECORDS.md)。
 
 ## 快速开始
 
-### 1. 环境要求
+### 1. 安装依赖
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-### 2. 下载 X-ASR 模型文件
-
-项目默认使用 960ms `meeting` 模型。下载器会从官方 Hugging Face 仓库断点下载、校验并原子发布模型文件：
+### 2. 下载 X-ASR 模型
 
 ```powershell
-python backend/xasr/download_models.py
-
-# 也可以显式部署其他延迟档位
-python backend/xasr/download_models.py --profile low-latency
+python backend\xasr\download_models.py --profile meeting
 ```
 
-模型目录应有以下文件：
-```
-backend/xasr/models/
-  ├── encoder-160ms.onnx
-  ├── decoder-160ms.onnx
-  ├── joiner-160ms.onnx
-  ├── encoder-960ms.onnx   (默认)
-  ├── decoder-960ms.onnx   (默认)
-  ├── joiner-960ms.onnx    (默认)
-  ├── tokens.txt
-  └── silero_vad.onnx       (麦克风与文件切分共用的本地 Silero VAD)
-```
-
-### 2.1 可选：启用本地 Qwen3-ASR
-
-设置页支持在 `X-ASR` 与 `Qwen3-ASR` 之间直接切换最终转写引擎。实时麦克风预览仍由低延迟
-X-ASR 完成；上传文件和录音停止后的最终转写可切到 Qwen3-ASR。这样不会用大模型加载延迟阻塞实时预览。
-
-建议为 Qwen 单独创建 Python 3.12 环境，启动器检测到 `.venv-qwen3` 后会自动用它启动后端：
-
-```powershell
-py -3.12 -m venv .venv-qwen3
-.venv-qwen3\Scripts\python.exe -m pip install -r backend\requirements.txt qwen-asr
-# 再按 PyTorch 官方安装页安装与本机显卡匹配的 CUDA 版本
-```
-
-打开 `会议转写 → 设置 → 识别与分段`，选择 `Qwen3-ASR`，填写本地模型目录（目录中应包含
-`config.json`、tokenizer/preprocessor 文件和完整的 `.safetensors` 分片），设备选 `CUDA 0`、
-精度选 `bfloat16`，保存后状态应显示：
+默认模型目录：
 
 ```text
-selected_provider=qwen3
-effective_provider=qwen3
-provider_fallback=false
+backend/xasr/models/
+  encoder-960ms.onnx
+  decoder-960ms.onnx
+  joiner-960ms.onnx
+  tokens.txt
+  silero_vad.onnx
 ```
 
-若依赖、模型目录或显存不可用，系统会明确显示原因并安全回退到 X-ASR。Qwen3-ASR 的安装与
-本地音频输入格式以 [Qwen3-ASR 官方仓库](https://github.com/QwenLM/Qwen3-ASR) 为准；CUDA Torch
-版本以 [PyTorch 官方安装页](https://pytorch.org/get-started/locally/) 为准。
-
-保存识别设置后，前端会等待所选运行时真正完成加载，再允许把“已就绪”作为成功状态展示。
-Qwen3 模式下，录音期间仍由 X-ASR 提供低延迟预览；停止录音后才执行 Qwen3 最终转写。
-如果 Qwen3 最终转写在运行时失败（例如显存不足），后端会自动用 X-ASR 对同一份完整录音重试，
-前端会明确显示回退原因；若两个引擎都没有返回文字，也会保留录音并提示查看日志，不再静默显示“完成”。
-
-离线说话人日志还需要两个 sherpa-onnx 兼容模型（当前本地工作区已放置好）：
+可选说话人模型：
 
 ```text
 backend/diarization/models/
@@ -101,104 +101,49 @@ backend/diarization/models/
   3dspeaker-eres2net.onnx
 ```
 
-也可以不复制模型，直接通过环境变量指向已有文件：
+### 3. 启动
 
 ```powershell
-$env:DITING_DIARIZATION_SEGMENTATION_MODEL = "D:\models\pyannote\model.int8.onnx"
-$env:DITING_SPEAKER_EMBEDDING_MODEL = "D:\models\3dspeaker.onnx"
-```
-
-### 3. 获取 Eval_Ali 数据集
-
-数据集中包含远场会议录音和近场单说话人录音，带 TextGrid 标注。
-
-- **来源**: AliMeeting Eval Set (达摩院开源)
-- **内容**: 8 场会议, 25 位说话人, 含远场混音和近场纯净音频
-- **地址**: [阿里天池 / ModelScope](https://modelscope.cn/datasets) 搜索 `AliMeeting`
-- **存放位置**: `Eval_Ali/Eval_Ali/` 目录
-
-目录结构：
-```
-Eval_Ali/Eval_Ali/
-  ├── Eval_Ali_far/
-  │   ├── audio_dir/       ← 8 个远场混音 WAV
-  │   └── textgrid_dir/    ← 8 个 TextGrid (每场含 4 人标注)
-  └── Eval_Ali_near/
-      ├── audio_dir/       ← 25 个近场单说话人 WAV
-      └── textgrid_dir/    ← 25 个 TextGrid
-```
-
-### 4. 启动
-
-```bash
 python start.py
 ```
 
-- 前端: [http://localhost:3000](http://localhost:3000)
-- 后端 API: [http://localhost:8765](http://localhost:8765)
-- API 文档: [http://localhost:8765/docs](http://localhost:8765/docs)
+- 前端：<http://localhost:3000>
+- 后端：<http://localhost:8765>
+- API 文档：<http://localhost:8765/docs>
 
-如果模型未就绪，上传接口会明确返回错误，不会再用预置样例冒充真实转写。
-启动器会校验后端 API revision；如果 `8765` 被旧版 会悟 占用，会明确报错并要求先关闭旧进程，
-不会再把旧服务误判为本次启动成功。
+启动器会校验后端 API revision。若端口被旧进程占用，会明确提示，而不会把不兼容服务误判为启动成功。
 
-### 5. 会议管理与转写结果
+## 本地 Qwen3-ASR
 
-首页现已整合 `supabase-hero` 的会议管理系统，登录后可进入会议转写、会议预约、会议分析和用户管理。
-“会议转写”直接使用当前分支的 X-ASR、Silero VAD、长音频分块、说话人分离和实时 DTP2 麦克风链路；
-转写完成后可在“会议分析”中关联预约会议并保存分段、说话人、时长和质量统计。
+设置页可在 `X-ASR` 与 `Qwen3-ASR` 之间切换最终转写引擎。实时麦克风预览始终使用低延迟 X-ASR；上传文件和停止录音后的最终转写才调用 Qwen3-ASR。
 
-未登录时启动页会显示账号登录界面。登录后，左上角显示当前用户头像和姓名；点击后可以查看账号摘要、
-编辑显示名称、头像、邮箱和电话，或选择“切换用户”“退出登录”。切换用户会先注销当前服务端会话，
-再返回登录界面，不会在浏览器中保存其他账号密码。上传的头像会先在浏览器裁剪为正方形并压缩后保存。
-
-共享预约的使用方式：
-
-1. 在“用户”页把账号加入自己的同事列表。
-2. 在“会议预约”创建会议时勾选参会同事，并填写时间、地点和会议说明。
-3. 会议会同时出现在创建者及所有参会人的个人日期界面；详情包含创建者与其他参会人。
-4. 只有创建者（以及管理员）能从日期右侧栏修改时间、地点、说明和参会人；普通参会人只有查看权限。
-
-管理数据默认保存在本地 `backend/data/diting.db`，无需联网即可使用。首次启动会创建管理员账号 `admin`，
-密码读取 `DITING_ADMIN_PASSWORD`，未配置时仅为本地开发保留默认值 `admin123`。只要各账号访问同一个后端进程，
-它们就共享这一个 SQLite 数据库；预约与参会人使用关系表保存，并启用外键、索引、30 秒忙等待和 WAL 并发模式。
-旧数据库会在启动时自动增加 `avatar_data_url` 资料字段，不需要删除或重建数据库。
-
-如需使用 Supabase，在 Supabase SQL Editor 中执行 `backend/supabase_init.sql`，复制并填写配置：
+建议使用独立 Python 3.12 环境：
 
 ```powershell
-Copy-Item backend/.env.example backend/.env
-# 编辑 backend/.env 中的 SUPABASE_URL、SUPABASE_KEY 和管理员密码
-python backend/setup_supabase.py
-python start.py
+py -3.12 -m venv .venv-qwen3
+.venv-qwen3\Scripts\python.exe -m pip install -r backend\requirements.txt qwen-asr
+# 再按 PyTorch 官方说明安装与本机 CUDA 匹配的 torch
 ```
 
-只有 `SUPABASE_URL` 与 `SUPABASE_KEY` 同时存在时才启用 Supabase；否则自动回退到本地 SQLite，
-不会影响本地转写服务启动。Supabase 初始化脚本会迁移旧版 JSON 参会人数据，并用 PostgreSQL 触发器在同一事务中
-同步预约和参会关系。当前 SQL 中的 RLS 策略仅用于开发调试；推向公网前必须把 `SUPABASE_KEY` 保留在后端，
-使用服务端密钥，并将开发阶段的全开放策略替换为正式最小权限策略。
+在 `会议转写 → 设置 → 识别与分段` 中填写本地模型目录。目录应包含 `config.json`、tokenizer/preprocessor 文件和完整 `.safetensors` 分片。保存后查看：
 
-### 5.1 大模型摘要与 DSv4
+```text
+selected_provider=qwen3
+effective_provider=qwen3
+provider_fallback=false
+```
 
-在 `记录管理 → 大模型设置` 中配置摘要模型。默认 Provider 为 DeepSeek，默认模型为
-`deepseek-v4-flash`（界面显示 DSv4 Flash），高质量档可直接切到 `deepseek-v4-pro`（DSv4 Pro）。
-DeepSeek 官方当前只公布这两个 V4 API ID；旧 `deepseek-chat` / `deepseek-reasoner` 将于
-2026-07-24 停用，详见 [DeepSeek 官方模型与价格](https://api-docs.deepseek.com/quick_start/pricing/)
-和 [模型列表 API](https://api-docs.deepseek.com/api/list-models)。
+若依赖、模型或显存不可用，状态会显示具体原因并回退 X-ASR。Qwen3-ASR 的模型布局以 [官方仓库](https://github.com/QwenLM/Qwen3-ASR) 为准，CUDA 安装以 [PyTorch 官方页面](https://pytorch.org/get-started/locally/) 为准。
 
-设置界面支持以下方式：
+## 大模型摘要
 
-- 选择 DSv4 Flash / DSv4 Pro、Qwen3.7、Qwen3.6 Flash、GPT-5.x 等常用文字模型；
-- 点击“更新模型列表”从当前 Base URL 的 `/models` 读取账号实际可用模型；
-- 直接填写自定义模型 ID，例如私有网关使用的 `dsv4pro`；
-- 点击“测试连接”执行一次真实 JSON 推理，而不只是检测 `/models` 是否可访问。
+在 `记录管理 → 大模型设置` 中配置 Provider、Base URL、模型 ID 和 API Key。当前仓库预置：
 
-DSv4 等聊天模型不会被当作图像生成模型调用。会议结构图始终由模型返回结构化文字节点，再由本地代码
-渲染为 Mermaid 和 Markdown；设置中的“生成文字图”不会请求任何图片接口。阿里云当前 Qwen 文字模型
-列表可参考 [Model Studio 模型更新页](https://help.aliyun.com/en/model-studio/newly-released-models)。
+- DeepSeek：`deepseek-v4-flash`（默认，界面名 DSv4 Flash）、`deepseek-v4-pro`（DSv4 Pro）。
+- Qwen：Qwen3.7 Max/Plus、Qwen3.6 Flash。
+- OpenAI 兼容：GPT-5.2、GPT-5.1、GPT-5 mini，或自定义网关模型 ID。
 
-用户在界面保存的 Provider、Base URL、模型和 API Key 会真正用于该用户的摘要任务；API Key 使用
-Fernet 加密，密钥保存在忽略提交的 `backend/data/llm_secret.key`。也可用环境变量作为低优先级默认值：
+“更新模型列表”读取当前 Base URL 的 `/models`；“测试连接”执行一次真实 JSON 推理。用户设置会用于该用户的摘要任务，API Key 以 Fernet 加密，密钥文件位于忽略提交的 `backend/data/llm_secret.key`。
 
 ```powershell
 $env:DITING_LLM_PROVIDER = "deepseek"
@@ -208,149 +153,62 @@ $env:DITING_LLM_MODEL = "deepseek-v4-flash"
 python start.py
 ```
 
-对应 API：`GET/PUT /api/llm-settings`、`POST /api/llm-settings/models` 和
-`POST /api/llm-settings/test`。摘要记录只保存脱敏后的配置快照，不保存明文 API Key。
+DSv4 等不支持图像生成的聊天模型只处理文字与结构化节点。系统在本地渲染 Mermaid 和 Markdown，不向图像生成接口发送请求。摘要不强制固定章节：议题、决策、行动项、风险等内容为空时直接省略，剩余章节自动连续编号。
 
-摘要 Markdown 不再强制输出固定章节：议题、决策、行动项、公式、风险等字段为空时，对应章节会被
-直接省略，后续章节使用连续中文序号重新编号。文字结构图只有在模型返回有效节点时才追加，并自动使用
-下一个章节序号。转写主界面底部原有的“会议处理完成后将生成摘要”占位栏已移除，摘要仍从记录管理入口生成。
+## 会议管理与记录
 
-### 6. 离线多说话人会议
+登录后可使用会议转写、会议预约、记录管理、会议分析和用户管理。共享预约仅对创建者、参与者和管理员可见；创建者与管理员可以编辑参会人。
 
-上传前勾选底部“说话人”，人数已知时选择 `2～8 人`；已知人数会直接约束聚类，通常比自动估计稳定。
-后端会让 diarization 与 X-ASR 共享同一份标准音频并独立分析，在换人点对跨说话人的 ASR 长段做带边界留白的
-局部重识别，最后返回 `speaker_id`、`speaker_confidence`、`overlap` 和时间戳。点击彩色说话人标签可重命名，
-当前任务中的同一标签会同步更新。
+管理数据默认位于 `backend/data/diting.db`，记录数据默认位于 `backend/data/records.db`。前者文件名是历史兼容标识。部署 Supabase 时先执行 `backend/supabase_init.sql`，并把密钥仅保留在后端；示例 RLS 策略只适合开发环境。
 
-HTTP 上传参数：
+## 实时麦克风与离线转写
+
+浏览器 AudioWorklet 按设备真实采样率采集，连续降采样至 16 kHz 单声道 PCM，通过带 DTP2 和序号的 WebSocket 帧发送到 `/ws/live`。停止时发布完整 WAV，再执行最终识别和离线说话人对齐。
+
+无物理麦克风时可用文件验证同一协议：
+
+```powershell
+python backend\tests\smoke_live_websocket.py path\to\meeting.wav --url ws://127.0.0.1:8765/ws/live
+```
+
+设置、热词和录音分别保存在：
 
 ```text
-POST /api/audio/upload?enable_diarization=true&num_speakers=4
-PATCH /api/meetings/{meeting_id}/speakers/SPEAKER_00  {"name":"张三"}
+backend/data/settings.json
+backend/data/hotwords.json
+backend/recordings/
 ```
 
-模型缺失或显式关闭时会安全降级为原来的纯 ASR，不会让文件上传失败。重叠语音第一版只标记和降低归属置信度，
-不会把混合语音伪装成已经分离的双路文本。
-
-超过 10 分钟的音频默认启用静音感知分块：目标块长 5 分钟、最大 8 分钟、前后保留 2 秒上下文，最多两个
-worker 并行执行说话人分析。每个块先生成本地说话人，再通过 3D-Speaker 声纹做全局聚类，因此不会直接把
-不同块中的 `SPEAKER_00` 当成同一个人。X-ASR 仍保留整段连续识别上下文，不随 diarization 分块。
-前端处理状态会显示 `diarization 2/6` 之类的块级进度。
-
-长音频参数可通过环境变量调整：
-
-```text
-DITING_DIARIZATION_CHUNKING=true
-DITING_DIARIZATION_LONG_AUDIO_SEC=600
-DITING_DIARIZATION_TARGET_CHUNK_SEC=300
-DITING_DIARIZATION_MAX_CHUNK_SEC=480
-DITING_DIARIZATION_CHUNK_OVERLAP_SEC=2
-DITING_DIARIZATION_MAX_WORKERS=2
-DITING_DIARIZATION_WORKER_THREADS=2
-DITING_SPEAKER_STITCH_THRESHOLD=0.75
-```
-
-单块失败会使用全新 worker 重试；分块或跨块声纹统一仍失败时回退到整段说话人分析，整段也失败才降级为纯 ASR。
-
-### 7. 实时麦克风转写
-
-打开前端后点击顶部 `Mic`，允许浏览器使用麦克风即可。浏览器通过
-`AudioWorklet` 连续采集音频，按实际设备采样率降采样为 16 kHz 单声道
-`pcm_s16le`，再以带 `DTP2 + uint32 sequence` 头的二进制 WebSocket 帧发送到
-`/ws/live`，后端可直接统计丢帧。停止录音时先补齐最后一句，再用落盘 WAV 做一次
-完整文件转写，并用这份 canonical transcript 替换低延迟预览结果。录音期间底部会显示由真实
-RMS/峰值驱动的彩色声量动画；声量测量只用于本地显示，不会额外上传数据。
-
-当前本地若后端使用非默认端口，可这样打开：
-
-```text
-http://localhost:3000/?apiPort=8766
-```
-
-点击底部 `Settings` 可在同一界面调整识别、麦克风和热词。识别设置支持为实时预览与
-最终转写分别选择模型档位（默认均为 960ms），并调整本地 Silero 文件切分阈值、最短
-语音/静音与前后留白。麦克风设置支持枚举设备、录音电平测试、回声消除、降噪、自动增益、
-VAD 门控、pre-roll 和句尾宽限期。运行设置保存到 `backend/data/settings.json`。
-
-热词设置支持启用/停用解码增强、调整全局默认权重、逐词设置权重，以及开启模糊拼音纠错。
-配置保存到本机 `backend/data/hotwords.json`，从下一次麦克风或文件识别会话开始生效。模糊拼音只对
-至少两个汉字的中文热词执行最长优先匹配，支持平翘舌、`n/l` 和前后鼻音归一化；
-英文热词还会统一大小写、空格、缩写和常见误识别写法。
-
-实时句尾采用“VAD 候选句尾 + 可撤销宽限期”：Silero 检测到约 500ms
-静音后不会立刻重置识别流，而是继续保留上下文；默认再等待 800ms，期间恢复说话就
-继续同一句，只有静音持续约 1.3 秒才真正定稿。可通过环境变量调整额外宽限期：
-
-```powershell
-$env:DITING_LIVE_ENDPOINT_GRACE_MS = "1000"
-python start.py
-```
-
-如果仍然容易切出短句，可调到 `1000`～`1400`；如果更重视句尾返回速度，可调到
-`400`～`600`。实时 Silero VAD 可用时，sherpa 内置端点会关闭，避免两个端点机制
-重复重置解码器；Silero 模型缺失时会回退到依赖无关的流式能量 VAD，而不是把
-所有输入都当作语音。直播音频先写入 `backend/recordings/*.wav.part`，正常停止时
-原子发布为 `.wav`，异常断线时保留 `.part` 以便恢复。
-
-可选择 `meeting`、`dictation`、`oncall` 三种直播边界档位；模型延迟档位支持
-`low-latency`（160ms）、`balanced`（480ms）、`meeting`（960ms）和
-`quality`（1920ms），对应 ONNX 文件存在时才可启用。默认的实时与最终转写都使用
-`meeting`（960ms）；两者相同时共享一份已预热 ONNX 运行时，避免重复占用内存。
-识别、VAD 与麦克风参数通过前端 `Settings` 调整；服务容量相关参数仍保留环境变量入口：
-
-```powershell
-$env:DITING_MAX_UPLOAD_MB = "2048"
-$env:DITING_PROCESSING_WORKERS = "2"
-python start.py
-```
-
-如已安装 `torch` 与 `pycorrector`，可显式启用 tep 分支同步来的 MacBERT
-同音字/形似字纠错。默认关闭，避免首次加载模型阻塞最终转写：
-
-```powershell
-$env:DITING_ENABLE_MACBERT = "1"
-python start.py
-```
-
-无需物理麦克风也可以用音频文件验证同一条 WebSocket 链路：
-
-```bash
-python backend/tests/smoke_live_websocket.py path/to/meeting.wav --url ws://127.0.0.1:8765/ws/live
-```
-
-若要用自己的标注音频对比 160ms 与 960ms 的原始 CER、热词召回率和运行时间，可创建：
-
-```json
-[
-  {"audio": "sample.wav", "reference": "这是参考文本", "keywords": ["参考文本"]}
-]
-```
-
-然后运行：
-
-```powershell
-python backend/evaluate_profiles.py manifest.json --profiles low-latency meeting --output report.json
-```
-
-## 功能
+## 功能状态
 
 | 功能 | 状态 | 说明 |
-|------|------|------|
-| ASR 转写 | ✅ | sherpa-onnx zipformer2 流式推理 |
-| Qwen3-ASR 最终转写 | ✅ | 本地 CUDA 文件/最终转写，可在设置中切换；实时预览继续使用 X-ASR |
-| VAD + 端点检测 | ✅ | 文件：Silero 提供时间锚点，X-ASR 跨段保留上下文并按完整句合并；实时：Silero 优先、能量 VAD 降级 + 可配置 pre-roll |
-| 热词修正 | ✅ | 可持久化逐词权重 + modified beam search + 多音字模糊拼音 + ASCII 标准化 |
-| 文本后处理 | ✅ | 保守去口癖、标点恢复、重复清理与中文数字 ITN |
-| 逻辑校验 | ✅ | 数据冲突检测 (数字/百分比对比) |
-| 不确定性估计 | ✅ | 低置信度区段标记 |
-| 音频波形可视化 | ✅ | wavesurfer.js + WAV 编码 |
-| 实时录音转写 | ✅ | AudioWorklet + DTP2 帧序号 + partial/final + 持久 WAV + 停止后二次定稿和离线说话人对齐 |
-| Eval_Ali 评测 | ✅ | CER 计算 / 热词提取 |
-| 说话人日志/分段 | ✅ | pyannote segmentation + 3D-Speaker，全局聚类、时间平滑、边界重识别与可重命名标签 |
-| DSv4 会议摘要 | ✅ | 用户级 OpenAI 兼容配置、真实推理测试、DSv4 Flash/Pro 与动态模型列表 |
-| 文字流程图 | ✅ | 结构化 JSON → Mermaid + Markdown，不调用图像生成接口 |
-| 重叠语音双路分离 | 🔜 | LocalMeet 已有 MossFormer2 离线 GPU 实现；不放入低延迟实时预览主链路 |
-| 说话人识别 | 🔜 | 声纹注册库匹配 待实现 |
+|---|---|---|
+| 实时 X-ASR | 已实现 | AudioWorklet + DTP2 + Silero VAD + partial/final |
+| Qwen3-ASR 最终转写 | 已实现 | 本地 CUDA 模型，可切换并自动回退 |
+| 说话人日志 | 已实现 | 全局聚类、时间对齐、边界重识别、标签重命名 |
+| 热词与文本增强 | 已实现 | 逐词权重、模糊拼音、标点、ITN、逻辑检查 |
+| 本地会议记录 | 已实现 | 分段音频、文本、元数据、检索和导出 |
+| DSv4 动态摘要 | 已实现 | 用户级配置、真实连接测试、动态章节 |
+| Mermaid 文字流程图 | 已实现 | 结构化文字节点，本地渲染 |
+| 重叠语音双路分离 | 规划中 | 当前只标记重叠并降低归属置信度 |
+| 注册声纹身份识别 | 规划中 | 当前输出匿名说话人标签 |
+
+## 验证
+
+```powershell
+.venv\Scripts\python.exe -m pytest backend\tests -q
+node --test frontend\tests\*.test.mjs
+```
+
+本次品牌与文档更新提交前会重新执行全量测试；可复现结果以当前分支提交记录和终端输出为准。
+
+## 未来规划
+
+1. 对重叠区段进行按需语音分离，并把分离结果回绑原时间轴。
+2. 增加可授权的声纹注册库，实现匿名标签到已知参会人的映射。
+3. 将单文件前端拆分为可测试模块，降低设置、录音和记录流程的耦合。
+4. 增加长会基准、GPU 显存基线和多模型质量/时延对比报告。
+5. 完善公网部署的权限、审计、密钥轮换和对象存储策略。
 
 ## License
 

@@ -1,5 +1,5 @@
-"""
-谛听 会悟 - Eval_Ali Dataset Integration Module
+r"""
+会悟 - Eval_Ali Dataset Integration Module
 ==========================================================================
 Integrates the AliMeeting Eval dataset and AliMeeting4MUG dataset
 to improve 会悟's ASR quality and cognitive enhancement.

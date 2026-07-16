@@ -162,7 +162,7 @@ def init_logging(
     _initialized = True
 
     # Log startup banner
-    logger = logging.getLogger("diting")
+    logger = logging.getLogger("huiwu")
     logger.info("=" * 60)
     logger.info("  会悟 Logging System Initialized")
     logger.info(f"  Log directory: {log_dir}")

@@ -119,7 +119,7 @@ class ChunkedDiarizationBackend:
         self._worker_state = threading.local()
         self._executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=max(1, int(self.config.max_workers)),
-            thread_name_prefix="diting-diarization",
+            thread_name_prefix="huiwu-diarization",
         )
 
     def availability(self) -> tuple[bool, str]:

@@ -1,9 +1,10 @@
 (function attachI18n(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingI18n = api;
+  if (root) root.HuiWuI18n = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createI18nModule() {
-  const STORAGE_KEY = 'diting:language';
+  const STORAGE_KEY = 'huiwu:language';
+  const LEGACY_STORAGE_KEY = 'diting:language';
   const DEFAULT_LANGUAGE = 'zh-CN';
   const MESSAGES = Object.freeze({
     'zh-CN': Object.freeze({
@@ -455,7 +456,16 @@
     const storage = options.storage;
     const documentRef = options.document;
     let savedLanguage = null;
-    try { savedLanguage = storage?.getItem(STORAGE_KEY); } catch (error) { /* ignore */ }
+    try {
+      savedLanguage = storage?.getItem(STORAGE_KEY);
+      if (!savedLanguage) {
+        savedLanguage = storage?.getItem(LEGACY_STORAGE_KEY);
+        if (savedLanguage) {
+          storage?.setItem(STORAGE_KEY, savedLanguage);
+          storage?.removeItem?.(LEGACY_STORAGE_KEY);
+        }
+      }
+    } catch (error) { /* ignore */ }
     let activeLanguage = normalizeLanguage(savedLanguage || options.navigatorLanguage);
 
     const t = (key, values = {}, fallback = key) => {

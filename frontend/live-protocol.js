@@ -1,7 +1,7 @@
 (function attachLiveProtocol(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingLiveProtocol = api;
+  if (root) root.HuiWuLiveProtocol = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createLiveProtocol() {
   const MAGIC = [0x44, 0x54, 0x50, 0x32]; // DTP2
 

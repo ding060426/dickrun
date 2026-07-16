@@ -1,12 +1,12 @@
 /** S6: Record Summary — dialog, polling, preview, download.
  *
- *  Exposed on `window.DiTingRecordSummary` so the records panel can
- *  call `DiTingRecordSummary.open(recordIds)`.
+ *  Exposed on `window.HuiWuRecordSummary` so the records panel can
+ *  call `HuiWuRecordSummary.open(recordIds)`.
  */
 (function attachRecordSummary(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingRecordSummary = api;
+  if (root) root.HuiWuRecordSummary = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createRecordSummary() {
 
   let currentSummaryId = null;
@@ -21,7 +21,7 @@
   function hide(el) { if (el) el.style.display = 'none'; }
 
   async function apiFetch(url, opts) {
-    const token = localStorage.getItem('diting_auth_token') || '';
+    const token = globalThis.HuiWuStorage?.getAuthToken() || '';
     const headers = { 'Content-Type': 'application/json', ...(opts?.headers || {}) };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const resp = await fetch(url, { ...opts, headers });
@@ -247,7 +247,7 @@
   }
 
   function authHeaders() {
-    const token = localStorage.getItem('diting_auth_token') || '';
+    const token = globalThis.HuiWuStorage?.getAuthToken() || '';
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 

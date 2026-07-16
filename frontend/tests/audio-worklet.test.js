@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 
 
 let RegisteredProcessor = null;
+let registeredName = null;
 global.sampleRate = 48000;
 global.AudioWorkletProcessor = class {
   constructor() {
@@ -12,11 +13,15 @@ global.AudioWorkletProcessor = class {
     };
   }
 };
-global.registerProcessor = (_name, Processor) => {
+global.registerProcessor = (name, Processor) => {
+  registeredName = name;
   RegisteredProcessor = Processor;
 };
 
 require('../audio-worklet.js');
+
+assert.equal(registeredName, 'huiwu-pcm');
+assert.equal(RegisteredProcessor.name, 'HuiWuPcmProcessor');
 
 const processor = new RegisteredProcessor();
 processor.process([[new Float32Array(2048).fill(0.25)]]);

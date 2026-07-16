@@ -106,6 +106,11 @@ class ManagementApiTests(unittest.IsolatedAsyncioTestCase):
         paths = {route.path for route in main.app.routes}
         self.assertIn("/api/meetings/reservations", paths)
         self.assertIn("/api/meetings/analysis", paths)
+        legacy_hotword_routes = [
+            route for route in main.app.routes
+            if route.path == "/api/hotwords" and "POST" in (route.methods or set())
+        ]
+        self.assertEqual(legacy_hotword_routes, [])
 
     async def test_user_can_update_their_current_profile(self):
         registered = await main.auth_register(

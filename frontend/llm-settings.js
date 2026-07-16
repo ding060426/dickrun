@@ -1,11 +1,11 @@
 /** G2: LLM Settings — dialog, test connection, save.
  *
- *  Exposed on `window.DiTingLLMSettings`.
+ *  Exposed on `window.HuiWuLLMSettings`.
  */
 (function attachLLMSettings(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingLLMSettings = api;
+  if (root) root.HuiWuLLMSettings = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createLLMSettings() {
 
   const DEFAULT_PROVIDER = 'deepseek';
@@ -34,7 +34,7 @@
   function hide(el) { if (el) el.style.display = 'none'; }
 
   async function apiFetch(url, opts) {
-    const token = localStorage.getItem('diting_auth_token') || '';
+    const token = globalThis.HuiWuStorage?.getAuthToken() || '';
     const headers = { 'Content-Type': 'application/json', ...(opts?.headers || {}) };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const resp = await fetch(url, { ...opts, headers });

@@ -128,7 +128,7 @@ context.globalThis = context;
 context.window.webkitAudioContext = context.AudioContext;
 
 vm.createContext(context);
-for (const script of ['mic-level.js', 'live-protocol.js', 'management-transcription.js', 'app-settings.js', 'hotword-settings.js', 'i18n.js']) {
+for (const script of ['brand-storage.js', 'mic-level.js', 'live-protocol.js', 'management-transcription.js', 'app-settings.js', 'hotword-settings.js', 'i18n.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, script), 'utf8'), context, { filename: script });
 }
 

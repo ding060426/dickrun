@@ -117,7 +117,7 @@ _xasr_reload_pending = False
 _xasr_reload_worker_active = False
 PROCESSING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=max(1, int(os.getenv("DITING_PROCESSING_WORKERS", "2"))),
-    thread_name_prefix="diting-asr",
+    thread_name_prefix="huiwu-asr",
 )
 RECORDINGS_DIR = Path(
     os.getenv("DITING_RECORDINGS_DIR", os.path.join(BACKEND_DIR, "recordings"))
@@ -1257,19 +1257,6 @@ async def replace_settings(data: dict):
         "ok": True,
         "reloading_models": reload_required,
     }
-
-
-@app.post("/api/hotwords")
-async def add_hotwords(data: dict):
-    """Compatibility endpoint: add words while preserving current settings."""
-    raw_words = data.get("words", [])
-    new_words = [
-        item.get("text", "") if isinstance(item, dict) else item
-        for item in raw_words
-    ]
-    settings = hotword_config_store.add_words(new_words)
-    _apply_hotword_settings(settings)
-    return {**settings, "added": new_words, "ok": True, "applies_to": "new_sessions"}
 
 
 @app.put("/api/hotwords")

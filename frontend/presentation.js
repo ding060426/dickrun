@@ -1,7 +1,7 @@
 (function attachPresentation(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingPresentation = api;
+  if (root) root.HuiWuPresentation = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createPresentation() {
   function formatDuration(segment = {}) {
     const start = Number(segment.start_sec ?? segment.start);

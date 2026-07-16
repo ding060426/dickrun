@@ -15,7 +15,7 @@ class StartupCompatibilityTests(unittest.TestCase):
     def test_launcher_and_backend_share_one_revision(self):
         self.assertEqual(API_REVISION, BACKEND_API_REVISION)
 
-    def test_rejects_stale_diting_process_without_current_api_revision(self):
+    def test_rejects_stale_legacy_process_without_current_api_revision(self):
         self.assertFalse(is_compatible_backend({"service": "会悟 v2.0"}))
 
     def test_accepts_current_backend_revision(self):

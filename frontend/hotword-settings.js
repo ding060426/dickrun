@@ -1,7 +1,7 @@
 (function attachHotwordSettings(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingHotwordSettings = api;
+  if (root) root.HuiWuHotwordSettings = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createHotwordSettings() {
   const DOMAIN_PRESETS = Object.freeze([
     {

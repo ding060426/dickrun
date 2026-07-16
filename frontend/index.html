@@ -2175,6 +2175,7 @@ body {
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- Scripts                                                     -->
 <!-- ═══════════════════════════════════════════════════════════ -->
+<script src="./brand-storage.js"></script>
 <script src="./mic-level.js"></script>
 <script src="./live-protocol.js"></script>
 <script src="./management-transcription.js"></script>
@@ -2193,7 +2194,7 @@ const {
   buildRecordPayload,
   buildUploadUrl,
   resolveBackend,
-} = globalThis.DiTingManagementTranscription;
+} = globalThis.HuiWuManagementTranscription;
 
 // ── Import wavesurfer.js (non-blocking — don't block UI init) ──
 let WaveSurfer = null;
@@ -2291,7 +2292,7 @@ const profileForm = $('profileForm');
 const languageSelect = $('languageSelect');
 
 // ── i18n ─────────────────────────────────────────────────────
-const i18n = window.DiTingI18n.createI18n({
+const i18n = window.HuiWuI18n.createI18n({
   storage: window.localStorage,
   document,
   navigatorLanguage: window.navigator.language,
@@ -2346,7 +2347,7 @@ let logWs = null;
 let logVisible = false;
 
 // Auth and management
-let authToken = localStorage.getItem('diting_auth_token') || '';
+let authToken = window.HuiWuStorage.getAuthToken();
 let currentUser = null;
 let pendingAvatarDataUrl = '';
 
@@ -2513,7 +2514,7 @@ function setLoggedIn(user, token) {
   currentUser = user;
   if (token) {
     authToken = token;
-    localStorage.setItem('diting_auth_token', token);
+    window.HuiWuStorage.setAuthToken(token);
   }
   if (loginOverlay) loginOverlay.classList.remove('visible');
   if (currentUserDisplay) currentUserDisplay.textContent = `${user.display_name || user.username} · ${user.role}`;
@@ -2669,7 +2670,7 @@ async function restoreLogin() {
     const data = await apiFetch('/api/auth/me');
     setLoggedIn(data.user);
   } catch (e) {
-    localStorage.removeItem('diting_auth_token');
+    window.HuiWuStorage.clearAuthToken();
     authToken = '';
     showLogin();
   }
@@ -2749,7 +2750,7 @@ async function logout() {
   _lastReservationMap = {};
   resetReservationForm();
   renderCalendar([]);
-  localStorage.removeItem('diting_auth_token');
+  window.HuiWuStorage.clearAuthToken();
   showHome();
 }
 
@@ -3391,8 +3392,8 @@ function getSelectedRecordIds() {
 function openSummaryDialog() {
   const ids = getSelectedRecordIds();
   if (!ids.length) return;
-  if (window.DiTingRecordSummary) {
-    window.DiTingRecordSummary.open(ids);
+  if (window.HuiWuRecordSummary) {
+    window.HuiWuRecordSummary.open(ids);
   }
 }
 
@@ -4491,9 +4492,9 @@ function refreshLocalizedInterface(language = null) {
 }
 
 function renderDomainPresetButtons() {
-  if (!domainPresetGrid || !window.DiTingHotwordSettings) return;
+  if (!domainPresetGrid || !window.HuiWuHotwordSettings) return;
   domainPresetGrid.innerHTML = '';
-  window.DiTingHotwordSettings.getDomainPresets().forEach(preset => {
+  window.HuiWuHotwordSettings.getDomainPresets().forEach(preset => {
     const localizedName = t(`settings.domain.${preset.id}.name`, {}, preset.name);
     const localizedDescription = t(
       `settings.domain.${preset.id}.description`,
@@ -4528,7 +4529,7 @@ function renderDomainPresetButtons() {
 }
 
 function updateDomainPresetSelectionUi() {
-  const presets = window.DiTingHotwordSettings?.getDomainPresets() || [];
+  const presets = window.HuiWuHotwordSettings?.getDomainPresets() || [];
   const presetNames = new Map(presets.map(preset => [
     preset.id,
     t(`settings.domain.${preset.id}.name`, {}, preset.name),
@@ -4554,20 +4555,20 @@ function updateDomainPresetSelectionUi() {
 }
 
 function syncDomainPresetSelection() {
-  if (!window.DiTingHotwordSettings) return;
+  if (!window.HuiWuHotwordSettings) return;
   selectedDomainPresetIds = new Set(
-    window.DiTingHotwordSettings.getSelectedDomainPresetIds(collectHotwordRows()),
+    window.HuiWuHotwordSettings.getSelectedDomainPresetIds(collectHotwordRows()),
   );
   updateDomainPresetSelectionUi();
 }
 
 function toggleHotwordDomainPreset(presetId) {
-  if (!hotwordSettingsState || !window.DiTingHotwordSettings) {
+  if (!hotwordSettingsState || !window.HuiWuHotwordSettings) {
     setHotwordStatus(t('settings.hotwords.loading'), true);
     return;
   }
   const selected = !selectedDomainPresetIds.has(presetId);
-  const result = window.DiTingHotwordSettings.setDomainPresetSelection(
+  const result = window.HuiWuHotwordSettings.setDomainPresetSelection(
     collectHotwordRows(),
     presetId,
     selected,
@@ -4691,8 +4692,8 @@ function renderModelProfiles(models = {}) {
 }
 
 function collectRuntimeSettings() {
-  if (!window.DiTingAppSettings) return null;
-  return window.DiTingAppSettings.normalizeAppSettings({
+  if (!window.HuiWuAppSettings) return null;
+  return window.HuiWuAppSettings.normalizeAppSettings({
     recognition: {
       asr_provider: selectedAsrProvider,
       qwen3_model_path: $('qwen3ModelPath')?.value,
@@ -4777,7 +4778,7 @@ async function toggleMicrophoneTest() {
   if (!runtime || !navigator.mediaDevices?.getUserMedia) return;
   try {
     micTestStream = await navigator.mediaDevices.getUserMedia(
-      window.DiTingAppSettings.buildMediaConstraints(runtime.microphone),
+      window.HuiWuAppSettings.buildMediaConstraints(runtime.microphone),
     );
     await refreshMicrophoneDevices();
     micTestAudioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -4815,8 +4816,8 @@ function setHotwordStatus(message, isError = false) {
 }
 
 function setDefaultHotwordScore(value) {
-  if (!window.DiTingHotwordSettings) return;
-  const score = window.DiTingHotwordSettings.clamp(value);
+  if (!window.HuiWuHotwordSettings) return;
+  const score = window.HuiWuHotwordSettings.clamp(value);
   if (defaultHotwordScore) defaultHotwordScore.value = String(Math.min(12, score));
   if (defaultHotwordScoreNumber) defaultHotwordScoreNumber.value = String(score);
   if (defaultScoreLabel) defaultScoreLabel.textContent = score.toFixed(1);
@@ -4878,7 +4879,7 @@ function renderHotwordRows() {
 }
 
 async function openHotwordSettings() {
-  if (!hotwordModal || !window.DiTingHotwordSettings || !window.DiTingAppSettings) return;
+  if (!hotwordModal || !window.HuiWuHotwordSettings || !window.HuiWuAppSettings) return;
   hotwordModal.classList.add('visible');
   hotwordModal.setAttribute('aria-hidden', 'false');
   if (settingsSearch) settingsSearch.value = '';
@@ -4889,8 +4890,8 @@ async function openHotwordSettings() {
     const response = await fetch(`${API_BASE}/api/settings`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(data);
-    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data.hotwords);
+    appSettingsState = window.HuiWuAppSettings.normalizeAppSettings(data);
+    hotwordSettingsState = window.HuiWuHotwordSettings.normalizeSettings(data.hotwords);
     appSettingsState.hotwords = hotwordSettingsState;
     renderRuntimeSettings(appSettingsState);
     await refreshMicrophoneDevices();
@@ -4914,14 +4915,14 @@ function closeHotwordSettings() {
 function addHotwordToEditor() {
   const input = $('newHotwordInput');
   const text = input?.value.trim();
-  if (!text || !hotwordList || !window.DiTingHotwordSettings) return;
+  if (!text || !hotwordList || !window.HuiWuHotwordSettings) return;
   const duplicate = Array.from(hotwordList.querySelectorAll('[data-field="text"]'))
     .some(element => element.value.trim().toLocaleLowerCase() === text.toLocaleLowerCase());
   if (duplicate) {
     setHotwordStatus(t('settings.hotwords.duplicate'), true);
     return;
   }
-  const score = window.DiTingHotwordSettings.scoreForNewWord(
+  const score = window.HuiWuHotwordSettings.scoreForNewWord(
     text,
     defaultHotwordScoreNumber?.value,
   );
@@ -4941,9 +4942,9 @@ function collectHotwordRows() {
 }
 
 async function saveHotwordSettings() {
-  if (!hotwordSettingsState || !window.DiTingHotwordSettings) return;
+  if (!hotwordSettingsState || !window.HuiWuHotwordSettings) return;
   const saveButton = $('btnSaveHotwords');
-  const hotwordPayload = window.DiTingHotwordSettings.buildPayload({
+  const hotwordPayload = window.HuiWuHotwordSettings.buildPayload({
     ...hotwordSettingsState,
     enabled: hotwordsEnabled?.checked !== false,
     fuzzy_pinyin_enabled: fuzzyPinyinEnabled?.checked !== false,
@@ -4961,8 +4962,8 @@ async function saveHotwordSettings() {
     });
     const data = await response.json();
     if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(data);
-    hotwordSettingsState = window.DiTingHotwordSettings.normalizeSettings(data.hotwords);
+    appSettingsState = window.HuiWuAppSettings.normalizeAppSettings(data);
+    hotwordSettingsState = window.HuiWuHotwordSettings.normalizeSettings(data.hotwords);
     appSettingsState.hotwords = hotwordSettingsState;
     renderRuntimeSettings(appSettingsState);
     renderHotwordRows();
@@ -4989,22 +4990,22 @@ async function saveHotwordSettings() {
 
 // ── Live Mic Recording ───────────────────────────────────────
 function updateMicLevel(rms, peak) {
-  if (!window.DiTingMicLevel) return;
-  micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
+  if (!window.HuiWuMicLevel) return;
+  micDisplayLevel = window.HuiWuMicLevel.nextMicLevel(micDisplayLevel, rms, peak);
   micLevelLastUpdate = performance.now();
 }
 
 function renderMicLevel(timestamp) {
-  if (!micOrbPanel?.classList.contains('visible') || !window.DiTingMicLevel) {
+  if (!micOrbPanel?.classList.contains('visible') || !window.HuiWuMicLevel) {
     micLevelAnimationFrame = null;
     return;
   }
   if (timestamp - micLevelLastUpdate > 100) {
-    micDisplayLevel = window.DiTingMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
+    micDisplayLevel = window.HuiWuMicLevel.nextMicLevel(micDisplayLevel, 0, 0);
   }
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const phase = reduceMotion ? 0 : timestamp / 180;
-  const scales = window.DiTingMicLevel.buildBarScales(
+  const scales = window.HuiWuMicLevel.buildBarScales(
     micDisplayLevel,
     phase,
     micLevelBars.length,
@@ -5012,7 +5013,7 @@ function renderMicLevel(timestamp) {
   micLevelBars.forEach((bar, index) => {
     bar.style.transform = `scaleY(${scales[index].toFixed(3)})`;
   });
-  const orb = window.DiTingMicLevel.buildOrbStyle(micDisplayLevel);
+  const orb = window.HuiWuMicLevel.buildOrbStyle(micDisplayLevel);
   if (micOrbWrap) {
     micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
     micOrbWrap.style.setProperty('--orb-ring-opacity', orb.ringOpacity.toFixed(3));
@@ -5049,7 +5050,7 @@ function setMicVisualizerState(state) {
   micDisplayLevel = 0;
   micLevelLastUpdate = 0;
   micLevelBars.forEach(bar => { bar.style.transform = 'scaleY(0.12)'; });
-  const orb = window.DiTingMicLevel?.buildOrbStyle(0);
+  const orb = window.HuiWuMicLevel?.buildOrbStyle(0);
   if (micOrbWrap && orb) {
     micOrbWrap.style.setProperty('--orb-scale', orb.scale.toFixed(3));
     micOrbWrap.style.setProperty('--orb-core-scale', orb.coreScale.toFixed(3));
@@ -5062,14 +5063,14 @@ function setMicOrbMessage(title, subtitle) {
 }
 
 async function ensureAppSettingsLoaded() {
-  if (appSettingsState || !window.DiTingAppSettings) return appSettingsState;
+  if (appSettingsState || !window.HuiWuAppSettings) return appSettingsState;
   try {
     const response = await fetch(`${API_BASE}/api/settings`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings(await response.json());
+    appSettingsState = window.HuiWuAppSettings.normalizeAppSettings(await response.json());
   } catch (error) {
     console.warn('[Settings] Falling back to local defaults:', error);
-    appSettingsState = window.DiTingAppSettings.normalizeAppSettings({});
+    appSettingsState = window.HuiWuAppSettings.normalizeAppSettings({});
   }
   return appSettingsState;
 }
@@ -5138,7 +5139,7 @@ async function toggleMic() {
     }
     micSegmentStartIndex = allSegments.length;
     micStream = await navigator.mediaDevices.getUserMedia(
-      window.DiTingAppSettings.buildMediaConstraints(microphoneSettings),
+      window.HuiWuAppSettings.buildMediaConstraints(microphoneSettings),
     );
     micAudioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     if (micAudioContext.state === 'suspended') await micAudioContext.resume();
@@ -5235,12 +5236,12 @@ async function toggleMic() {
     });
 
     const source = micAudioContext.createMediaStreamSource(micStream);
-    micWorklet = new AudioWorkletNode(micAudioContext, 'diting-pcm');
+    micWorklet = new AudioWorkletNode(micAudioContext, 'huiwu-pcm');
     const silent = micAudioContext.createGain();
     silent.gain.value = 0;
     micWorklet.port.onmessage = (event) => {
       if (event.data?.type === 'audio.pcm' && micWs?.readyState === WebSocket.OPEN) {
-        const frame = window.DiTingLiveProtocol.encodePcmFrame(
+        const frame = window.HuiWuLiveProtocol.encodePcmFrame(
           micSequence++,
           event.data.payload,
         );
@@ -5635,20 +5636,20 @@ function initApp() {
   if ($('btnClearSelectRecords')) $('btnClearSelectRecords').addEventListener('click', clearRecordSelection);
   if ($('btnGenerateSummary')) $('btnGenerateSummary').addEventListener('click', openSummaryDialog);
   // S6: summary dialog buttons
-  if ($('btnCloseSummaryDialog')) $('btnCloseSummaryDialog').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.close(); });
-  if ($('btnSubmitSummary')) $('btnSubmitSummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.submit(); });
-  if ($('btnCopySummary')) $('btnCopySummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.copyMarkdown(); });
-  if ($('btnDownloadSummary')) $('btnDownloadSummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.downloadMarkdown(); });
-  if ($('btnRetrySummary')) $('btnRetrySummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.retry(); });
-  if ($('btnBackToConfig')) $('btnBackToConfig').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.backToConfig(); });
+  if ($('btnCloseSummaryDialog')) $('btnCloseSummaryDialog').addEventListener('click', () => { if (window.HuiWuRecordSummary) window.HuiWuRecordSummary.close(); });
+  if ($('btnSubmitSummary')) $('btnSubmitSummary').addEventListener('click', () => { if (window.HuiWuRecordSummary) window.HuiWuRecordSummary.submit(); });
+  if ($('btnCopySummary')) $('btnCopySummary').addEventListener('click', () => { if (window.HuiWuRecordSummary) window.HuiWuRecordSummary.copyMarkdown(); });
+  if ($('btnDownloadSummary')) $('btnDownloadSummary').addEventListener('click', () => { if (window.HuiWuRecordSummary) window.HuiWuRecordSummary.downloadMarkdown(); });
+  if ($('btnRetrySummary')) $('btnRetrySummary').addEventListener('click', () => { if (window.HuiWuRecordSummary) window.HuiWuRecordSummary.retry(); });
+  if ($('btnBackToConfig')) $('btnBackToConfig').addEventListener('click', () => { if (window.HuiWuRecordSummary) window.HuiWuRecordSummary.backToConfig(); });
   // G2: LLM settings dialog
-  if ($('btnLLMSettings')) $('btnLLMSettings').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.open(); });
-  if ($('btnRefreshLLMModels')) $('btnRefreshLLMModels').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.refreshModels(); });
-  if ($('llmProvider')) $('llmProvider').addEventListener('change', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.applyProviderPreset(true); });
-  if ($('llmModelName')) $('llmModelName').addEventListener('input', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.updateCapabilityNote(); });
-  if ($('btnCloseLLMSettings')) $('btnCloseLLMSettings').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.close(); });
-  if ($('btnTestLLM')) $('btnTestLLM').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.testConnection(); });
-  if ($('btnSaveLLMSettings')) $('btnSaveLLMSettings').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.saveSettings(); });
+  if ($('btnLLMSettings')) $('btnLLMSettings').addEventListener('click', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.open(); });
+  if ($('btnRefreshLLMModels')) $('btnRefreshLLMModels').addEventListener('click', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.refreshModels(); });
+  if ($('llmProvider')) $('llmProvider').addEventListener('change', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.applyProviderPreset(true); });
+  if ($('llmModelName')) $('llmModelName').addEventListener('input', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.updateCapabilityNote(); });
+  if ($('btnCloseLLMSettings')) $('btnCloseLLMSettings').addEventListener('click', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.close(); });
+  if ($('btnTestLLM')) $('btnTestLLM').addEventListener('click', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.testConnection(); });
+  if ($('btnSaveLLMSettings')) $('btnSaveLLMSettings').addEventListener('click', () => { if (window.HuiWuLLMSettings) window.HuiWuLLMSettings.saveSettings(); });
   if ($('recordTitleInput')) $('recordTitleInput').addEventListener('input', event => {
     if (meetingTitleDisplay) meetingTitleDisplay.textContent = event.target.value || '未命名会议记录';
   });

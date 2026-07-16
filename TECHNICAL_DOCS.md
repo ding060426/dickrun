@@ -1,6 +1,6 @@
 # 会悟 v3.0 — 技术文档
 
-本文描述当前分支实际实现的系统边界、语音链路、模型切换、数据持久化和接口契约。产品正式名称为“会悟”。`DITING_*`、`diting.db`、`diting.log`、`DiTing*` 等名称仅作为历史兼容接口保留，重命名会破坏已有部署或数据，因此不属于品牌残留清理范围。
+本文描述当前分支实际实现的系统边界、语音链路、模型切换、数据持久化和接口契约。产品正式名称为“会悟”。`DITING_*`、`diting.db`、`diting.log` 仍作为外部兼容契约保留；前端全局对象、AudioWorklet、内部线程、logger 和临时目录已经统一为 `HuiWu` / `huiwu`。
 
 ## 1. 系统边界
 
@@ -162,7 +162,7 @@ DSv4 等文字模型不会被路由到图像生成接口。模型只产生文字
 | `DITING_*` | 已有环境变量和部署脚本依赖 |
 | `backend/data/diting.db` | 直接改名会导致旧数据不可见 |
 | `backend/logs/diting.log` | 运维脚本和历史日志路径依赖 |
-| `DiTing*` / `diting-*` 前端键 | 浏览器存储、Worklet 和运行时协议依赖 |
+| 旧浏览器登录/语言键 | 由 `brand-storage.js` 和 `i18n.js` 一次性迁移到 `huiwu:*` 后删除 |
 
 新文档和界面只使用“会悟”品牌；以上标识只在技术语境中出现。
 
@@ -179,7 +179,7 @@ DSv4 等文字模型不会被路由到图像生成接口。模型只产生文字
 | `/api/meetings/analysis*` | 转写分析持久化与查询 |
 | `POST /api/audio/upload` | 文件上传与最终处理 |
 | `GET/PUT /api/settings` | 识别、VAD、麦克风、热词统一设置 |
-| `GET/POST/PUT /api/hotwords` | 热词兼容读取、追加和完整替换 |
+| `GET/PUT /api/hotwords` | 读取或完整替换热词设置；旧追加接口已移除 |
 | `/api/records*` | 会议记录、分段、源音频、定稿 |
 | `/api/record-summaries*` | 摘要创建、查询、重试与下载 |
 | `/api/llm-settings*` | 用户模型设置、模型列表和真实连接测试 |

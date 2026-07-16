@@ -1,4 +1,4 @@
-class DiTingPcmProcessor extends AudioWorkletProcessor {
+class HuiWuPcmProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.targetRate = 16000;
@@ -67,4 +67,4 @@ class DiTingPcmProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('diting-pcm', DiTingPcmProcessor);
+registerProcessor('huiwu-pcm', HuiWuPcmProcessor);

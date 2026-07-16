@@ -1,7 +1,7 @@
 (function attachManagementTranscription(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingManagementTranscription = api;
+  if (root) root.HuiWuManagementTranscription = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createApi() {
   function resolveBackend(locationLike) {
     const params = new URLSearchParams(locationLike.search || '');

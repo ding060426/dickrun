@@ -8,7 +8,7 @@ const recordSummaryJs = fs.readFileSync(path.join(__dirname, '..', 'record-summa
 assert.match(html, /data-module="meeting">会议转写/);
 assert.match(html, /buildUploadUrl\(API_BASE/);
 assert.match(html, /enableDiarization/);
-assert.match(html, /DiTingLiveProtocol\.encodePcmFrame/);
+assert.match(html, /HuiWuLiveProtocol\.encodePcmFrame/);
 assert.match(html, /msg\.type === 'final_transcript'/);
 assert.match(html, /canonical_error/);
 assert.match(html, /Qwen3.*停止录音.*最终转写/s);
@@ -54,6 +54,7 @@ assert.doesNotMatch(html, /function startDemo\(/);
 assert.doesNotMatch(html, /getEmbeddedDemoData/);
 assert.doesNotMatch(html, /\/api\/meeting\/demo/);
 assert.doesNotMatch(html, /demo_mode/);
+assert.doesNotMatch(html, /DiTing|diting-pcm|diting_auth_token/);
 assert.match(html, /id="reservationParticipants"/);
 assert.match(html, /participant_user_ids:/);
 assert.match(html, /function editReservation\(/);

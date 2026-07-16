@@ -1,7 +1,7 @@
 (function attachMicLevel(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingMicLevel = api;
+  if (root) root.HuiWuMicLevel = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createMicLevel() {
   function clamp(value, minimum = 0, maximum = 1) {
     return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : 0));

@@ -1,7 +1,7 @@
 (function attachAppSettings(root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.DiTingAppSettings = api;
+  if (root) root.HuiWuAppSettings = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createAppSettings() {
   const ASR_PROFILES = ['low-latency', 'balanced', 'meeting', 'quality'];
   const ASR_PROVIDERS = ['xasr', 'qwen3'];

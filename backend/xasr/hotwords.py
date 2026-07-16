@@ -38,7 +38,7 @@ def prepare_hotword_assets(
     if not normalized or not tokens_path.is_file():
         return HotwordAssets(decoding_method="greedy_search")
 
-    output_dir = Path(runtime_dir or Path(tempfile.gettempdir()) / "diting-xasr")
+    output_dir = Path(runtime_dir or Path(tempfile.gettempdir()) / "huiwu-xasr")
     output_dir.mkdir(parents=True, exist_ok=True)
     token_bytes = tokens_path.read_bytes()
     token_hash = hashlib.sha256(token_bytes).hexdigest()[:12]

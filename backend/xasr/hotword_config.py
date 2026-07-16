@@ -63,13 +63,6 @@ class HotwordConfigStore:
             os.replace(temporary, self.path)
         return normalized
 
-    def add_words(self, words: Iterable[str]) -> dict:
-        current = self.load()
-        existing = list(current["words"])
-        existing.extend({"text": word} for word in words)
-        current["words"] = existing
-        return self.save(current)
-
     def normalize(self, payload: dict | None) -> dict:
         source = payload if isinstance(payload, dict) else {}
         default_score = _score(source.get("default_score"), self.default_score)

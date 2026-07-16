@@ -2,10 +2,16 @@ const assert = require('node:assert/strict');
 
 const {
   buildAnalysisPayload,
+  buildRecordDetailPath,
   buildRecordPayload,
   buildUploadUrl,
   resolveBackend,
 } = require('../management-transcription.js');
+
+assert.equal(
+  buildRecordDetailPath('record id'),
+  '/api/records/record%20id?include_audio=true',
+);
 
 
 const backend = resolveBackend({

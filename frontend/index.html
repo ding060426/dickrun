@@ -2191,6 +2191,7 @@ body {
 
 const {
   buildAnalysisPayload,
+  buildRecordDetailPath,
   buildRecordPayload,
   buildUploadUrl,
   resolveBackend,
@@ -3399,7 +3400,7 @@ function openSummaryDialog() {
 
 async function viewMeetingRecord(recordId) {
   try {
-    const data = await apiFetch(`/api/records/${encodeURIComponent(recordId)}`);
+    const data = await apiFetch(buildRecordDetailPath(recordId));
     renderRecordDetail(data.record);
   } catch (error) {
     showToast('记录读取失败：' + error.message);
@@ -3574,7 +3575,7 @@ class AudioPlaybackManager {
    * Convert base64 WAV to a Blob URL and create a WaveSurfer instance.
    */
   async create(segIndex, audioBase64, containerEl) {
-    if (!HAS_WAVESURFER || !audioBase64) return null;
+    if (!audioBase64) return null;
 
     // Destroy existing instance for this index (shouldn't happen, but be safe)
     this.destroy(segIndex);
@@ -3589,6 +3590,37 @@ class AudioPlaybackManager {
     }
 
     const blobUrl = URL.createObjectURL(blob);
+
+    if (!HAS_WAVESURFER || !WaveSurfer) {
+      containerEl.classList.add('segment-waveform-placeholder');
+      containerEl.innerHTML = `<div class="mini-wave" aria-label="音频波形占位图">${
+        Array.from({ length: 48 }, (_, index) =>
+          `<div class="mini-wave-bar" style="height:${6 + ((index * 7) % 16)}px"></div>`
+        ).join('')
+      }</div>`;
+      const audio = new Audio(blobUrl);
+      audio.preload = 'metadata';
+      const adapter = {
+        play: () => audio.play(),
+        pause: () => audio.pause(),
+        destroy: () => {
+          audio.pause();
+          audio.removeAttribute('src');
+          audio.load();
+        },
+      };
+      audio.addEventListener('play', () => this._onPlay(segIndex));
+      audio.addEventListener('pause', () => this._onPause(segIndex));
+      audio.addEventListener('ended', () => this._onFinish(segIndex));
+      audio.addEventListener('timeupdate', () => {
+        this._onTimeUpdate(segIndex, audio.currentTime, audio.duration || 0);
+      });
+      const entry = { ws: adapter, blobUrl, duration: 0, nativeAudio: audio };
+      audio.addEventListener('loadedmetadata', () => { entry.duration = audio.duration || 0; });
+      this.instances.set(segIndex, entry);
+      this._evict();
+      return entry;
+    }
 
     // Create WaveSurfer
     const ws = WaveSurfer.create({
@@ -4002,7 +4034,7 @@ function renderSegment(seg, index, autoPlay = false) {
   }
 
   // Initialize wavesurfer if audio is available
-  if (hasAudio && HAS_WAVESURFER) {
+  if (hasAudio) {
     const waveformContainer = card.querySelector(`#waveform-seg-${index}`);
     if (waveformContainer) {
       audioManager.create(index, seg.audio_wav_base64, waveformContainer).then((entry) => {

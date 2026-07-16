@@ -58,7 +58,7 @@ class MarkdownRendererTests(unittest.TestCase):
         headings = re.findall(r"^## ([一二三四五六七八九十]+)、(.+)$", markdown, re.MULTILINE)
         self.assertEqual(
             headings,
-            [("一", "报告范围"), ("二", "执行摘要"), ("三", "项目进展变化"), ("四", "文字结构图")],
+            [("一", "报告范围"), ("二", "执行摘要"), ("三", "内容脉络与时间线"), ("四", "文字结构图")],
         )
         self.assertNotIn("（无", markdown)
 

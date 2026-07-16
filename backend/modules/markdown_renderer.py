@@ -213,7 +213,7 @@ def render_multi_summary(data: dict, meta: dict | None = None) -> str:
             for item in timeline
             if _escape_md(item.get("event"))
         )
-    sections.append(("项目进展变化", "\n".join(progress_lines)))
+    sections.append(("内容脉络与时间线", "\n".join(progress_lines)))
 
     action_rows = [
         [item.get("task"), item.get("assignee"), item.get("first_raised"), item.get("latest_status")]

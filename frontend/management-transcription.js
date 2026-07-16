@@ -23,6 +23,10 @@
     return `${apiBase}/api/audio/upload?${params.toString()}`;
   }
 
+  function buildRecordDetailPath(recordId) {
+    return `/api/records/${encodeURIComponent(recordId)}?include_audio=true`;
+  }
+
   function buildAnalysisPayload({
     meetingId,
     title,
@@ -104,5 +108,11 @@
     };
   }
 
-  return { buildAnalysisPayload, buildRecordPayload, buildUploadUrl, resolveBackend };
+  return {
+    buildAnalysisPayload,
+    buildRecordDetailPath,
+    buildRecordPayload,
+    buildUploadUrl,
+    resolveBackend,
+  };
 });

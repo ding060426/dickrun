@@ -16,7 +16,7 @@ from modules import llm_settings_store
 from modules import record_store
 from modules import summary_service
 from modules import summary_store
-from modules.llm_client import LLMClient
+from modules.llm_client import LLMClient, LLMResponseError
 from modules.summary_service import _public_settings_snapshot
 
 
@@ -108,6 +108,33 @@ class LLMConfigurationTests(unittest.TestCase):
         self.assertEqual(payload["max_tokens"], 2048)
         self.assertEqual(payload["temperature"], 0.1)
         self.assertNotIn("image", json.dumps(payload))
+
+    def test_client_embeds_schema_in_prompt_and_rejects_wrong_shape(self):
+        client = LLMClient(
+            base_url="https://api.deepseek.com",
+            api_key="secret",
+            model="deepseek-v4-flash",
+            max_retries=1,
+        )
+        fake = _FakeHttpClient()
+        client._client = fake
+        schema = {
+            "type": "object",
+            "required": ["overview"],
+            "properties": {"overview": {"type": "string"}},
+        }
+
+        with self.assertRaises(LLMResponseError):
+            asyncio.run(
+                client.generate_json(
+                    system_prompt="生成会议摘要。",
+                    user_prompt="正文",
+                    json_schema=schema,
+                )
+            )
+
+        _, payload = fake.requests[0]
+        self.assertIn('"overview"', payload["messages"][0]["content"])
 
     def test_summary_snapshot_never_persists_plaintext_api_key(self):
         snapshot = _public_settings_snapshot(

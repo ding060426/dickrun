@@ -7,14 +7,18 @@ Language is parameterised so the prompts can be swapped between zh-CN and en.
 def single_summary_system(language: str = "zh-CN") -> str:
     if language.startswith("en"):
         return (
-            "You are a professional meeting analyst. Given a meeting transcript, "
-            "produce a structured JSON summary covering: overview, topics, decisions, "
+            "You are a professional content analyst. Summarize the actual transcript, which may be "
+            "a work meeting, course, lecture, interview, demonstration, or discussion. Do not call "
+            "substantive input empty merely because it has no project decisions or action items. "
+            "Produce structured JSON covering: overview, topics, decisions, "
             "action items, risks, open questions, and speaker contributions.\n"
             "Only return valid JSON conforming to the provided schema. "
             "Use empty strings/arrays for missing information; never invent facts."
         )
     return (
-        "你是一名专业的会议分析师。根据给定的会议转写文本，"
+        "你是一名专业的内容分析师。根据给定的完整转写文本生成真正的内容摘要。"
+        "输入可能是工作会议、课程、讲座、访谈、演示或讨论，必须按实际内容概括，"
+        "不能因为没有项目决策或行动项就声称正文为空。"
         "生成结构化 JSON 摘要，包含：会议概述、主要议题、关键决策、"
         "行动项、风险、待确认问题、说话人贡献、公式和思维导图结构。\n"
         "只返回符合给定 Schema 的有效 JSON。"
@@ -36,17 +40,20 @@ def single_summary_user(title: str, date: str, source: str, duration: str, full_
 def multi_summary_system(language: str = "zh-CN") -> str:
     if language.startswith("en"):
         return (
-            "You are a senior programme manager synthesising insights across multiple "
-            "meetings. Given per-meeting structured summaries, produce a comprehensive "
-            "JSON report covering: executive summary, per-meeting summaries, common "
+            "You are a senior content analyst synthesising multiple transcript summaries, which may "
+            "have different types or topics. Faithfully summarise each record before identifying only "
+            "genuine connections, and never call substantive summaries empty. Produce a comprehensive "
+            "JSON report covering: executive summary, per-record summaries, common "
             "topics, timeline, decision changes, progress, open action items, resolved "
             "items, new risks, and recommendations.\n"
             "Only return valid JSON conforming to the provided schema. "
             "Cross-reference meeting dates and titles in your analysis."
         )
     return (
-        "你是一名资深项目管理者，需要综合多场会议的信息。"
-        "根据每场会议的结构化摘要，生成综合 JSON 报告，包含："
+        "你是一名资深内容分析师，需要综合多条转写记录的信息。"
+        "记录可能属于不同类型或不同主题；应先忠实概括每条记录，再提取确实存在的关联。"
+        "只要输入摘要包含实质内容，就不得称其为空，也不得因为不是项目会议而忽略。"
+        "根据每条记录的结构化摘要，生成综合 JSON 摘要，包含："
         "执行摘要、每场会议概览、共同议题、时间线、决策变化、"
         "项目进展、未完成行动项、已解决问题、新增风险和建议。\n"
         "只返回符合给定 Schema 的有效 JSON。"

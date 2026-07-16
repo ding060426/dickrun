@@ -14,6 +14,8 @@ assert.match(html, /canonical_error/);
 assert.match(html, /Qwen3.*停止录音.*最终转写/s);
 assert.match(html, /buildAnalysisPayload/);
 assert.match(html, /buildRecordPayload/);
+assert.match(html, /buildRecordDetailPath\(recordId\)/);
+assert.match(html, /new Audio\(blobUrl\)/);
 assert.match(html, /id="btnNewRecord"/);
 assert.match(html, /id="btnSaveRecord"/);
 assert.match(html, /id="recordsPanel"/);

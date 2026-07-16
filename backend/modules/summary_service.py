@@ -77,6 +77,221 @@ def _segments_to_text(segments: list[dict], *, include_speaker: bool = True, lan
     return "\n".join(lines)
 
 
+def _as_list(value) -> list:
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
+
+
+def _first_text(data: dict, *keys: str) -> str:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _extractive_overview(full_text: str, limit: int = 360) -> str:
+    """Return a content-bearing fallback when a model omits its overview field."""
+    lines = []
+    for raw_line in str(full_text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("[") and "]" in line:
+            line = line.split("]", 1)[1].strip()
+        if line:
+            lines.append(line)
+    text = " ".join(lines)
+    if len(text) <= limit:
+        return text
+    cut = max(text.rfind(mark, 0, limit) for mark in ("。", "！", "？", ".", "!", "?"))
+    return text[: cut + 1 if cut >= limit // 2 else limit].rstrip() + "…"
+
+
+def _normalize_single_result(result: dict, *, fallback_text: str = "") -> dict:
+    """Map common OpenAI-compatible model aliases into the canonical summary schema."""
+    data = result if isinstance(result, dict) else {}
+    overview = _first_text(
+        data,
+        "overview",
+        "meeting_summary",
+        "summary",
+        "executive_summary",
+    ) or _extractive_overview(fallback_text)
+
+    topics = []
+    for item in _as_list(data.get("topics") or data.get("main_topics")):
+        if isinstance(item, str):
+            topic, summary = item.strip(), ""
+        elif isinstance(item, dict):
+            topic = _first_text(item, "topic", "title", "name", "label")
+            summary = _first_text(item, "summary", "content", "description", "key_points")
+        else:
+            continue
+        if topic or summary:
+            topics.append({"topic": topic or "内容要点", "summary": summary, "speakers": item.get("speakers", []) if isinstance(item, dict) else []})
+
+    decisions = []
+    for item in _as_list(data.get("decisions") or data.get("key_decisions")):
+        if isinstance(item, str):
+            decisions.append({"content": item})
+        elif isinstance(item, dict):
+            content = _first_text(item, "content", "decision", "summary", "description")
+            if content:
+                decisions.append({**item, "content": content})
+
+    actions = []
+    for item in _as_list(data.get("action_items") or data.get("tasks") or data.get("todos")):
+        if isinstance(item, str):
+            actions.append({"task": item})
+        elif isinstance(item, dict):
+            task = _first_text(item, "task", "content", "action", "description")
+            if task:
+                actions.append({**item, "task": task})
+
+    risks = []
+    for item in _as_list(data.get("risks") or data.get("risk_items")):
+        if isinstance(item, str):
+            risks.append({"description": item})
+        elif isinstance(item, dict):
+            description = _first_text(item, "description", "risk", "content", "summary")
+            if description:
+                risks.append({**item, "description": description})
+
+    contributions = []
+    for item in _as_list(data.get("speaker_contributions") or data.get("contributions")):
+        if not isinstance(item, dict):
+            continue
+        speaker = _first_text(item, "speaker", "speaker_name", "name")
+        contribution = _first_text(item, "contribution", "content", "summary")
+        if speaker and contribution:
+            contributions.append({**item, "speaker": speaker, "contribution": contribution})
+
+    normalized = {
+        **data,
+        "overview": overview,
+        "topics": topics,
+        "decisions": decisions,
+        "action_items": actions,
+        "risks": risks,
+        "open_questions": [
+            str(value).strip()
+            for value in _as_list(data.get("open_questions") or data.get("pending_issues"))
+            if str(value).strip()
+        ],
+        "speaker_contributions": contributions,
+        "formulas": [item for item in _as_list(data.get("formulas")) if isinstance(item, dict)],
+    }
+    diagram = data.get("diagram")
+    if isinstance(diagram, dict):
+        normalized["diagram"] = diagram
+    return normalized
+
+
+def _normalize_multi_result(result: dict) -> dict:
+    """Normalize provider-specific multi-summary aliases and container types."""
+    data = result if isinstance(result, dict) else {}
+
+    meeting_summaries = []
+    raw_meetings = data.get("meeting_summaries") or data.get("meeting_overviews")
+    for item in _as_list(raw_meetings):
+        if not isinstance(item, dict):
+            continue
+        meeting_summaries.append({
+            **item,
+            "record_id": _first_text(item, "record_id", "id"),
+            "title": _first_text(item, "title", "meeting_title", "name"),
+            "date": _first_text(item, "date", "meeting_date", "created_at"),
+            "summary": _first_text(item, "summary", "overview", "meeting_summary"),
+            "topics": [str(value).strip() for value in _as_list(item.get("topics") or item.get("key_topics")) if str(value).strip()],
+            "decisions": [str(value).strip() for value in _as_list(item.get("decisions") or item.get("decisions_made")) if str(value).strip()],
+            "action_items": [str(value).strip() for value in _as_list(item.get("action_items") or item.get("tasks")) if str(value).strip()],
+        })
+
+    common_topics = []
+    for item in _as_list(data.get("common_topics") or data.get("common_themes")):
+        if isinstance(item, str) and item.strip():
+            common_topics.append({"topic": item.strip(), "description": "", "mentioned_in": []})
+        elif isinstance(item, dict):
+            topic = _first_text(item, "topic", "theme", "title", "name")
+            description = _first_text(item, "description", "summary", "content")
+            if topic or description:
+                common_topics.append({**item, "topic": topic or "共同内容", "description": description})
+
+    raw_timeline = data.get("timeline") or []
+    if isinstance(raw_timeline, dict):
+        raw_timeline = raw_timeline.get("key_events") or raw_timeline.get("events") or []
+    timeline = []
+    for item in _as_list(raw_timeline):
+        if isinstance(item, str) and item.strip():
+            timeline.append({"date": "", "event": item.strip()})
+        elif isinstance(item, dict):
+            event = _first_text(item, "event", "content", "summary", "description")
+            if event:
+                timeline.append({**item, "date": _first_text(item, "date", "time"), "event": event})
+
+    progress = data.get("progress_changes")
+    if progress is None:
+        progress = data.get("project_progress")
+
+    open_actions = []
+    for item in _as_list(data.get("open_action_items") or data.get("uncompleted_action_items")):
+        if isinstance(item, str) and item.strip():
+            open_actions.append({"task": item.strip()})
+        elif isinstance(item, dict):
+            task = _first_text(item, "task", "content", "action", "description")
+            if task:
+                open_actions.append({**item, "task": task})
+
+    new_risks = []
+    for item in _as_list(data.get("new_risks") or data.get("risks")):
+        if isinstance(item, str) and item.strip():
+            new_risks.append({"description": item.strip()})
+        elif isinstance(item, dict):
+            description = _first_text(item, "description", "risk", "content")
+            if description:
+                new_risks.append({**item, "description": description})
+
+    return {
+        **data,
+        "executive_summary": _first_text(data, "executive_summary", "summary", "overview"),
+        "meeting_summaries": meeting_summaries,
+        "common_topics": common_topics,
+        "timeline": timeline,
+        "decision_changes": [item for item in _as_list(data.get("decision_changes")) if isinstance(item, dict)],
+        "progress_changes": [str(value).strip() for value in _as_list(progress) if str(value).strip()],
+        "open_action_items": open_actions,
+        "resolved_items": [str(value).strip() for value in _as_list(data.get("resolved_items") or data.get("resolved_issues")) if str(value).strip()],
+        "new_risks": new_risks,
+        "recommendations": [str(value).strip() for value in _as_list(data.get("recommendations")) if str(value).strip()],
+        "formulas": [item for item in _as_list(data.get("formulas")) if isinstance(item, dict)],
+    }
+
+
+def _merge_meeting_summaries(model_items: list[dict], source_items: list[dict]) -> list[dict]:
+    """Keep source IDs and content even when the cross-meeting model omits them."""
+    merged = []
+    for index, source in enumerate(source_items):
+        model = model_items[index] if index < len(model_items) and isinstance(model_items[index], dict) else {}
+        merged.append({
+            **source,
+            **model,
+            "record_id": source.get("record_id", ""),
+            "title": model.get("title") or source.get("title", ""),
+            "date": model.get("date") or source.get("date", ""),
+            "summary": model.get("summary") or source.get("summary", ""),
+            "topics": model.get("topics") or source.get("topics", []),
+            "decisions": model.get("decisions") or source.get("decisions", []),
+            "action_items": model.get("action_items") or source.get("action_items", []),
+        })
+    return merged
+
+
 # ── Single-meeting summary ───────────────────────────────────────
 
 async def _summarize_single(
@@ -124,8 +339,13 @@ async def _summarize_single(
                 duration=f"{meta['duration_sec']:.1f}s", full_text=full_text, language=language,
             ),
             json_schema=summary_schema.SINGLE_SUMMARY_SCHEMA,
+            result_normalizer=lambda value: _normalize_single_result(
+                value,
+                fallback_text=full_text,
+            ),
             max_tokens=4096,
         )
+        result = _normalize_single_result(result, fallback_text=full_text)
     else:
         # Chunked processing
         segments_for_chunking = segments if segments else _text_to_segments(full_text)
@@ -158,8 +378,13 @@ async def _summarize_single(
             system_prompt=summary_prompts.chunk_merge_system(language),
             user_prompt=merge_text,
             json_schema=summary_schema.SINGLE_SUMMARY_SCHEMA,
+            result_normalizer=lambda value: _normalize_single_result(
+                value,
+                fallback_text=full_text,
+            ),
             max_tokens=4096,
         )
+        result = _normalize_single_result(result, fallback_text=full_text)
 
     summary_store.update_summary(summary_id, {"stage": "rendering", "progress": 0.85, "result_json": result})
     markdown = markdown_renderer.render_single_summary(result, meta)
@@ -229,8 +454,13 @@ async def _summarize_multi(
                     duration=f"{meta['duration_sec']:.1f}s", full_text=full_text, language=language,
                 ),
                 json_schema=summary_schema.SINGLE_SUMMARY_SCHEMA,
+                result_normalizer=lambda value, transcript=full_text: _normalize_single_result(
+                    value,
+                    fallback_text=transcript,
+                ),
                 max_tokens=4096,
             )
+            ms = _normalize_single_result(ms, fallback_text=full_text)
             meeting_summaries.append({
                 "record_id": rid,
                 "title": meta["title"],
@@ -258,11 +488,23 @@ async def _summarize_multi(
         system_prompt=summary_prompts.multi_summary_system(language),
         user_prompt=summary_prompts.multi_summary_user(meeting_texts, language),
         json_schema=summary_schema.MULTI_SUMMARY_SCHEMA,
+        result_normalizer=_normalize_multi_result,
         max_tokens=8192,
     )
+    result = _normalize_multi_result(result)
 
-    # Inject per-meeting summaries into result
-    result["meeting_summaries"] = result.get("meeting_summaries") or meeting_summaries
+    # Preserve record IDs and source-backed content even if the synthesis model
+    # omits them or returns provider-specific aliases.
+    result["meeting_summaries"] = _merge_meeting_summaries(
+        result.get("meeting_summaries") or [],
+        meeting_summaries,
+    )
+    if not result.get("executive_summary"):
+        result["executive_summary"] = " ".join(
+            item.get("summary", "")
+            for item in result["meeting_summaries"]
+            if item.get("summary")
+        )
 
     summary_store.update_summary(summary_id, {"stage": "rendering", "progress": 0.85, "result_json": result})
 

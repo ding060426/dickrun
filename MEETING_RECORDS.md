@@ -37,6 +37,7 @@
 - `POST /api/records`：创建记录草稿。
 - `GET /api/records?q=关键词`：列出或搜索当前用户记录。
 - `GET /api/records/{record_id}`：读取详情及分段。
+- `GET /api/records/{record_id}?include_audio=true`：读取详情时同时恢复全部分段 WAV；记录管理的“载入转写界面”使用此模式。
 - `PUT /api/records/{record_id}`：更新标题、文本和整理结果。
 - `DELETE /api/records/{record_id}`：删除单条记录。
 - `GET /api/records/{record_id}/text`：导出纯文本。
@@ -55,6 +56,7 @@
 - `GET /api/record-summaries` 与 `GET /api/record-summaries/{summary_id}`：查询摘要列表和详情。
 - `/api/record-summaries/{summary_id}/retry`、`/download`：重试或下载摘要。
 - 摘要失败可重试，历史结果仍可查看或下载。
+- 摘要始终读取已定稿记录的 `full_text`；模型字段先按 JSON Schema 校验并归一化，课程、讲座、访谈或演示不会因为缺少项目行动项而被误判为空内容。
 - 没有实际内容的章节不会渲染，剩余章节连续编号。
 - 文字流程图由结构化节点生成 Mermaid/Markdown，不依赖图像模型。
 
@@ -76,7 +78,7 @@
 - `final_transcript` 是最终文字事实来源，实时 partial 只用于会中反馈。
 - ASR、说话人、分段音频与波形使用同一 16 kHz 时间轴。
 - 摘要引用已定稿记录，不直接依赖仍在变化的实时缓冲。
-- 列表不加载音频，详情按需加载，避免记录量增长后拖慢首页。
+- 列表不加载音频；用户载入某条历史记录时完整读取该记录的分段音频，恢复真实波形与播放接口。WaveSurfer 不可用时显示占位波形，并使用浏览器原生音频兜底播放。
 
 ## 兼容与迁移
 

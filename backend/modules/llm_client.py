@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import re
-from typing import Any
+from typing import Any, Callable
 
 from .llm_models import provider_defaults
 
@@ -116,6 +116,7 @@ class LLMClient:
         system_prompt: str = "",
         user_prompt: str = "",
         json_schema: dict | None = None,
+        result_normalizer: Callable[[dict], dict] | None = None,
         max_tokens: int | None = None,
         temperature: float | None = None,
     ) -> dict:
@@ -128,6 +129,14 @@ class LLMClient:
             raise LLMNotConfiguredError(
                 "LLM not configured. Set DITING_LLM_BASE_URL, DITING_LLM_API_KEY, DITING_LLM_MODEL."
             )
+
+        if json_schema:
+            schema_text = json.dumps(json_schema, ensure_ascii=False, separators=(",", ":"))
+            schema_instruction = (
+                "\n\n严格按照下面的 JSON Schema 返回字段与类型，不得改名、遗漏必填字段或增加说明文字：\n"
+                + schema_text
+            )
+            system_prompt = (system_prompt or "Return valid JSON only.") + schema_instruction
 
         messages = []
         if system_prompt:
@@ -169,6 +178,8 @@ class LLMClient:
                     body = resp.json()
                     content = body["choices"][0]["message"]["content"]
                     result = self._parse_json(content)
+                    if result_normalizer:
+                        result = result_normalizer(result)
                     if json_schema:
                         result = self._validate_schema(result, json_schema)
                     logger.info("LLM response OK: %d keys", len(result))
@@ -200,10 +211,39 @@ class LLMClient:
             import jsonschema
             jsonschema.validate(instance=data, schema=schema)
         except ImportError:
-            logger.warning("jsonschema not installed — skipping schema validation")
+            self._validate_schema_minimal(data, schema)
         except jsonschema.ValidationError as exc:
             raise LLMResponseError(f"LLM JSON failed schema validation: {exc.message}")
         return data
+
+    def _validate_schema_minimal(self, value: Any, schema: dict, path: str = "$") -> None:
+        """Validate the schema subset used by 会悟 when jsonschema is unavailable."""
+        expected = schema.get("type")
+        type_map = {
+            "object": dict,
+            "array": list,
+            "string": str,
+            "number": (int, float),
+            "integer": int,
+            "boolean": bool,
+        }
+        if expected in type_map and not isinstance(value, type_map[expected]):
+            raise LLMResponseError(
+                f"LLM JSON failed schema validation: {path} must be {expected}"
+            )
+        if expected == "object":
+            for key in schema.get("required", []):
+                if key not in value:
+                    raise LLMResponseError(
+                        f"LLM JSON failed schema validation: {path}.{key} is required"
+                    )
+            properties = schema.get("properties", {})
+            for key, child_schema in properties.items():
+                if key in value:
+                    self._validate_schema_minimal(value[key], child_schema, f"{path}.{key}")
+        elif expected == "array" and "items" in schema:
+            for index, item in enumerate(value):
+                self._validate_schema_minimal(item, schema["items"], f"{path}[{index}]")
 
     async def close(self) -> None:
         if self._client:

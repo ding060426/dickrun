@@ -88,6 +88,11 @@ provider_fallback=false
 本地音频输入格式以 [Qwen3-ASR 官方仓库](https://github.com/QwenLM/Qwen3-ASR) 为准；CUDA Torch
 版本以 [PyTorch 官方安装页](https://pytorch.org/get-started/locally/) 为准。
 
+保存识别设置后，前端会等待所选运行时真正完成加载，再允许把“已就绪”作为成功状态展示。
+Qwen3 模式下，录音期间仍由 X-ASR 提供低延迟预览；停止录音后才执行 Qwen3 最终转写。
+如果 Qwen3 最终转写在运行时失败（例如显存不足），后端会自动用 X-ASR 对同一份完整录音重试，
+前端会明确显示回退原因；若两个引擎都没有返回文字，也会保留录音并提示查看日志，不再静默显示“完成”。
+
 离线说话人日志还需要两个 sherpa-onnx 兼容模型（当前本地工作区已放置好）：
 
 ```text
@@ -205,6 +210,10 @@ python start.py
 
 对应 API：`GET/PUT /api/llm-settings`、`POST /api/llm-settings/models` 和
 `POST /api/llm-settings/test`。摘要记录只保存脱敏后的配置快照，不保存明文 API Key。
+
+摘要 Markdown 不再强制输出固定章节：议题、决策、行动项、公式、风险等字段为空时，对应章节会被
+直接省略，后续章节使用连续中文序号重新编号。文字结构图只有在模型返回有效节点时才追加，并自动使用
+下一个章节序号。转写主界面底部原有的“会议处理完成后将生成摘要”占位栏已移除，摘要仍从记录管理入口生成。
 
 ### 6. 离线多说话人会议
 

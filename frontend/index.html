@@ -602,15 +602,6 @@ body {
 }
 
 /* ── Bottom Summary ── */
-.summary-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 16px;
-  grid-column: 1 / -1;
-  max-height: 160px; overflow-y: auto;
-}
-
 /* ── Toast ── */
 .toast {
   position: fixed; top: 70px; right: 20px;
@@ -1680,12 +1671,6 @@ body {
     </div>
   </div>
 
-  <!-- Summary Panel -->
-  <div class="summary-panel" id="summaryPanel">
-    <div style="font-size:12px;color:var(--text-muted);text-align:center;">
-      会议处理完成后将生成摘要...
-    </div>
-  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -2043,7 +2028,7 @@ body {
                 <option value="float32">float32</option>
               </select>
             </label>
-            <p class="qwen3-settings-note wide" id="qwen3ProviderNote" data-i18n="settings.provider.live_note">Qwen3 负责文件与最终转写；实时预览继续使用 X-ASR。</p>
+            <p class="qwen3-settings-note wide" id="qwen3ProviderNote" data-i18n="settings.provider.live_note">Qwen3 模式：停止录音后生成最终转写；录音中由 X-ASR 提供实时预览。</p>
           </div>
           <label class="settings-field"><span data-i18n="settings.recognition.live_model">实时预览模型</span>
             <select class="hotword-input" id="liveAsrProfile">
@@ -2256,7 +2241,6 @@ const statLogicFlags = $('statLogicFlags');
 const statCorrections = $('statCorrections');
 const processingPanel = $('processingPanel');
 const logicPanel = $('logicPanel');
-const summaryPanel = $('summaryPanel');
 const micStatus = $('micStatus');
 const micOrbPanel = $('micOrbPanel');
 const micOrbWrap = $('micOrbWrap');
@@ -2340,6 +2324,7 @@ let micWorklet = null;
 let micSequence = 0;
 let micStreamId = null;
 let micStopTimer = null;
+let micFinalTranscriptReceived = false;
 let micSegmentStartIndex = 0;
 let hotwordSettingsState = null;
 let appSettingsState = null;
@@ -4739,6 +4724,22 @@ function collectRuntimeSettings() {
   });
 }
 
+async function waitForRecognitionRuntime(expectedProvider, timeoutMs = 180000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${API_BASE}/api/xasr/status`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const status = await response.json();
+    const models = status.models || {};
+    const selected = models.selected_provider || models.effective_provider;
+    if (selected === expectedProvider && (models.effective_provider === expectedProvider || models.provider_fallback)) {
+      return models;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  throw new Error('模型加载超时，请查看日志后重试');
+}
+
 async function refreshMicrophoneDevices() {
   if (!microphoneDevice || !navigator.mediaDevices?.enumerateDevices) return;
   const selected = microphoneDevice.value || appSettingsState?.microphone?.device_id || '';
@@ -4966,9 +4967,16 @@ async function saveHotwordSettings() {
     renderRuntimeSettings(appSettingsState);
     renderHotwordRows();
     const activeCount = data.hotwords?.active_count ?? hotwordSettingsState.words.length;
-    const savedMessage = data.reloading_models
-      ? t('settings.hotwords.saved_reloading', { count: activeCount })
-      : t('settings.hotwords.saved', { count: activeCount });
+    let savedMessage = t('settings.hotwords.saved', { count: activeCount });
+    if (data.reloading_models) {
+      savedMessage = t('settings.hotwords.saved_reloading', { count: activeCount });
+      setHotwordStatus(savedMessage);
+      appSettingsState.models = await waitForRecognitionRuntime(selectedAsrProvider);
+      renderRuntimeSettings(appSettingsState);
+      savedMessage = selectedAsrProvider === 'qwen3'
+        ? '设置已保存，Qwen3 最终转写模型已就绪'
+        : t('settings.hotwords.saved', { count: activeCount });
+    }
     setHotwordStatus(savedMessage);
     showToast(savedMessage);
   } catch (error) {
@@ -5093,6 +5101,7 @@ async function toggleMic() {
     micWorklet = null;
     clearTimeout(micStopTimer);
     micStopTimer = null;
+    micFinalTranscriptReceived = false;
 
     const runtimeSettings = await ensureAppSettingsLoaded();
     const microphoneSettings = runtimeSettings?.microphone || {};
@@ -5152,9 +5161,13 @@ async function toggleMic() {
         }));
       } else if (msg.type === 'configured') {
         micStreamId = msg.data.stream_id || micStreamId;
-        setMicOrbMessage('正在听你说话', `实时转写 · ${msg.data.vad}`);
+        const qwenMode = appSettingsState?.recognition?.asr_provider === 'qwen3';
+        const recordingHint = qwenMode
+          ? 'X-ASR 实时预览；停止录音后由 Qwen3 生成最终转写'
+          : `实时转写 · ${msg.data.vad}`;
+        setMicOrbMessage('正在听你说话', recordingHint);
         if (micStatusEl) {
-          micStatusEl.textContent = `实时转写 · ${msg.data.vad}`;
+          micStatusEl.textContent = recordingHint;
           micStatusEl.style.color = 'var(--accent-red)';
         }
       } else if (msg.type === 'live_result' && msg.data.text) {
@@ -5163,18 +5176,40 @@ async function toggleMic() {
       } else if (msg.type === 'finalizing') {
         // Orb is already hidden by stopMicRecording; just update the status bar
         if (micStatusEl) {
-          micStatusEl.textContent = t('mic.status_finalizing');
+          micStatusEl.textContent = msg.data?.provider === 'qwen3'
+            ? 'Qwen3 正在生成最终转写...'
+            : t('mic.status_finalizing');
           micStatusEl.style.color = 'var(--accent-yellow)';
         }
       } else if (msg.type === 'final_transcript') {
+        micFinalTranscriptReceived = Array.isArray(msg.data?.segments) && msg.data.segments.length > 0;
         replaceMicTranscript(msg.data);
+        if (msg.data?.provider_fallback) {
+          showToast(`Qwen3 最终转写失败，已自动使用 X-ASR：${msg.data.provider_error || '未知原因'}`);
+        }
         if (micStatusEl && !isRecording) {
           micStatusEl.textContent = t('mic.status_complete');
           micStatusEl.style.color = 'var(--accent-green)';
         }
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
-        if (micStatusEl) {
+        const canonicalError = msg.data?.canonical_error;
+        const expectedFinal = appSettingsState?.recognition?.final_transcription_enabled !== false;
+        if (canonicalError) {
+          const message = `最终转写失败：${canonicalError}`;
+          showToast(message);
+          if (micStatusEl) {
+            micStatusEl.textContent = message;
+            micStatusEl.style.color = 'var(--accent-red)';
+          }
+        } else if (expectedFinal && !micFinalTranscriptReceived) {
+          const message = '录音已保存，但识别模型没有返回文字；请查看日志或切换 X-ASR 重试';
+          showToast(message);
+          if (micStatusEl) {
+            micStatusEl.textContent = message;
+            micStatusEl.style.color = 'var(--accent-yellow)';
+          }
+        } else if (micStatusEl) {
           micStatusEl.textContent = `${t('mic.status_complete')} · ${seconds}s`;
           micStatusEl.style.color = 'var(--accent-green)';
         }
@@ -5520,8 +5555,6 @@ function resetAll() {
 
   if (logicPanel) logicPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">暂无数据</div>';
   if (processingPanel) processingPanel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px 0;">等待输入...</div>';
-  if (summaryPanel) summaryPanel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;">会议处理完成后将生成摘要...</div>';
-
   if (progressFill) progressFill.style.width = '0%';
   if (timeDisplay) timeDisplay.textContent = '--:--';
   if (segmentCounter) segmentCounter.textContent = '0/0';

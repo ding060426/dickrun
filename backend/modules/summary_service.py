@@ -340,15 +340,17 @@ async def generate_summary(summary_id: str) -> None:
                 logger.warning("Diagram render failed for %s: %s", summary_id, e)
 
         if diag_mermaid:
-            markdown = (
-                markdown.rstrip()
-                + "\n\n## 文字结构图\n\n"
-                + "```mermaid\n"
+            diagram_content = (
+                "```mermaid\n"
                 + diag_mermaid
                 + "\n```\n\n"
                 + "### Markdown 备用结构\n\n"
                 + diag_markdown.rstrip()
-                + "\n"
+            )
+            markdown = markdown_renderer.append_numbered_section(
+                markdown,
+                "文字结构图",
+                diagram_content,
             )
 
         summary_store.update_summary(summary_id, {

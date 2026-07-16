@@ -1733,6 +1733,42 @@ async def rename_meeting_speaker(meeting_id: str, speaker_id: str, data: dict):
 # WebSocket endpoints
 # ===========================================================================
 
+def _process_canonical_recording(recording_path, engine_pool, pipeline):
+    """Run the selected final recognizer and retry Qwen3 failures with X-ASR."""
+
+    status = engine_pool.status()
+    selected_provider = str(status.get("effective_provider") or "xasr")
+    primary_engine = engine_pool.create_final_session()
+    try:
+        run = pipeline.process_file(
+            str(recording_path),
+            primary_engine,
+            enable_diarization=True,
+        )
+        return run, {
+            "provider": selected_provider,
+            "fallback": False,
+            "primary_error": "",
+        }
+    except Exception as primary_error:
+        if selected_provider != "qwen3":
+            raise
+        logger.warning(
+            "Qwen3 canonical transcription failed; retrying with X-ASR: %s",
+            primary_error,
+        )
+        fallback_engine = engine_pool.create_live_session()
+        run = pipeline.process_file(
+            str(recording_path),
+            fallback_engine,
+            enable_diarization=True,
+        )
+        return run, {
+            "provider": "xasr",
+            "fallback": True,
+            "primary_error": str(primary_error),
+        }
+
 @app.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
     """Low-latency preview plus durable recording and canonical final ASR."""
@@ -1881,6 +1917,7 @@ async def ws_live(websocket: WebSocket):
                         })
 
                     canonical_error = None
+                    canonical_metadata = None
                     final_enabled = runtime_config_store.load()["recognition"][
                         "final_transcription_enabled"
                     ]
@@ -1892,18 +1929,18 @@ async def ws_live(websocket: WebSocket):
                                 "stream_id": stream_id,
                                 "duration_ms": recording_result.duration_ms,
                                 "stage": "canonical_transcription",
+                                "provider": xasr_pool.status().get("effective_provider", "xasr"),
                             },
                         })
                         try:
-                            final_engine = xasr_pool.create_final_session()
                             loop = asyncio.get_running_loop()
-                            canonical_run = await loop.run_in_executor(
+                            canonical_run, canonical_metadata = await loop.run_in_executor(
                                 PROCESSING_EXECUTOR,
                                 partial(
-                                    meeting_pipeline.process_file,
+                                    _process_canonical_recording,
                                     str(recording_result.path),
-                                    final_engine,
-                                    enable_diarization=True,
+                                    xasr_pool,
+                                    meeting_pipeline,
                                 ),
                             )
                             canonical_results = canonical_run.results
@@ -1924,6 +1961,9 @@ async def ws_live(websocket: WebSocket):
                                     "segments": canonical_segments,
                                     "segments_count": len(canonical_results),
                                     "canonical": True,
+                                    "provider": canonical_metadata["provider"],
+                                    "provider_fallback": canonical_metadata["fallback"],
+                                    "provider_error": canonical_metadata["primary_error"],
                                     "speakers": canonical_run.speakers,
                                     "diarization": canonical_run.metadata(),
                                 },
@@ -1948,6 +1988,8 @@ async def ws_live(websocket: WebSocket):
                         }
                     if canonical_error:
                         metrics["canonical_error"] = canonical_error
+                    if canonical_metadata:
+                        metrics["canonical"] = canonical_metadata
                     await manager.send_json(websocket, {
                         "type": "stopped",
                         "data": {**metrics, "vad": vad_provider},

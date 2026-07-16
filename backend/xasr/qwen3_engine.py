@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import gc
 import importlib.util
 import threading
+import weakref
 from pathlib import Path
 from typing import Callable
 
@@ -30,6 +32,7 @@ class Qwen3AsrEngine:
         hotwords: list[str] | None = None,
         hotword_scores: dict[str, float] | None = None,
         enable_hotword_correction: bool = True,
+        num_threads: int = 12,
         model_loader: Callable | None = None,
         torch_module=None,
         shared_runtime: dict | None = None,
@@ -38,11 +41,13 @@ class Qwen3AsrEngine:
         self.model_path = str(model_path or "").strip()
         self.device = str(device or "auto").lower()
         self.dtype = str(dtype or "auto").lower()
+        self.num_threads = max(1, int(num_threads))
         self.logic_validator = None
         self.is_model_available = False
         self._model_loader = model_loader
         self._torch = torch_module
         self._runtime = shared_runtime or {"model": None, "lock": threading.RLock()}
+        self._runtime.setdefault("owners", weakref.WeakSet()).add(self)
         self._hotwords = list(hotwords or []) if enable_hotword_correction else []
         self._hotword_scores = dict(hotword_scores or {})
 
@@ -78,6 +83,9 @@ class Qwen3AsrEngine:
 
                     torch = torch_module
                     self._torch = torch
+                set_num_threads = getattr(torch, "set_num_threads", None)
+                if callable(set_num_threads):
+                    set_num_threads(self.num_threads)
                 loader = self._model_loader
                 if loader is None:
                     from qwen_asr import Qwen3ASRModel
@@ -100,6 +108,7 @@ class Qwen3AsrEngine:
             model_path=self.model_path,
             device=self.device,
             dtype=self.dtype,
+            num_threads=self.num_threads,
             hotwords=self._hotwords,
             hotword_scores=self._hotword_scores,
             model_loader=self._model_loader,
@@ -108,6 +117,20 @@ class Qwen3AsrEngine:
         )
         session.is_model_available = self.is_model_available
         return session
+
+    def close(self) -> None:
+        """Drop the shared model and return cached CUDA memory to the driver."""
+        model = None
+        with self._runtime["lock"]:
+            model = self._runtime.get("model")
+            self._runtime["model"] = None
+            for owner in tuple(self._runtime.get("owners", ())):
+                owner.is_model_available = False
+        if model is None:
+            return
+        del model
+        gc.collect()
+        self._release_cuda_cache()
 
     def configure_hotwords(
         self,
@@ -176,8 +199,13 @@ class Qwen3AsrEngine:
         kwargs = {"audio": (np.asarray(samples, dtype=np.float32), sample_rate), "language": None}
         if context:
             kwargs["context"] = context
-        with self._runtime["lock"]:
-            output = self._runtime["model"].transcribe(**kwargs)
+        try:
+            with self._runtime["lock"]:
+                output = self._runtime["model"].transcribe(**kwargs)
+        except Exception as exc:
+            if self._is_cuda_oom(exc):
+                self.close()
+            raise
         item = output[0] if isinstance(output, (list, tuple)) and output else output
         text = str(getattr(item, "text", item if isinstance(item, str) else "") or "").strip()
         if not text:
@@ -213,3 +241,26 @@ class Qwen3AsrEngine:
             selected = "bfloat16" if device.startswith("cuda") else "float32"
         return getattr(torch, selected)
 
+    def _is_cuda_oom(self, exc: Exception) -> bool:
+        torch = self._torch
+        cuda = getattr(torch, "cuda", None) if torch is not None else None
+        oom_type = getattr(cuda, "OutOfMemoryError", None)
+        return bool(
+            (oom_type is not None and isinstance(exc, oom_type))
+            or "out of memory" in str(exc).lower()
+        )
+
+    def _release_cuda_cache(self) -> None:
+        torch = self._torch
+        cuda = getattr(torch, "cuda", None) if torch is not None else None
+        if cuda is None or not cuda.is_available():
+            return
+        empty_cache = getattr(cuda, "empty_cache", None)
+        if callable(empty_cache):
+            empty_cache()
+        ipc_collect = getattr(cuda, "ipc_collect", None)
+        if callable(ipc_collect):
+            try:
+                ipc_collect()
+            except RuntimeError:
+                pass

@@ -204,6 +204,7 @@ DSv4 等文字模型不会被路由到图像生成接口。模型只产生文字
 
 ```powershell
 $env:DITING_MAX_UPLOAD_MB = "2048"
+$env:DITING_ASR_THREADS = "12"
 $env:DITING_PROCESSING_WORKERS = "2"
 $env:DITING_LIVE_ENDPOINT_GRACE_MS = "800"
 $env:DITING_DIARIZATION_CHUNKING = "true"
@@ -211,6 +212,8 @@ $env:DITING_DIARIZATION_MAX_WORKERS = "2"
 $env:DITING_LLM_PROVIDER = "deepseek"
 $env:DITING_LLM_MODEL = "deepseek-v4-flash"
 ```
+
+`DITING_ASR_THREADS` 是单个 X-ASR recognizer 及 Qwen 音频预处理的 CPU 线程数，默认 12；`DITING_PROCESSING_WORKERS` 是并行处理的会议任务数，默认保持 2，避免多个长音频或 Qwen 推理同时争抢内存和显存。Qwen 运行时在模型切换、CUDA OOM 和服务关闭时主动丢弃模型引用，并调用 PyTorch CUDA 缓存回收接口；切回 X-ASR 后不再长期保留 Qwen 显存。
 
 模型延迟档位包括 `low-latency`（160 ms）、`balanced`（480 ms）、`meeting`（960 ms）和 `quality`（1920 ms）；只有对应 ONNX 文件存在时才可选择。实时和最终 X-ASR 档位相同时共享已预热运行时。
 

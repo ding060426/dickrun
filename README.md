@@ -117,6 +117,15 @@ python start.py
 
 设置页可在 `X-ASR` 与 `Qwen3-ASR` 之间切换最终转写引擎。实时麦克风预览始终使用低延迟 X-ASR；上传文件和停止录音后的最终转写才调用 Qwen3-ASR。
 
+本地识别默认使用 12 个推理线程，可通过环境变量调整：
+
+```powershell
+$env:DITING_ASR_THREADS = "12"
+python start.py
+```
+
+该值会传给 X-ASR recognizer，并设置 Qwen 音频预处理所用的 PyTorch CPU 线程数；Qwen 的主要生成阶段仍受 GPU 显存和算力限制。`DITING_PROCESSING_WORKERS` 是并发会议任务数，不应为了增加单条录音速度而同步调高。切换出 Qwen、CUDA OOM 或后端关闭时，系统会释放 Qwen 模型引用并清理 PyTorch CUDA allocator 缓存。
+
 建议使用独立 Python 3.12 环境：
 
 ```powershell

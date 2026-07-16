@@ -32,6 +32,7 @@ class _FakeEngine:
         self.is_model_available = True
         self.warmed = False
         self.configured = []
+        self.close_calls = 0
         self.__class__.instances.append(self)
 
     def warmup(self):
@@ -44,15 +45,20 @@ class _FakeEngine:
     def configure_hotwords(self, *args, **kwargs):
         self.configured.append((args, kwargs))
 
+    def close(self):
+        self.close_calls += 1
+
 
 class _FakeQwenEngine:
     instances = []
+    provider_name = "qwen3"
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.is_model_available = True
         self.file_vad_provider = "qwen3-full-audio"
         self.logic_validator = None
+        self.close_calls = 0
         self.__class__.instances.append(self)
 
     @classmethod
@@ -67,6 +73,10 @@ class _FakeQwenEngine:
 
     def configure_hotwords(self, *args, **kwargs):
         pass
+
+    def close(self):
+        self.close_calls += 1
+        self.is_model_available = False
 
 
 class AsrEnginePoolTests(unittest.TestCase):
@@ -90,6 +100,24 @@ class AsrEnginePoolTests(unittest.TestCase):
         self.assertEqual(pool.create_live_session(), ("session", "meeting"))
         self.assertEqual(status["live"]["chunk_ms"], 960)
         self.assertTrue(status["shared_runtime"])
+
+    def test_inference_thread_count_is_forwarded_and_exposed_in_status(self):
+        with tempfile.TemporaryDirectory() as root:
+            model_dir = Path(root)
+            _write_profile(model_dir, 960)
+            pool = AsrEnginePool(
+                model_dir,
+                engine_factory=_FakeEngine,
+                base_options={"num_threads": 12},
+            )
+
+            status = pool.reload(
+                {"live_asr_profile": "meeting", "final_asr_profile": "meeting"},
+                {"enabled": True, "words": []},
+            )
+
+        self.assertEqual(_FakeEngine.instances[0].kwargs["num_threads"], 12)
+        self.assertEqual(status["inference_threads"], 12)
 
     def test_missing_requested_profile_falls_back_to_deployed_960ms(self):
         with tempfile.TemporaryDirectory() as root:
@@ -134,6 +162,7 @@ class AsrEnginePoolTests(unittest.TestCase):
         self.assertEqual(status["effective_provider"], "qwen3")
         self.assertEqual(status["live_provider"], "xasr")
         self.assertFalse(status["provider_fallback"])
+        self.assertEqual(_FakeQwenEngine.instances[0].kwargs["num_threads"], 12)
 
     def test_unavailable_qwen3_falls_back_to_xasr(self):
         with tempfile.TemporaryDirectory() as root:
@@ -154,6 +183,33 @@ class AsrEnginePoolTests(unittest.TestCase):
         self.assertEqual(status["effective_provider"], "xasr")
         self.assertTrue(status["provider_fallback"])
         self.assertEqual(status["providers"]["qwen3"]["reason"], "model_not_configured")
+
+    def test_reload_and_close_release_previous_runtime(self):
+        with tempfile.TemporaryDirectory() as root:
+            model_dir = Path(root)
+            _write_profile(model_dir, 960)
+            pool = AsrEnginePool(
+                model_dir,
+                engine_factory=_FakeEngine,
+                qwen_engine_factory=_FakeQwenEngine,
+            )
+            settings = {
+                "asr_provider": "qwen3",
+                "qwen3_model_path": "Qwen/Qwen3-ASR-0.6B",
+                "live_asr_profile": "meeting",
+            }
+            hotwords = {"enabled": True, "words": []}
+            pool.reload(settings, hotwords)
+            old_qwen = pool.final_engine
+
+            pool.reload({"asr_provider": "xasr", "live_asr_profile": "meeting"}, hotwords)
+            active_xasr = pool.live_engine
+            pool.close()
+
+        self.assertEqual(old_qwen.close_calls, 1)
+        self.assertEqual(active_xasr.close_calls, 1)
+        self.assertIsNone(pool.live_engine)
+        self.assertIsNone(pool.final_engine)
 
 
 if __name__ == "__main__":

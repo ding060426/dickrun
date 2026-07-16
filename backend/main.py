@@ -115,6 +115,7 @@ xasr_loading: bool = False
 _xasr_reload_lock = threading.Lock()
 _xasr_reload_pending = False
 _xasr_reload_worker_active = False
+ASR_INFERENCE_THREADS = max(1, int(os.getenv("DITING_ASR_THREADS", "12")))
 PROCESSING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=max(1, int(os.getenv("DITING_PROCESSING_WORKERS", "2"))),
     thread_name_prefix="huiwu-asr",
@@ -204,26 +205,29 @@ def _load_xasr_engine():
     try:
         runtime_settings = runtime_config_store.load()
         hotword_settings = hotword_config_store.load()
-        pool = AsrEnginePool(
-            XASREngine.DEFAULT_MODEL_DIR,
-            base_options={
-                "enable_logic_validation": True,
-                "enable_uncertainty": True,
-                "enable_endpoint_detection": False,
-                "provider": "cpu",
-                "num_threads": 2,
-            },
-        )
+        pool = xasr_pool
+        if not isinstance(pool, AsrEnginePool):
+            pool = AsrEnginePool(
+                XASREngine.DEFAULT_MODEL_DIR,
+                base_options={
+                    "enable_logic_validation": True,
+                    "enable_uncertainty": True,
+                    "enable_endpoint_detection": False,
+                    "provider": "cpu",
+                    "num_threads": ASR_INFERENCE_THREADS,
+                },
+            )
         status = pool.reload(runtime_settings["recognition"], hotword_settings)
         xasr_pool = pool
         xasr_engine = pool.live_engine
         final_xasr_engine = pool.final_engine
         logger.info(
-            "X-ASR ready: live=%sms final=%sms shared=%s file_vad=%s",
+            "X-ASR ready: live=%sms final=%sms shared=%s file_vad=%s threads=%s",
             status["live"]["chunk_ms"],
             status["final"]["chunk_ms"],
             status["shared_runtime"],
             status["file_vad_provider"],
+            status["inference_threads"],
         )
     except Exception as e:
         logger.error(f"X-ASR init failed: {e}")
@@ -271,6 +275,8 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down 会悟 backend...")
     PROCESSING_EXECUTOR.shutdown(wait=False, cancel_futures=True)
+    if xasr_pool is not None:
+        xasr_pool.close()
 
 app = FastAPI(
     title="会悟 - Smart Meeting Speech Cognitive System",

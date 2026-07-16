@@ -54,6 +54,35 @@ class AsrEnginePool:
         self._status = self._empty_status()
 
     def reload(self, recognition: dict, hotwords: dict) -> dict:
+        with self._lock:
+            previous_engines = self._unique_engines(
+                self.live_engine,
+                self.final_engine,
+            )
+            previous_qwen_ids = {
+                id(engine)
+                for engine in previous_engines
+                if getattr(engine, "provider_name", "") == "qwen3"
+            }
+            if self.final_engine is not None and id(self.final_engine) in previous_qwen_ids:
+                self.final_engine = self.live_engine
+                self._status = {
+                    **self._status,
+                    "effective_provider": "xasr",
+                    "provider_fallback": True,
+                    "provider_reason": "runtime_reloading",
+                    "shared_runtime": True,
+                    "file_vad_provider": getattr(
+                        self.live_engine,
+                        "file_vad_provider",
+                        "silero",
+                    ),
+                }
+        preclosed_ids = {
+            id(engine)
+            for engine in previous_engines
+            if id(engine) in previous_qwen_ids and self._close_engine(engine)
+        }
         available = deployed_profiles(self.model_dir)
         requested_live = str(recognition.get("live_asr_profile", "meeting"))
         requested_final = str(recognition.get("final_asr_profile", "meeting"))
@@ -121,12 +150,27 @@ class AsrEnginePool:
             "final": self._profile_status(requested_final, effective_xasr_final),
             "shared_runtime": live is final,
             "file_vad_provider": getattr(final, "file_vad_provider", "silero"),
+            "inference_threads": max(1, int(common.get("num_threads", 1))),
         }
         with self._lock:
             self.live_engine = live
             self.final_engine = final
             self._status = status
+        active_ids = {id(engine) for engine in self._unique_engines(live, final)}
+        for engine in previous_engines:
+            if id(engine) not in active_ids and id(engine) not in preclosed_ids:
+                self._close_engine(engine)
         return self.status()
+
+    def close(self) -> None:
+        """Release recognizer runtimes and any model-owned accelerator cache."""
+        with self._lock:
+            engines = self._unique_engines(self.live_engine, self.final_engine)
+            self.live_engine = None
+            self.final_engine = None
+            self._status = self._empty_status()
+        for engine in engines:
+            self._close_engine(engine)
 
     def create_live_session(self):
         with self._lock:
@@ -190,6 +234,7 @@ class AsrEnginePool:
             "model_path": recognition.get("qwen3_model_path", ""),
             "device": recognition.get("qwen3_device", "auto"),
             "dtype": recognition.get("qwen3_dtype", "auto"),
+            "num_threads": max(1, int(self.base_options.get("num_threads", 12))),
             "hotwords": words,
             "hotword_scores": scores,
             "enable_hotword_correction": hotwords.get("enabled", True),
@@ -219,7 +264,18 @@ class AsrEnginePool:
         }
 
     @staticmethod
-    def _empty_status() -> dict:
+    def _unique_engines(*engines) -> list:
+        return list({id(engine): engine for engine in engines if engine}.values())
+
+    @staticmethod
+    def _close_engine(engine) -> bool:
+        close = getattr(engine, "close", None)
+        if not callable(close):
+            return False
+        close()
+        return True
+
+    def _empty_status(self) -> dict:
         return {
             "available_profiles": [],
             "selected_provider": "xasr",
@@ -235,4 +291,5 @@ class AsrEnginePool:
             "final": {},
             "shared_runtime": False,
             "file_vad_provider": "unavailable",
+            "inference_threads": max(1, int(self.base_options.get("num_threads", 1))),
         }

@@ -41,7 +41,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # ── Paths ───────────────────────────────────────────────────────
@@ -64,6 +64,7 @@ from diarization.registry import MeetingRegistry
 from build_info import API_REVISION
 from modules.management_store import select_management_store
 from modules import record_store
+from modules import summary_store
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -716,6 +717,19 @@ async def api_create_record(
     authorization: str | None = Header(None),
 ):
     user = _require_user(authorization)
+    # Draft mode: no segments → create a lightweight draft immediately
+    segments = data.get("segments") or []
+    if data.get("action") == "draft" or not segments:
+        record = record_store.create_draft(
+            title=str(data.get("title") or "未命名会议记录"),
+            created_by=user["id"],
+            source_type=data.get("source_type", "manual"),
+            source_filename=data.get("source_filename", ""),
+            source_mime_type=data.get("source_mime_type", ""),
+            source_size_bytes=data.get("source_size_bytes", 0),
+        )
+        return {"record": record}
+    # Full save path (backward compatible)
     payload = {**data, "created_by": user["id"]}
     payload.pop("id", None)
     try:
@@ -760,10 +774,20 @@ async def api_download_record_text(
 @app.get("/api/records/{record_id}")
 async def api_get_record(
     record_id: str,
+    include_audio: bool = Query(False),
     authorization: str | None = Header(None),
 ):
     user = _require_user(authorization)
-    return {"record": _owned_record(record_id, user)}
+    record = record_store.get_record(record_id, include_audio=include_audio)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    if (
+        record.get("created_by")
+        and record["created_by"] != user["id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return {"record": record}
 
 
 @app.put("/api/records/{record_id}")
@@ -792,6 +816,251 @@ async def api_delete_record(
     user = _require_user(authorization)
     _owned_record(record_id, user)
     return {"ok": record_store.delete_record(record_id)}
+
+
+# ── P0 incremental endpoints ───────────────────────────────────
+
+@app.patch("/api/records/{record_id}")
+async def api_patch_record(
+    record_id: str,
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    """Update record metadata only (title, source info, etc.) — does not touch segments."""
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    record = record_store.patch_record(record_id, data)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return {"record": record}
+
+
+@app.post("/api/records/{record_id}/segments")
+async def api_append_segment(
+    record_id: str,
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    """Append a single segment (with optional audio_wav_base64) to an existing record."""
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    try:
+        result = record_store.append_segment(record_id, data)
+        return {"segment": result}
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.patch("/api/records/{record_id}/segments/{segment_uuid}")
+async def api_update_segment(
+    record_id: str,
+    segment_uuid: str,
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    """Update a segment's text, speaker, or metadata — does not accept audio."""
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    result = record_store.update_segment(record_id, segment_uuid, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    return {"segment": result}
+
+
+@app.delete("/api/records/{record_id}/segments/{segment_uuid}")
+async def api_delete_segment(
+    record_id: str,
+    segment_uuid: str,
+    authorization: str | None = Header(None),
+):
+    """Delete a single segment from a record."""
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    ok = record_store.delete_segment(record_id, segment_uuid)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    return {"ok": True}
+
+
+@app.get("/api/records/{record_id}/segments/{segment_uuid}/audio")
+async def api_get_segment_audio(
+    record_id: str,
+    segment_uuid: str,
+    authorization: str | None = Header(None),
+):
+    """Return binary WAV audio for a single segment."""
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    audio_blob, mime_type = record_store.get_segment_audio(record_id, segment_uuid)
+    if audio_blob is None:
+        raise HTTPException(status_code=404, detail="Segment audio not found")
+    return Response(content=audio_blob, media_type=mime_type)
+
+
+@app.post("/api/records/{record_id}/finalize")
+async def api_finalize_record(
+    record_id: str,
+    authorization: str | None = Header(None),
+):
+    """Mark record as completed: rebuild full_text, set completed_at, status=completed."""
+    user = _require_user(authorization)
+    _owned_record(record_id, user)
+    record = record_store.finalize_record(record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return {"record": record}
+
+
+@app.get("/api/records/{record_id}/source-audio")
+async def api_get_source_audio(
+    record_id: str,
+    authorization: str | None = Header(None),
+):
+    """Return the original uploaded or recorded source audio as binary WAV."""
+    user = _require_user(authorization)
+    record = _owned_record(record_id, user)
+    source_path = record.get("source_audio_path")
+    if not source_path or not os.path.exists(source_path):
+        raise HTTPException(status_code=404, detail="Source audio not available")
+    return FileResponse(source_path, media_type="audio/wav")
+
+
+# ── Summary API ────────────────────────────────────────────────
+
+@app.post("/api/record-summaries")
+async def api_create_summary(
+    data: dict,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    record_ids = list(dict.fromkeys(data.get("record_ids") or []))  # dedup, preserve order
+    if not record_ids:
+        raise HTTPException(status_code=422, detail="record_ids must not be empty")
+    max_records = int(os.environ.get("DITING_SUMMARY_MAX_RECORDS", "20"))
+    if len(record_ids) > max_records:
+        raise HTTPException(status_code=422, detail=f"Maximum {max_records} records per summary")
+
+    # Validate all records exist, are completed, and user has access
+    for rid in record_ids:
+        rec = record_store.get_record(rid)
+        if not rec:
+            raise HTTPException(status_code=404, detail=f"Record {rid} not found")
+        if rec.get("created_by") and rec["created_by"] != user["id"] and user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail=f"Permission denied for record {rid}")
+        if rec.get("status") != "completed":
+            raise HTTPException(status_code=422, detail=f"Record {rid} is not completed (status={rec.get('status')})")
+        if not (rec.get("full_text") or "").strip():
+            raise HTTPException(status_code=422, detail=f"Record {rid} has no text content")
+
+    summary = summary_store.create_summary(
+        title=str(data.get("title") or "未命名摘要"),
+        summary_type=str(data.get("summary_type") or ("comprehensive" if len(record_ids) > 1 else "standard")),
+        language=str(data.get("language") or "zh-CN"),
+        record_ids=record_ids,
+        options=data.get("options"),
+        created_by=user["id"],
+    )
+
+    # Kick off async generation (fire-and-forget)
+    import asyncio
+    asyncio.create_task(_run_summary_generation(summary["id"]))
+
+    return {"summary": {"id": summary["id"], "status": "processing", "record_count": len(record_ids)}}
+
+
+@app.get("/api/record-summaries")
+async def api_list_summaries(
+    q: str | None = Query(None),
+    status: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    owner_id = None if user.get("role") == "admin" else user["id"]
+    return summary_store.list_summaries(user_id=owner_id, q=q, status=status, limit=limit, offset=offset)
+
+
+@app.get("/api/record-summaries/{summary_id}")
+async def api_get_summary(
+    summary_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    summary = summary_store.get_summary(summary_id)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found")
+    if summary.get("created_by") and summary["created_by"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return {"summary": summary}
+
+
+@app.delete("/api/record-summaries/{summary_id}")
+async def api_delete_summary(
+    summary_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    summary = summary_store.get_summary(summary_id)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found")
+    if summary.get("created_by") and summary["created_by"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return {"ok": summary_store.delete_summary(summary_id)}
+
+
+@app.get("/api/record-summaries/{summary_id}/download")
+async def api_download_summary(
+    summary_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    summary = summary_store.get_summary(summary_id)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found")
+    if summary.get("created_by") and summary["created_by"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    markdown = summary.get("markdown_content") or ""
+    safe_title = "".join(c if c.isalnum() or c in "._- " else "_" for c in summary.get("title", "summary")).strip()
+    return PlainTextResponse(
+        markdown,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title or "meeting-summary"}.md"'},
+    )
+
+
+@app.post("/api/record-summaries/{summary_id}/retry")
+async def api_retry_summary(
+    summary_id: str,
+    authorization: str | None = Header(None),
+):
+    user = _require_user(authorization)
+    summary = summary_store.get_summary(summary_id)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found")
+    if summary.get("created_by") and summary["created_by"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    # Reset status and re-run
+    summary_store.update_summary(summary_id, {"status": "pending", "stage": "", "progress": 0, "error_message": ""})
+    import asyncio
+    asyncio.create_task(_run_summary_generation(summary_id))
+    return {"summary": {"id": summary_id, "status": "pending"}}
+
+
+async def _run_summary_generation(summary_id: str) -> None:
+    """Background task: run LLM summary generation."""
+    try:
+        from modules.summary_service import generate_summary
+        await generate_summary(summary_id=summary_id)
+    except Exception as exc:
+        logger.error("Summary generation failed for %s: %s", summary_id, exc)
+        try:
+            summary_store.update_summary(summary_id, {
+                "status": "failed",
+                "error_message": str(exc)[:1000],
+            })
+        except Exception:
+            pass
 
 
 @app.get("/api/xasr/status")

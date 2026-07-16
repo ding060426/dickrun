@@ -718,6 +718,7 @@ body {
 .records-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, 360px) 1fr; }
 .records-list { overflow-y: auto; padding: 12px; border-right: 1px solid var(--border); }
 .record-card {
+  display: flex; align-items: flex-start;
   padding: 10px; margin-bottom: 8px; border: 1px solid var(--border);
   border-radius: 7px; background: var(--bg-primary); cursor: pointer;
 }
@@ -733,6 +734,20 @@ body {
   .record-detail { display: none; }
   .record-title-input { width: 130px; }
 }
+/* S1: multi-select */
+.record-select { width:16px; height:16px; cursor:pointer; accent-color:var(--accent-blue); }
+.select-count { white-space:nowrap; }
+/* S6: summary dialog */
+.summary-dialog-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:2000;
+  display:flex; align-items:center; justify-content:center;
+}
+.summary-dialog {
+  width:min(720px,92vw); max-height:85vh; background:var(--bg-primary);
+  border-radius:12px; box-shadow:0 24px 80px rgba(0,0,0,0.35);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.summary-dialog-body { padding:18px; overflow-y:auto; flex:1; }
 .entity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .entity-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 5px 8px; font-size: 10px; }
 .entity-card .title { font-weight: 600; color: var(--text-primary); font-size: 11px; }
@@ -1779,6 +1794,60 @@ body {
 </div>
 
 
+<!-- ═══ S6: Summary Dialog ═══════════════════════════════════════ -->
+<div class="summary-dialog-overlay" id="summaryDialog" aria-hidden="true" style="display:none;">
+  <div class="summary-dialog">
+    <div class="management-header">
+      <strong id="summaryDialogTitle">生成会议摘要</strong>
+      <button class="btn btn-secondary" id="btnCloseSummaryDialog">关闭</button>
+    </div>
+    <div class="summary-dialog-body" id="summaryDialogBody">
+      <!-- Config form (shown initially) -->
+      <div id="summaryConfigForm">
+        <div class="settings-section-title">摘要配置</div>
+        <label style="display:block;margin-bottom:8px;">报告标题
+          <input id="summaryTitleInput" style="width:100%;box-sizing:border-box;" maxlength="240" placeholder="摘要标题">
+        </label>
+        <label style="display:block;margin-bottom:8px;">摘要类型
+          <select id="summaryTypeSelect" style="width:100%;box-sizing:border-box;">
+            <option value="standard">标准会议摘要</option>
+            <option value="executive">管理层简报</option>
+            <option value="action">行动项与责任人</option>
+            <option value="comprehensive">综合报告</option>
+          </select>
+        </label>
+        <label style="display:block;margin-bottom:8px;">输出语言
+          <select id="summaryLangSelect" style="width:100%;box-sizing:border-box;">
+            <option value="zh-CN">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <div style="margin-bottom:12px;">
+          <label style="margin-right:16px;"><input type="checkbox" id="summaryOptSpeakers" checked> 包含说话人</label>
+          <label style="margin-right:16px;"><input type="checkbox" id="summaryOptDecisions" checked> 提取决策</label>
+          <label style="margin-right:16px;"><input type="checkbox" id="summaryOptActions" checked> 提取行动项</label>
+          <label><input type="checkbox" id="summaryOptChanges" checked> 跨会议变化分析</label>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
+          所选记录：<span id="summaryRecordList">—</span>
+        </div>
+        <button class="btn btn-primary" id="btnSubmitSummary">开始生成摘要</button>
+      </div>
+      <!-- Progress / Result (shown after submit) -->
+      <div id="summaryResultArea" style="display:none;">
+        <div id="summaryProgress" style="margin-bottom:12px;color:var(--text-muted);font-size:12px;"></div>
+        <pre id="summaryMarkdownPreview" style="max-height:50vh;overflow:auto;background:var(--bg-tertiary);padding:12px;border-radius:8px;white-space:pre-wrap;font:12px/1.6 monospace;"></pre>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btnCopySummary">复制 Markdown</button>
+          <button class="btn btn-secondary" id="btnDownloadSummary">下载 .md</button>
+          <button class="btn btn-secondary" id="btnRetrySummary" style="display:none;">重新生成</button>
+          <button class="btn btn-secondary" id="btnBackToConfig">返回配置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="records-panel" id="recordsPanel" aria-hidden="true">
   <div class="management-header">
     <strong>会议记录管理</strong>
@@ -1788,6 +1857,11 @@ body {
     <input id="recordSearchInput" type="search" placeholder="搜索标题、文件名或转写全文">
     <button class="btn btn-primary" id="btnSearchRecords">搜索</button>
     <button class="btn btn-secondary" id="btnRefreshRecords">刷新</button>
+    <span style="flex:1;"></span>
+    <button class="btn btn-secondary btn-select-all" id="btnSelectAllRecords" style="display:none;">全选</button>
+    <button class="btn btn-secondary btn-clear-select" id="btnClearSelectRecords" style="display:none;">清除</button>
+    <span class="select-count" id="selectCountLabel" style="display:none;font-size:11px;color:var(--text-muted);">已选择 0 条</span>
+    <button class="btn btn-primary" id="btnGenerateSummary" style="display:none;" disabled>生成摘要</button>
   </div>
   <div class="records-layout">
     <div class="records-list" id="recordsList"><div class="entity-card">暂无记录</div></div>
@@ -2016,6 +2090,7 @@ body {
 <script src="./mic-level.js"></script>
 <script src="./live-protocol.js"></script>
 <script src="./management-transcription.js"></script>
+<script src="./record-summary.js"></script>
 <script src="./app-settings.js"></script>
 <script src="./hotword-settings.js"></script>
 <script src="./i18n.js"></script>
@@ -2155,6 +2230,7 @@ let currentRecordSpeakers = [];
 let micStream = null;
 let micWs = null;
 let isRecording = false;
+let selectedRecordIds = new Set();  // S1: multi-select state
 let micAudioContext = null;
 let micWorklet = null;
 let micSequence = 0;
@@ -3012,7 +3088,7 @@ function setRecordTitle(title) {
   if (meetingTitleDisplay && value) meetingTitleDisplay.textContent = value;
 }
 
-function newMeetingRecord() {
+async function newMeetingRecord() {
   if (isRecording) {
     showToast('请先停止当前录音，再新建记录。');
     return;
@@ -3020,7 +3096,18 @@ function newMeetingRecord() {
   resetAll();
   const title = recordTitleFallback();
   setRecordTitle(title);
-  showToast('已新建空白会议记录');
+  // P0: create a backend draft immediately so the record survives browser crashes
+  try {
+    const data = await apiFetch('/api/records', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'draft', title, source_type: 'manual' }),
+    });
+    currentRecordId = data.record.id;
+    showToast('已新建空白会议记录');
+  } catch (err) {
+    console.warn('[Record] Draft creation failed, will save on demand:', err);
+    showToast('已新建空白会议记录（离线）');
+  }
 }
 
 async function saveCurrentRecord() {
@@ -3032,24 +3119,42 @@ async function saveCurrentRecord() {
   const title = $('recordTitleInput')?.value.trim()
     || meetingTitleDisplay?.textContent?.trim()
     || recordTitleFallback();
-  const payload = buildRecordPayload({
-    recordId: currentRecordId,
-    meetingId: currentMeetingId,
-    title,
-    ...currentRecordSource,
-    segments,
-    speakers: currentRecordSpeakers,
-  });
   const button = $('btnSaveRecord');
   if (button) button.disabled = true;
   try {
-    const data = await apiFetch(
-      currentRecordId ? `/api/records/${encodeURIComponent(currentRecordId)}` : '/api/records',
-      { method: currentRecordId ? 'PUT' : 'POST', body: JSON.stringify(payload) },
-    );
-    currentRecordId = data.record.id;
-    setRecordTitle(data.record.title);
-    showToast(`记录已保存：${data.record.segments_count} 个分段`);
+    if (currentRecordId) {
+      // P0: incremental path — update metadata then finalize
+      await apiFetch(`/api/records/${encodeURIComponent(currentRecordId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title,
+          source_type: currentRecordSource.sourceType,
+          source_filename: currentRecordSource.sourceFilename,
+          source_mime_type: currentRecordSource.sourceMimeType,
+          source_size_bytes: currentRecordSource.sourceSizeBytes,
+          speakers: currentRecordSpeakers,
+        }),
+      });
+      const data = await apiFetch(`/api/records/${encodeURIComponent(currentRecordId)}/finalize`, {
+        method: 'POST',
+      });
+      setRecordTitle(data.record.title);
+      showToast(`记录已保存：${data.record.segments_count} 个分段`);
+    } else {
+      // Fallback: full save (backward compatible)
+      const payload = buildRecordPayload({
+        recordId: null,
+        meetingId: currentMeetingId,
+        title,
+        ...currentRecordSource,
+        segments,
+        speakers: currentRecordSpeakers,
+      });
+      const data = await apiFetch('/api/records', { method: 'POST', body: JSON.stringify(payload) });
+      currentRecordId = data.record.id;
+      setRecordTitle(data.record.title);
+      showToast(`记录已保存：${data.record.segments_count} 个分段`);
+    }
     if (recordsPanel?.classList.contains('visible')) await loadRecords();
   } catch (error) {
     showToast('记录保存失败：' + error.message);
@@ -3096,26 +3201,109 @@ async function loadRecords(q = '') {
     const data = await apiFetch(`/api/records${query}`);
     if (!data.items?.length) {
       list.innerHTML = '<div class="entity-card">暂无匹配的会议记录</div>';
+      updateSelectionUI();
       return;
     }
-    list.innerHTML = data.items.map(record => `
-      <article class="record-card" data-record-id="${escapeHTML(record.id)}">
-        <div class="record-card-title">${escapeHTML(record.title)}</div>
-        <div class="record-card-meta">${escapeHTML(recordSourceLabel(record.source_type))} · ${record.segments_count || 0} 段 · ${Number(record.duration_sec || 0).toFixed(1)} 秒</div>
-        <div class="record-card-preview">${escapeHTML(record.full_text_preview || '暂无转写文本')}</div>
-        <div class="record-card-actions">
-          <button class="btn btn-secondary record-view" type="button">查看</button>
-          <button class="btn btn-danger record-delete" type="button">删除</button>
+    list.innerHTML = data.items.map(record => {
+      const isCompleted = record.status === 'completed';
+      const disabledAttr = isCompleted ? '' : ' disabled';
+      const grayClass = isCompleted ? '' : ' style="opacity:0.5;"';
+      const statusBadge = record.status === 'completed' ? '' :
+        ` <small style="color:var(--accent-yellow);">[${escapeHTML(record.status || 'draft')}]</small>`;
+      return `
+      <article class="record-card" data-record-id="${escapeHTML(record.id)}"${grayClass}>
+        <input type="checkbox" class="record-select" data-record-id="${escapeHTML(record.id)}"${disabledAttr} style="margin-right:6px;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+          <div class="record-card-title">${escapeHTML(record.title)}${statusBadge}</div>
+          <div class="record-card-meta">${escapeHTML(recordSourceLabel(record.source_type))} · ${record.segments_count || 0} 段 · ${Number(record.duration_sec || 0).toFixed(1)} 秒</div>
+          <div class="record-card-preview">${escapeHTML(record.full_text_preview || '暂无转写文本')}</div>
+          <div class="record-card-actions">
+            <button class="btn btn-secondary record-view" type="button">查看</button>
+            <button class="btn btn-danger record-delete" type="button">删除</button>
+          </div>
         </div>
-      </article>`).join('');
+      </article>`;
+    }).join('');
+    // Wire card clicks and checkbox events
     list.querySelectorAll('.record-card').forEach(card => {
+      const cb = card.querySelector('.record-select');
+      const rid = card.dataset.recordId;
       card.addEventListener('click', event => {
         if (event.target.closest('.record-delete')) return deleteMeetingRecord(card.dataset.recordId);
-        viewMeetingRecord(card.dataset.recordId);
+        if (event.target === cb || event.target.closest('.record-select')) return;  // checkbox handles itself
+        viewMeetingRecord(rid);
       });
+      if (cb) {
+        cb.addEventListener('change', () => {
+          if (cb.checked) selectedRecordIds.add(rid);
+          else selectedRecordIds.delete(rid);
+          updateSelectionUI();
+        });
+      }
     });
+    updateSelectionUI();
   } catch (error) {
     list.innerHTML = `<div class="entity-card">记录读取失败：${escapeHTML(error.message)}</div>`;
+  }
+}
+
+// ── Multi-select helpers (S1) ──────────────────────────────────
+
+function updateSelectionUI() {
+  const count = selectedRecordIds.size;
+  const btnSelectAll = $('btnSelectAllRecords');
+  const btnClear = $('btnClearSelectRecords');
+  const countLabel = $('selectCountLabel');
+  const btnSummary = $('btnGenerateSummary');
+
+  if (btnSelectAll) btnSelectAll.style.display = 'inline-block';
+  if (btnClear) btnClear.style.display = count > 0 ? 'inline-block' : 'none';
+  if (countLabel) {
+    countLabel.style.display = count > 0 ? 'inline' : 'none';
+    countLabel.textContent = `已选择 ${count} 条`;
+  }
+  if (btnSummary) {
+    btnSummary.style.display = 'inline-block';
+    if (count === 0) {
+      btnSummary.disabled = true;
+      btnSummary.textContent = '生成摘要';
+    } else if (count === 1) {
+      btnSummary.disabled = false;
+      btnSummary.textContent = '生成会议摘要';
+    } else {
+      btnSummary.disabled = false;
+      btnSummary.textContent = `生成综合摘要 (${count})`;
+    }
+  }
+}
+
+function selectAllCompleted() {
+  const list = $('recordsList');
+  if (!list) return;
+  selectedRecordIds.clear();
+  list.querySelectorAll('.record-select:not([disabled])').forEach(cb => {
+    cb.checked = true;
+    selectedRecordIds.add(cb.dataset.recordId);
+  });
+  updateSelectionUI();
+}
+
+function clearRecordSelection() {
+  selectedRecordIds.clear();
+  const list = $('recordsList');
+  if (list) list.querySelectorAll('.record-select').forEach(cb => { cb.checked = false; });
+  updateSelectionUI();
+}
+
+function getSelectedRecordIds() {
+  return Array.from(selectedRecordIds);
+}
+
+function openSummaryDialog() {
+  const ids = getSelectedRecordIds();
+  if (!ids.length) return;
+  if (window.DiTingRecordSummary) {
+    window.DiTingRecordSummary.open(ids);
   }
 }
 
@@ -3158,6 +3346,7 @@ async function deleteMeetingRecord(recordId) {
   try {
     await apiFetch(`/api/records/${encodeURIComponent(recordId)}`, { method: 'DELETE' });
     if (currentRecordId === recordId) currentRecordId = null;
+    selectedRecordIds.delete(recordId);
     await loadRecords($('recordSearchInput')?.value || '');
     showToast('记录已删除');
   } catch (error) {
@@ -3866,6 +4055,24 @@ async function handleFileUpload(event) {
   if (meetingTitleDisplay) meetingTitleDisplay.textContent = file.name;
   if ($('recordTitleInput')) $('recordTitleInput').value = file.name;
 
+  // P0: create a database draft before processing so the record is durable
+  try {
+    const draftResp = await apiFetch('/api/records', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'draft',
+        title: file.name,
+        source_type: 'upload',
+        source_filename: file.name,
+        source_mime_type: file.type || 'audio/*',
+        source_size_bytes: file.size || 0,
+      }),
+    });
+    currentRecordId = draftResp.record.id;
+  } catch (e) {
+    console.warn('[Upload] Draft creation failed, will save later:', e);
+  }
+
   // Show uploading state
   if (transcriptBody) transcriptBody.innerHTML = '';
   if (emptyState) {
@@ -4055,6 +4262,8 @@ function handleUploadWSMessage(msg) {
         rerenderTranscript();
       }
       finishUploadUI('complete');
+      // P0: auto-save upload results to backend
+      autoSaveUploadResults();
       break;
 
     case 'error':
@@ -4075,6 +4284,26 @@ function handleUploadWSMessage(msg) {
         finishUploadUI('timeout');
       }
       break;
+  }
+}
+
+async function autoSaveUploadResults() {
+  const segments = allSegments.filter(Boolean);
+  if (!currentRecordId || !segments.length) return;
+  try {
+    for (const seg of segments) {
+      await apiFetch(`/api/records/${encodeURIComponent(currentRecordId)}/segments`, {
+        method: 'POST',
+        body: JSON.stringify(seg),
+      });
+    }
+    await apiFetch(`/api/records/${encodeURIComponent(currentRecordId)}/finalize`, {
+      method: 'POST',
+    });
+    showToast('已自动保存');
+  } catch (err) {
+    console.warn('[AutoSave] Upload results save failed:', err);
+    showToast('自动保存失败，请手动点击保存');
   }
 }
 
@@ -4776,6 +5005,23 @@ async function toggleMic() {
       };
       currentRecordSpeakers = [];
       setRecordTitle(recordTitleFallback());
+      // P0: create a database draft before recording so the session is durable
+      try {
+        const draftResp = await apiFetch('/api/records', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'draft',
+            title: recordTitleFallback(),
+            source_type: 'microphone',
+            source_filename: `${micStreamId}.wav`,
+            source_mime_type: 'audio/wav',
+          }),
+        });
+        currentRecordId = draftResp.record.id;
+        setRecordTitle(draftResp.record.title);
+      } catch (e) {
+        console.warn('[Mic] Draft creation failed, will save later:', e);
+      }
     }
     micSegmentStartIndex = allSegments.length;
     micStream = await navigator.mediaDevices.getUserMedia(
@@ -4951,7 +5197,7 @@ function updateMicResult(data) {
   transcriptBody.scrollTop = transcriptBody.scrollHeight;
 }
 
-function replaceMicTranscript(data) {
+async function replaceMicTranscript(data) {
   const segments = Array.isArray(data?.segments) ? data.segments : [];
   if (!segments.length) return;
   currentMeetingId = data.stream_id || currentMeetingId;
@@ -4962,6 +5208,25 @@ function replaceMicTranscript(data) {
   rerenderTranscript();
   updateStats(allSegments.length);
   showToast(`最终转写已完成，共 ${segments.length} 个分段`);
+
+  // P0: auto-save final segments to backend
+  if (currentRecordId) {
+    try {
+      for (const seg of segments) {
+        await apiFetch(`/api/records/${encodeURIComponent(currentRecordId)}/segments`, {
+          method: 'POST',
+          body: JSON.stringify(seg),
+        });
+      }
+      await apiFetch(`/api/records/${encodeURIComponent(currentRecordId)}/finalize`, {
+        method: 'POST',
+      });
+      showToast('已自动保存');
+    } catch (err) {
+      console.warn('[AutoSave] Mic transcript save failed:', err);
+      showToast('自动保存失败，请手动点击保存');
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5223,11 +5488,22 @@ function initApp() {
   if (btnSaveRecord) btnSaveRecord.addEventListener('click', saveCurrentRecord);
   if (btnRecords) btnRecords.addEventListener('click', openRecordsPanel);
   if ($('btnCloseRecords')) $('btnCloseRecords').addEventListener('click', closeRecordsPanel);
-  if ($('btnRefreshRecords')) $('btnRefreshRecords').addEventListener('click', () => loadRecords());
-  if ($('btnSearchRecords')) $('btnSearchRecords').addEventListener('click', () => loadRecords($('recordSearchInput')?.value || ''));
+  if ($('btnRefreshRecords')) $('btnRefreshRecords').addEventListener('click', () => { clearRecordSelection(); loadRecords(); });
+  if ($('btnSearchRecords')) $('btnSearchRecords').addEventListener('click', () => { clearRecordSelection(); loadRecords($('recordSearchInput')?.value || ''); });
   if ($('recordSearchInput')) $('recordSearchInput').addEventListener('keydown', event => {
-    if (event.key === 'Enter') loadRecords(event.target.value || '');
+    if (event.key === 'Enter') { clearRecordSelection(); loadRecords(event.target.value || ''); }
   });
+  // S1: multi-select buttons
+  if ($('btnSelectAllRecords')) $('btnSelectAllRecords').addEventListener('click', selectAllCompleted);
+  if ($('btnClearSelectRecords')) $('btnClearSelectRecords').addEventListener('click', clearRecordSelection);
+  if ($('btnGenerateSummary')) $('btnGenerateSummary').addEventListener('click', openSummaryDialog);
+  // S6: summary dialog buttons
+  if ($('btnCloseSummaryDialog')) $('btnCloseSummaryDialog').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.close(); });
+  if ($('btnSubmitSummary')) $('btnSubmitSummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.submit(); });
+  if ($('btnCopySummary')) $('btnCopySummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.copyMarkdown(); });
+  if ($('btnDownloadSummary')) $('btnDownloadSummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.downloadMarkdown(); });
+  if ($('btnRetrySummary')) $('btnRetrySummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.retry(); });
+  if ($('btnBackToConfig')) $('btnBackToConfig').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.backToConfig(); });
   if ($('recordTitleInput')) $('recordTitleInput').addEventListener('input', event => {
     if (meetingTitleDisplay) meetingTitleDisplay.textContent = event.target.value || '未命名会议记录';
   });

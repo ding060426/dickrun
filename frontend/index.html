@@ -4738,7 +4738,7 @@ async function toggleMic() {
 
   if (isRecording) {
     stopMicRecording();
-    if (btnMic) { btnMic.textContent = '录音'; btnMic.classList.remove('active'); }
+    if (btnMic) { btnMic.textContent = t('controls.mic'); btnMic.classList.remove('active'); }
     return;
   }
 
@@ -4746,6 +4746,21 @@ async function toggleMic() {
     if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
       throw new Error('当前浏览器不支持 AudioWorklet 麦克风采集');
     }
+    // Abort any lingering WebSocket / AudioContext from a previous recording
+    // that hasn't received its 'stopped' reply yet (e.g. user clicked stop then
+    // immediately clicked record again).
+    if (micWs && micWs.readyState === WebSocket.OPEN) {
+      micWs.close(1000, 'superseded');
+    }
+    micWs = null;
+    if (micAudioContext && micAudioContext.state !== 'closed') {
+      micAudioContext.close();
+    }
+    micAudioContext = null;
+    micWorklet = null;
+    clearTimeout(micStopTimer);
+    micStopTimer = null;
+
     const runtimeSettings = await ensureAppSettingsLoaded();
     const microphoneSettings = runtimeSettings?.microphone || {};
     micSequence = 0;
@@ -4796,24 +4811,30 @@ async function toggleMic() {
         setMicOrbMessage(msg.data.is_final ? '已识别一句' : '正在转写', '请继续说话');
         updateMicResult(msg.data);
       } else if (msg.type === 'finalizing') {
-        setMicOrbMessage('正在完成转写', '正在生成最终文本与说话人结果');
+        // Orb is already hidden by stopMicRecording; just update the status bar
         if (micStatusEl) {
-          micStatusEl.textContent = '正在生成最终转写与说话人分离...';
+          micStatusEl.textContent = t('mic.status_finalizing');
           micStatusEl.style.color = 'var(--accent-yellow)';
         }
       } else if (msg.type === 'final_transcript') {
         replaceMicTranscript(msg.data);
+        if (micStatusEl && !isRecording) {
+          micStatusEl.textContent = t('mic.status_complete');
+          micStatusEl.style.color = 'var(--accent-green)';
+        }
       } else if (msg.type === 'stopped') {
         const seconds = ((msg.data.received_samples || 0) / 16000).toFixed(1);
-        setMicOrbMessage('转写完成', `已接收 ${seconds} 秒音频`);
         if (micStatusEl) {
-          micStatusEl.textContent = `已完成 ${seconds}s`;
+          micStatusEl.textContent = `${t('mic.status_complete')} · ${seconds}s`;
           micStatusEl.style.color = 'var(--accent-green)';
         }
         cleanupMicRecording();
       } else if (msg.type === 'error') {
-        setMicOrbMessage('实时转写失败', msg.message || '请重试');
-        showToast(msg.message || '实时转写失败');
+        showToast(msg.message || t('mic.status_live_error'));
+        if (micStatusEl) {
+          micStatusEl.textContent = t('mic.status_live_error');
+          micStatusEl.style.color = 'var(--accent-red)';
+        }
       }
     };
     micWs.onerror = (event) => {
@@ -4846,7 +4867,7 @@ async function toggleMic() {
     source.connect(micWorklet).connect(silent).connect(micAudioContext.destination);
     isRecording = true;
     setMicVisualizerState('recording');
-    if (btnMic) { btnMic.textContent = '停止'; btnMic.classList.add('active'); }
+    if (btnMic) { btnMic.textContent = t('controls.stop'); btnMic.classList.add('active'); }
     if (micStatusEl) {
       micStatusEl.textContent = `${micAudioContext.sampleRate}Hz → 16kHz`;
       micStatusEl.style.color = 'var(--accent-red)';
@@ -4862,19 +4883,24 @@ async function toggleMic() {
 
 function stopMicRecording() {
   isRecording = false;
-  setMicVisualizerState('finalizing');
+  // Immediately hide the volume orb — backend finalization runs in background
+  setMicVisualizerState('idle');
+  // Stop microphone tracks right away so the browser mic indicator turns off
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   micWorklet?.port.postMessage({ type: 'capture.stop' });
   if (micStatus) {
-    micStatus.textContent = '正在完成最终转写...';
+    micStatus.textContent = t('mic.status_finalizing');
     micStatus.style.color = 'var(--accent-yellow)';
   }
+  // Brief delay so the worklet can flush its last PCM frames before we tell the
+  // server to finalise; otherwise the server never sees the last samples.
   setTimeout(() => {
     if (micWs?.readyState === WebSocket.OPEN) {
       micWs.send(JSON.stringify({ action: 'stop' }));
     }
-  }, 100);
+  }, 120);
   clearTimeout(micStopTimer);
+  // Safety-net: if the server never replies with 'stopped', clean up after 10 min
   micStopTimer = setTimeout(() => cleanupMicRecording(), 600000);
 }
 

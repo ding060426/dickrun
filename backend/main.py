@@ -28,6 +28,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 import numpy as np
 from fastapi import (
@@ -290,6 +291,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 hotword_config_store = HotwordConfigStore(
@@ -1031,10 +1033,23 @@ async def api_download_summary(
         raise HTTPException(status_code=403, detail="Permission denied")
     markdown = summary.get("markdown_content") or ""
     safe_title = "".join(c if c.isalnum() or c in "._- " else "_" for c in summary.get("title", "summary")).strip()
+    filename = safe_title or "meeting-summary"
+    if not filename.lower().endswith(".md"):
+        filename += ".md"
+    filename_stem = filename[:-3]
+    ascii_stem = "".join(
+        c for c in filename_stem if c.isascii() and (c.isalnum() or c in "._- ")
+    ).strip(" .")
+    ascii_name = f"{ascii_stem or 'meeting-summary'}.md"
+    encoded_name = quote(filename, safe="")
     return PlainTextResponse(
         markdown,
         media_type="text/markdown; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title or "meeting-summary"}.md"'},
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
+            )
+        },
     )
 
 

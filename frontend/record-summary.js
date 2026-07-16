@@ -42,6 +42,20 @@
     return `${proto}://${host}:${port}`;
   }
 
+  function parseDownloadFilename(disposition) {
+    const value = String(disposition || '');
+    const utf8Match = value.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+    if (utf8Match) {
+      try {
+        return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ''));
+      } catch (_) { /* fall through to the ASCII filename */ }
+    }
+    const quotedMatch = value.match(/filename\s*=\s*"([^"]+)"/i);
+    if (quotedMatch) return quotedMatch[1];
+    const plainMatch = value.match(/filename\s*=\s*([^;]+)/i);
+    return plainMatch ? plainMatch[1].trim() : 'meeting-summary.md';
+  }
+
   // ── Open dialog ──────────────────────────────────────────────
 
   function open(recordIds) {
@@ -214,10 +228,11 @@
       const anchor = document.createElement('a');
       anchor.href = url;
       const disposition = resp.headers.get('Content-Disposition') || '';
-      const match = disposition.match(/filename="?(.+?)"?$/);
-      anchor.download = match ? match[1] : 'meeting-summary.md';
+      anchor.download = parseDownloadFilename(disposition);
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       alert('下载失败：' + (err.message || '未知错误'));
     }
@@ -259,6 +274,7 @@
     submit,
     retry,
     downloadMarkdown,
+    parseDownloadFilename,
     copyMarkdown,
     backToConfig,
     getSummaryId: () => currentSummaryId,

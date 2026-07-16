@@ -1,0 +1,40 @@
+# Local secrets/config
+.env
+.env.*
+!.env.example
+
+# Python/generated caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+
+# Runtime logs and local storage
+backend/logs/
+*.log
+backend/storage/*.db
+backend/storage/*.sqlite
+backend/storage/*.sqlite3
+
+# User media / uploads / temp artifacts
+backend/uploads/
+backend/temp/
+backend/tmp/
+*.wav
+*.mp3
+*.mp4
+*.m4a
+*.flac
+
+# Large model binaries: distribute via Git LFS/release/model package instead
+*.onnx
+*.pt
+*.pth
+*.bin
+
+# SQLite sidecar files
+backend/storage/*.db-shm
+backend/storage/*.db-wal
+
+# Temporary frontend checks
+frontend/.tmp_*

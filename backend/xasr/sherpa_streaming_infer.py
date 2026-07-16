@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import re
+import threading
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+import sherpa_onnx
+
+
+_CJK_RANGE = r"\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
+_CJK_PUNCT = re.escape("，。！？；：、（）《》〈〉【】「」『』“”‘’")
+_ASCII_PUNCT_NO_LEADING_SPACE = re.escape(",.!?;:%)]}")
+_BYTE_FALLBACK_RE = re.compile(r"<0x[0-9A-Fa-f]{2}>(?:\s*<0x[0-9A-Fa-f]{2}>)*")
+_SINGLE_BYTE_RE = re.compile(r"<0x([0-9A-Fa-f]{2})>")
+
+
+def _decode_byte_fallback(text: str) -> str:
+    """Decode sentencepiece byte-fallback tokens such as <0xE4><0xBD><0xA0>."""
+    if "<0x" not in text:
+        return text
+
+    def replace(match: re.Match) -> str:
+        values = _SINGLE_BYTE_RE.findall(match.group(0))
+        if not values:
+            return match.group(0)
+        data = bytes(int(v, 16) for v in values)
+        decoded = data.decode("utf-8", errors="ignore")
+        decoded = re.sub(r"[\x00-\x1f\x7f]", "", decoded)
+        return decoded
+
+    return _BYTE_FALLBACK_RE.sub(replace, text)
+
+
+def _normalize_cjk_spacing(text: str) -> str:
+    text = re.sub(rf"(?<=[{_CJK_RANGE}])\s+(?=[{_CJK_RANGE}])", "", text)
+    text = re.sub(rf"(?<=[{_CJK_RANGE}])\s+(?=[{_CJK_PUNCT}])", "", text)
+    text = re.sub(rf"(?<=[{_CJK_PUNCT}])\s+(?=[{_CJK_RANGE}])", "", text)
+    text = re.sub(rf"(?<=[{_CJK_PUNCT}])\s+(?=[{_CJK_PUNCT}])", "", text)
+    text = re.sub(rf"\s+(?=[{_ASCII_PUNCT_NO_LEADING_SPACE}])", "", text)
+    return text
+
+
+def format_text(text: str, mode: str = "none") -> str:
+    text = _decode_byte_fallback(text)
+    if mode == "lower":
+        text = text.lower()
+    elif mode == "capitalize":
+        text = text[:1].upper() + text[1:].lower() if text else text
+    return _normalize_cjk_spacing(text).replace("�", "")
+
+
+@dataclass
+class StreamingStats:
+    start_time: Optional[float] = None
+    first_non_empty_partial_time: Optional[float] = None
+
+    def reset(self):
+        self.start_time = None
+        self.first_non_empty_partial_time = None
+
+
+class SherpaRecognizerRuntime:
+    """Process-level recognizer runtime that can open independent streams."""
+
+    def __init__(
+        self,
+        tokens: str,
+        encoder: str,
+        decoder: str,
+        joiner: str,
+        provider: str = "cuda",
+        sample_rate: int = 16000,
+        feature_dim: int = 80,
+        num_threads: int = 1,
+        decoding_method: str = "greedy_search",
+        model_type: str = "zipformer2",
+        enable_endpoint_detection: bool = False,
+        text_format: str = "none",   # none / lower / capitalize
+        hotwords_file: str = "",
+        hotwords_score: float = 1.5,
+        modeling_unit: str = "cjkchar",
+        bpe_vocab: str = "",
+        max_active_paths: int = 4,
+    ):
+        self.tokens = tokens
+        self.encoder = encoder
+        self.decoder = decoder
+        self.joiner = joiner
+        self.provider = provider
+        self.sample_rate = sample_rate
+        self.feature_dim = feature_dim
+        self.num_threads = num_threads
+        self.decoding_method = decoding_method
+        self.model_type = model_type
+        self.enable_endpoint_detection = enable_endpoint_detection
+        self.text_format = text_format
+        self.hotwords_file = hotwords_file
+        self.hotwords_score = hotwords_score
+        self.modeling_unit = modeling_unit
+        self.bpe_vocab = bpe_vocab
+        self.max_active_paths = max_active_paths
+        self.lock = threading.RLock()
+
+        self.recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+            tokens=self.tokens,
+            encoder=self.encoder,
+            decoder=self.decoder,
+            joiner=self.joiner,
+            num_threads=self.num_threads,
+            sample_rate=self.sample_rate,
+            feature_dim=self.feature_dim,
+            decoding_method=self.decoding_method,
+            provider=self.provider,
+            model_type=self.model_type,
+            enable_endpoint_detection=self.enable_endpoint_detection,
+            hotwords_file=self.hotwords_file,
+            hotwords_score=self.hotwords_score,
+            modeling_unit=self.modeling_unit,
+            bpe_vocab=self.bpe_vocab,
+            max_active_paths=self.max_active_paths,
+        )
+
+    def create_session(self) -> "SherpaStreamingASR":
+        return SherpaStreamingASR(runtime=self)
+
+
+class SherpaStreamingASR:
+    """One mutable recognition stream backed by a shared recognizer runtime."""
+
+    def __init__(self, *, runtime: SherpaRecognizerRuntime):
+        self.runtime = runtime
+        self.recognizer = runtime.recognizer
+        self.sample_rate = runtime.sample_rate
+        self.text_format = runtime.text_format
+
+        self.stats = StreamingStats()
+        self.reset()
+
+    def reset(self):
+        with self.runtime.lock:
+            self.stream = self.recognizer.create_stream()
+        self.last_result = ""
+        self.partial_result = ""
+        self.final_result = ""
+        self.finished = False
+        self.stats.reset()
+
+    def _ensure_started(self):
+        if self.stats.start_time is None:
+            self.stats.start_time = time.perf_counter()
+
+    def _format(self, text: str) -> str:
+        return format_text(text, self.text_format)
+
+    def accept_waveform(self, samples: np.ndarray, sample_rate: Optional[int] = None):
+        if sample_rate is None:
+            sample_rate = self.sample_rate
+
+        self._ensure_started()
+
+        if not isinstance(samples, np.ndarray):
+            samples = np.asarray(samples)
+
+        samples = samples.astype(np.float32).reshape(-1)
+        with self.runtime.lock:
+            self.stream.accept_waveform(sample_rate, samples)
+
+    def decode(self) -> int:
+        """
+        Decode as much as possible for the current stream.
+        Returns:
+            number of decode steps performed
+        """
+        num_decodes = 0
+
+        with self.runtime.lock:
+            while self.recognizer.is_ready(self.stream):
+                self.recognizer.decode_stream(self.stream)
+                result = self.recognizer.get_result(self.stream)
+                result = self._format(result)
+
+                if result != self.last_result:
+                    self.partial_result = result
+                    self.last_result = result
+
+                    if result and self.stats.first_non_empty_partial_time is None:
+                        self.stats.first_non_empty_partial_time = (
+                            time.perf_counter() - self.stats.start_time
+                        )
+
+                num_decodes += 1
+
+        return num_decodes
+
+    def get_partial_result(self) -> str:
+        return self.partial_result
+
+    def input_finished(self):
+        self.finished = True
+        with self.runtime.lock:
+            self.stream.input_finished()
+
+    def get_final_result(self) -> str:
+        if not self.finished:
+            self.input_finished()
+
+        with self.runtime.lock:
+            while self.recognizer.is_ready(self.stream):
+                self.recognizer.decode_stream(self.stream)
+
+            result = self.recognizer.get_result(self.stream)
+        result = self._format(result)
+        self.final_result = result
+        self.partial_result = result
+        self.last_result = result
+        return self.final_result
+
+    def get_first_partial_latency(self) -> Optional[float]:
+        return self.stats.first_non_empty_partial_time
+
+    def is_endpoint(self) -> bool:
+        if hasattr(self.recognizer, "is_endpoint"):
+            with self.runtime.lock:
+                return self.recognizer.is_endpoint(self.stream)
+        return False

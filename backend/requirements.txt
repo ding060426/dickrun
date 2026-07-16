@@ -1,0 +1,33 @@
+# 谛听 DiTing - 后端依赖
+# 核心 Web 框架
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+
+# 音频处理
+numpy>=1.24.0
+scipy>=1.11.0
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# X-ASR 推理引擎 (sherpa-onnx)
+# pip install sherpa-onnx
+sherpa-onnx>=1.12.0
+
+# 中文 NLP 工具
+jieba>=0.42.1              # 中文分词（热词提取、文本分析）
+pypinyin>=0.51.0           # 拼音转换（热词模糊匹配）
+cn2an>=0.5.22              # 中文数字转阿拉伯数字（百分比/金额规范化）
+
+# LLM API 客户端
+httpx>=0.27.0              # 异步 HTTP 客户端（LLM API 调用）
+
+# Eureka runtime/live/upload dependencies
+sherpa-onnx
+pypinyin
+soundfile
+pydub
+librosa
+pytest

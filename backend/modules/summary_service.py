@@ -7,15 +7,18 @@ Flow:
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 
 from . import record_store
 from . import summary_store
-from .llm_client import get_llm_client, LLMNotConfiguredError, LLMResponseError
+from .llm_client import LLMClient, get_llm_client, LLMNotConfiguredError, LLMResponseError
+from .llm_models import model_capabilities
 from . import summary_schema
 from . import summary_prompts
 from . import markdown_renderer
+from . import diagram_renderer
 
 logger = logging.getLogger("summary_service")
 
@@ -25,6 +28,15 @@ MAX_TOTAL_CHARS = int(__import__("os").environ.get("DITING_SUMMARY_MAX_TOTAL_CHA
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _public_settings_snapshot(settings: dict) -> dict:
+    """Remove credentials before persisting the per-summary configuration."""
+
+    snapshot = {key: value for key, value in settings.items() if key != "api_key"}
+    snapshot["has_api_key"] = bool(settings.get("api_key"))
+    snapshot["capabilities"] = model_capabilities(str(settings.get("model_name", "")))
+    return snapshot
 
 
 # ── Chunk helpers ────────────────────────────────────────────────
@@ -67,9 +79,15 @@ def _segments_to_text(segments: list[dict], *, include_speaker: bool = True, lan
 
 # ── Single-meeting summary ───────────────────────────────────────
 
-async def _summarize_single(summary_id: str, record_ids: list[str], options: dict, language: str) -> str:
+async def _summarize_single(
+    summary_id: str,
+    record_ids: list[str],
+    options: dict,
+    language: str,
+    client: LLMClient | None = None,
+) -> str:
     """Generate a single-meeting summary. Returns markdown."""
-    client = get_llm_client()
+    client = client or get_llm_client()
     if not client.is_configured:
         raise LLMNotConfiguredError("LLM not configured — set DITING_LLM_* environment variables")
 
@@ -161,9 +179,15 @@ def _text_to_segments(full_text: str) -> list[dict]:
 
 # ── Multi-meeting synthesis ──────────────────────────────────────
 
-async def _summarize_multi(summary_id: str, record_ids: list[str], options: dict, language: str) -> str:
+async def _summarize_multi(
+    summary_id: str,
+    record_ids: list[str],
+    options: dict,
+    language: str,
+    client: LLMClient | None = None,
+) -> str:
     """Generate a comprehensive multi-meeting summary. Returns markdown."""
-    client = get_llm_client()
+    client = client or get_llm_client()
     if not client.is_configured:
         raise LLMNotConfiguredError("LLM not configured — set DITING_LLM_* environment variables")
 
@@ -272,13 +296,60 @@ async def generate_summary(summary_id: str) -> None:
     options = config.get("options", {})
     title = config.get("title", "")
 
+    # G3/G4: Load effective LLM settings (user-saved > env vars)
+    created_by = config.get("created_by", "")
+    effective_settings = {}
+    client: LLMClient | None = None
+    diagram_enabled = True
+    diagram_type = "auto"
+    try:
+        from . import llm_settings_store
+        effective_settings = llm_settings_store.get_effective_settings(created_by, options.get("llm_override"))
+        diagram_enabled = effective_settings.get("diagram_enabled", True)
+        diagram_type = effective_settings.get("diagram_type", "auto")
+    except Exception as e:
+        logger.warning("Could not load LLM settings: %s", e)
+
     try:
         summary_store.update_summary(summary_id, {"status": "processing", "stage": "starting", "progress": 0})
+        client = LLMClient.from_settings(effective_settings)
+        if not client.is_configured:
+            raise LLMNotConfiguredError("LLM base URL and model are not configured")
 
         if len(record_ids) == 1:
-            markdown = await _summarize_single(summary_id, record_ids, options, language)
+            markdown = await _summarize_single(summary_id, record_ids, options, language, client)
         else:
-            markdown = await _summarize_multi(summary_id, record_ids, options, language)
+            markdown = await _summarize_multi(summary_id, record_ids, options, language, client)
+
+        # G4: extract diagram from result_json and render Mermaid
+        diag_json = "{}"
+        diag_mermaid = ""
+        diag_markdown = ""
+        if diagram_enabled:
+            try:
+                summary = summary_store.get_summary(summary_id)
+                result = summary.get("result", {}) if summary else {}
+                diagram_data = result.get("diagram") if isinstance(result, dict) else None
+                if diagram_data:
+                    if diagram_type != "auto":
+                        diagram_data = dict(diagram_data, type=diagram_type)
+                    diag_json = _json.dumps(diagram_data, ensure_ascii=False)
+                    diag_mermaid = diagram_renderer.render_mermaid(diagram_data)
+                    diag_markdown = diagram_renderer.render_markdown_tree(diagram_data)
+            except Exception as e:
+                logger.warning("Diagram render failed for %s: %s", summary_id, e)
+
+        if diag_mermaid:
+            markdown = (
+                markdown.rstrip()
+                + "\n\n## 文字结构图\n\n"
+                + "```mermaid\n"
+                + diag_mermaid
+                + "\n```\n\n"
+                + "### Markdown 备用结构\n\n"
+                + diag_markdown.rstrip()
+                + "\n"
+            )
 
         summary_store.update_summary(summary_id, {
             "status": "completed",
@@ -286,8 +357,19 @@ async def generate_summary(summary_id: str) -> None:
             "progress": 1.0,
             "markdown_content": markdown,
             "completed_at": _now_iso(),
-            "provider": get_llm_client().base_url if get_llm_client().is_configured else "",
-            "model_name": get_llm_client().model if get_llm_client().is_configured else "",
+            "provider": effective_settings.get("provider", ""),
+            "model_name": effective_settings.get("model_name", ""),
+            "diagram_json": diag_json,
+            "diagram_mermaid": diag_mermaid,
+            "diagram_markdown": diag_markdown,
+            "diagram_type": diagram_type,
+            "llm_settings_snapshot_json": _json.dumps(
+                _public_settings_snapshot(effective_settings),
+                ensure_ascii=False,
+                default=str,
+            ),
+            "output_style": "formal" if effective_settings.get("formal_style", True) else "standard",
+            "formula_mode": effective_settings.get("formula_mode", "latex"),
         })
         logger.info("Summary %s completed (%d records, %d chars)", summary_id, len(record_ids), len(markdown))
 
@@ -295,7 +377,7 @@ async def generate_summary(summary_id: str) -> None:
         summary_store.update_summary(summary_id, {
             "status": "failed",
             "stage": "error",
-            "error_message": "LLM not configured. Set DITING_LLM_BASE_URL, DITING_LLM_API_KEY, DITING_LLM_MODEL env vars.",
+            "error_message": "LLM not configured. Save Base URL, API Key and model in 大模型设置, or set DITING_LLM_* env vars.",
         })
         logger.warning("Summary %s failed: LLM not configured", summary_id)
 
@@ -314,3 +396,6 @@ async def generate_summary(summary_id: str) -> None:
             "error_message": f"{type(exc).__name__}: {exc}"[:1000],
         })
         logger.exception("Summary %s unexpected error", summary_id)
+    finally:
+        if client is not None:
+            await client.close()

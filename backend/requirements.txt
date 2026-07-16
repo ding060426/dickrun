@@ -5,6 +5,7 @@ uvicorn>=0.24.0
 websockets>=12.0
 python-multipart>=0.0.6
 pydantic>=2.5.0
+httpx>=0.27.0
 
 # 音频处理
 numpy>=1.24.0
@@ -18,6 +19,9 @@ sherpa-onnx>=1.12.0
 
 # 热词同音/模糊拼音归一化
 pypinyin>=0.55.0
+
+# 本地加密保存大模型 API Key
+cryptography>=42.0.0
 
 # 可选会议管理云存储（未配置时自动使用本地 SQLite）
 supabase>=2.0.0

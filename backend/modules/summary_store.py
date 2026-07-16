@@ -22,7 +22,7 @@ MAX_RECORDS_PER_SUMMARY = 20
 
 
 def _summary_to_dict(row: Any) -> dict:
-    return {
+    result = {
         "id": row["id"],
         "title": row["title"],
         "summary_type": row["summary_type"],
@@ -42,6 +42,24 @@ def _summary_to_dict(row: Any) -> dict:
         "updated_at": row["updated_at"],
         "completed_at": row["completed_at"],
     }
+    optional_columns = {
+        "diagram": ("diagram_json", {}),
+        "diagram_mermaid": ("diagram_mermaid", ""),
+        "diagram_markdown": ("diagram_markdown", ""),
+        "llm_settings_snapshot": ("llm_settings_snapshot_json", {}),
+        "output_style": ("output_style", "formal"),
+        "formula_mode": ("formula_mode", "latex"),
+        "diagram_type": ("diagram_type", "auto"),
+    }
+    row_keys = set(row.keys())
+    for public_key, (column, fallback) in optional_columns.items():
+        if column not in row_keys:
+            result[public_key] = fallback
+        elif column.endswith("_json"):
+            result[public_key] = _json_load(row[column], fallback)
+        else:
+            result[public_key] = row[column]
+    return result
 
 
 def create_summary(
@@ -111,9 +129,20 @@ def get_summary(summary_id: str) -> dict | None:
             "SELECT record_id, sort_order, record_title_snapshot, record_updated_at_snapshot FROM record_summary_items WHERE summary_id = ? ORDER BY sort_order",
             (summary_id,),
         ).fetchall()
+        # G1c: detect stale records (snapshot != current updated_at) — must be inside the txn
+        stale = []
+        for item in items:
+            if item["record_updated_at_snapshot"]:
+                cur = conn.execute(
+                    "SELECT updated_at FROM meeting_records WHERE id = ?",
+                    (item["record_id"],),
+                ).fetchone()
+                if cur and cur["updated_at"] != item["record_updated_at_snapshot"]:
+                    stale.append(item["record_id"])
     result = _summary_to_dict(row)
     result["record_ids"] = [item["record_id"] for item in items]
     result["record_count"] = len(items)
+    result["stale_records"] = stale if stale else []
     return result
 
 
@@ -162,6 +191,9 @@ def update_summary(summary_id: str, patch: dict) -> dict | None:
         "status", "stage", "progress", "options_json", "result_json",
         "markdown_content", "provider", "model_name", "prompt_version",
         "error_message", "completed_at", "title",
+        "diagram_json", "diagram_mermaid", "diagram_markdown",
+        "llm_settings_snapshot_json", "output_style", "formula_mode",
+        "diagram_type",
     }
     updates = {}
     for k in allowed:

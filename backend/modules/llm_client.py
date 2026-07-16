@@ -9,6 +9,8 @@ import os
 import re
 from typing import Any
 
+from .llm_models import provider_defaults
+
 logger = logging.getLogger("llm_client")
 
 # ── Configuration (env vars) ────────────────────────────────────
@@ -48,31 +50,50 @@ class LLMClient:
         timeout_sec: int | None = None,
         max_retries: int | None = None,
         max_concurrency: int | None = None,
+        temperature: float | None = None,
+        default_max_tokens: int | None = None,
+        provider: str | None = None,
     ):
+        self.provider = str(provider or LLM_PROVIDER or "openai_compatible").strip().lower()
         self.base_url = (base_url or LLM_BASE_URL).rstrip("/")
         self.api_key = api_key or LLM_API_KEY
         self.model = model or LLM_MODEL
         self.timeout_sec = timeout_sec or LLM_TIMEOUT_SEC
         self.max_retries = max_retries or LLM_MAX_RETRIES
         self.max_concurrency = max_concurrency or LLM_MAX_CONCURRENCY
+        self.temperature = 0.2 if temperature is None else float(temperature)
+        self.default_max_tokens = int(default_max_tokens or 8192)
         self._semaphore = asyncio.Semaphore(self.max_concurrency)
         self._client: Any = None
 
+    @classmethod
+    def from_settings(cls, settings: dict) -> "LLMClient":
+        return cls(
+            base_url=settings.get("base_url"),
+            api_key=settings.get("api_key"),
+            model=settings.get("model_name"),
+            timeout_sec=settings.get("timeout_sec"),
+            temperature=settings.get("temperature"),
+            default_max_tokens=settings.get("max_tokens"),
+            provider=settings.get("provider"),
+        )
+
     @property
     def is_configured(self) -> bool:
-        return bool(self.base_url and self.api_key and self.model)
+        requires_key = provider_defaults(self.provider)["requires_api_key"]
+        return bool(self.base_url and self.model and (self.api_key or not requires_key))
 
     def _get_client(self) -> Any:
         if self._client is None:
             try:
                 import httpx
+                headers = {"Content-Type": "application/json"}
+                if self.api_key:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
                 self._client = httpx.AsyncClient(
                     base_url=self.base_url,
                     timeout=httpx.Timeout(self.timeout_sec),
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
+                    headers=headers,
                 )
             except ImportError:
                 raise LLMNotConfiguredError("httpx is not installed; run: pip install httpx")
@@ -95,8 +116,8 @@ class LLMClient:
         system_prompt: str = "",
         user_prompt: str = "",
         json_schema: dict | None = None,
-        max_tokens: int = 4096,
-        temperature: float = 0.3,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> dict:
         """Send a chat-completion request and return validated JSON.
 
@@ -113,9 +134,15 @@ class LLMClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": user_prompt})
 
+        request_max_tokens = min(
+            int(max_tokens or self.default_max_tokens),
+            self.default_max_tokens,
+        )
+        request_temperature = self.temperature if temperature is None else float(temperature)
+
         logger.info(
             "LLM request: model=%s endpoint=%s key=%s tokens=%d",
-            self.model, self.base_url, _redact_key(self.api_key), max_tokens,
+            self.model, self.base_url, _redact_key(self.api_key), request_max_tokens,
         )
 
         last_error: Exception | None = None
@@ -128,8 +155,8 @@ class LLMClient:
                         json={
                             "model": self.model,
                             "messages": messages,
-                            "max_tokens": max_tokens,
-                            "temperature": temperature,
+                            "max_tokens": request_max_tokens,
+                            "temperature": request_temperature,
                             "response_format": {"type": "json_object"},
                         },
                     )

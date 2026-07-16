@@ -97,7 +97,24 @@ def render_single_summary(data: dict, meta: dict | None = None) -> str:
     else:
         lines.append("（无行动项）\n")
 
-    lines.extend(["## 六、风险与待确认事项", ""])
+    lines.extend(["## 六、公式与关键技术说明", ""])
+    formulas = data.get("formulas") or []
+    if formulas:
+        for f in formulas:
+            name = f.get("name", "")
+            latex = f.get("latex", "")
+            explanation = f.get("explanation", "")
+            lines.append(f"### {_escape_md(name)}")
+            lines.append("")
+            lines.append(f"$${latex}$$")
+            lines.append("")
+            if explanation:
+                lines.append(f"{explanation}")
+                lines.append("")
+    else:
+        lines.append("（无公式或技术说明）\n")
+
+    lines.extend(["## 七、风险与待确认事项", ""])
     risks = data.get("risks") or []
     if risks:
         for r in risks:
@@ -117,7 +134,7 @@ def render_single_summary(data: dict, meta: dict | None = None) -> str:
             lines.append(f"- {_escape_md(q)}")
         lines.append("")
 
-    lines.extend(["## 七、说话人贡献", ""])
+    lines.extend(["## 八、说话人贡献", ""])
     contribs = data.get("speaker_contributions") or []
     if contribs:
         for c in contribs:
@@ -126,7 +143,7 @@ def render_single_summary(data: dict, meta: dict | None = None) -> str:
     else:
         lines.append("（无说话人贡献分析）\n")
 
-    lines.extend(["## 八、来源记录", ""])
+    lines.extend(["## 九、来源记录", ""])
     lines.append(f"- 记录 ID：{meta.get('record_id', '—')}")
     if meta.get("record_count", 0) > 1:
         for rid in meta.get("record_ids", []):
@@ -231,7 +248,24 @@ def render_multi_summary(data: dict, meta: dict | None = None) -> str:
     else:
         lines.append("（无未完成行动项）\n")
 
-    lines.extend(["## 八、已解决事项", ""])
+    lines.extend(["## 八、公式与关键技术说明", ""])
+    formulas = data.get("formulas") or []
+    if formulas:
+        for f in formulas:
+            name = f.get("name", "")
+            latex = f.get("latex", "")
+            explanation = f.get("explanation", "")
+            lines.append(f"### {_escape_md(name)}")
+            lines.append("")
+            lines.append(f"$${latex}$$")
+            lines.append("")
+            if explanation:
+                lines.append(f"{explanation}")
+                lines.append("")
+    else:
+        lines.append("（无公式或技术说明）\n")
+
+    lines.extend(["## 九、已解决事项", ""])
     resolved = data.get("resolved_items") or []
     if resolved:
         for r in resolved:
@@ -240,7 +274,7 @@ def render_multi_summary(data: dict, meta: dict | None = None) -> str:
     else:
         lines.append("（无已解决事项记录）\n")
 
-    lines.extend(["## 九、新增风险与待确认问题", ""])
+    lines.extend(["## 十、新增风险与待确认问题", ""])
     new_risks = data.get("new_risks") or []
     if new_risks:
         for r in new_risks:
@@ -253,7 +287,7 @@ def render_multi_summary(data: dict, meta: dict | None = None) -> str:
     else:
         lines.append("（无新增风险）\n")
 
-    lines.extend(["## 十、综合建议", ""])
+    lines.extend(["## 十一、综合建议", ""])
     recommendations = data.get("recommendations") or []
     if recommendations:
         for r in recommendations:
@@ -262,7 +296,7 @@ def render_multi_summary(data: dict, meta: dict | None = None) -> str:
     else:
         lines.append("（无建议）\n")
 
-    lines.extend(["## 十一、来源记录", ""])
+    lines.extend(["## 十二、来源记录", ""])
     for ms in meeting_summaries:
         lines.append(f"- **{_escape_md(ms.get('title', ''))}** ({ms.get('record_id', '')})")
 

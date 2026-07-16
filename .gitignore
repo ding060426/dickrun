@@ -22,6 +22,7 @@ __pycache__/
 backend/logs/
 backend/data/hotwords.json
 backend/data/settings.json
+backend/data/llm_secret.key
 backend/data/diting.db
 backend/data/diting.db-*
 backend/data/records.db

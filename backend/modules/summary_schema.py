@@ -36,6 +36,7 @@ SINGLE_SUMMARY_SCHEMA = {
                     "content": {"type": "string"},
                     "owner": {"type": "string", "default": ""},
                     "rationale": {"type": "string", "default": ""},
+                    "source_record_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "default": []},
                 },
             },
             "maxItems": 20,
@@ -51,6 +52,7 @@ SINGLE_SUMMARY_SCHEMA = {
                     "deadline": {"type": "string", "default": ""},
                     "priority": {"type": "string", "default": "medium"},
                     "status": {"type": "string", "default": "pending"},
+                    "source_record_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "default": []},
                 },
             },
             "maxItems": 20,
@@ -64,6 +66,7 @@ SINGLE_SUMMARY_SCHEMA = {
                     "description": {"type": "string"},
                     "impact": {"type": "string", "default": ""},
                     "mitigation": {"type": "string", "default": ""},
+                    "source_record_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "default": []},
                 },
             },
             "maxItems": 10,
@@ -84,6 +87,40 @@ SINGLE_SUMMARY_SCHEMA = {
                 },
             },
             "maxItems": 15,
+        },
+        "formulas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "latex"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "latex": {"type": "string"},
+                    "explanation": {"type": "string", "default": ""},
+                },
+            },
+            "maxItems": 15,
+        },
+        "diagram": {
+            "type": "object",
+            "properties": {
+                "type": {"type": "string", "default": "mindmap"},
+                "title": {"type": "string", "default": ""},
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "label"],
+                        "properties": {
+                            "id": {"type": "string"},
+                            "label": {"type": "string"},
+                            "parent": {"type": "string"},
+                            "children": {"type": "array", "items": {"type": "string"}, "default": []},
+                        },
+                    },
+                    "maxItems": 50,
+                },
+            },
         },
     },
 }
@@ -198,6 +235,40 @@ MULTI_SUMMARY_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
             "maxItems": 10,
+        },
+        "formulas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "latex"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "latex": {"type": "string"},
+                    "explanation": {"type": "string", "default": ""},
+                },
+            },
+            "maxItems": 15,
+        },
+        "diagram": {
+            "type": "object",
+            "properties": {
+                "type": {"type": "string", "default": "mindmap"},
+                "title": {"type": "string", "default": ""},
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "label"],
+                        "properties": {
+                            "id": {"type": "string"},
+                            "label": {"type": "string"},
+                            "parent": {"type": "string"},
+                            "children": {"type": "array", "items": {"type": "string"}, "default": []},
+                        },
+                    },
+                    "maxItems": 50,
+                },
+            },
         },
     },
 }

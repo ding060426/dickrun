@@ -65,6 +65,9 @@ from build_info import API_REVISION
 from modules.management_store import select_management_store
 from modules import record_store
 from modules import summary_store
+from modules import llm_settings_store
+from modules import llm_models
+from modules.llm_client import LLMClient
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -774,8 +777,8 @@ async def api_download_record_text(
 @app.get("/api/records/{record_id}")
 async def api_get_record(
     record_id: str,
-    include_audio: bool = Query(False),
     authorization: str | None = Header(None),
+    include_audio: bool = Query(False),
 ):
     user = _require_user(authorization)
     record = record_store.get_record(record_id, include_audio=include_audio)
@@ -1061,6 +1064,94 @@ async def _run_summary_generation(summary_id: str) -> None:
             })
         except Exception:
             pass
+
+
+# ── LLM Settings API (G2) ─────────────────────────────────────
+
+@app.get("/api/llm-settings")
+async def api_get_llm_settings(authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    return {
+        "settings": llm_settings_store.public_effective_settings(user["id"]),
+        "catalog": llm_models.public_catalog(),
+    }
+
+
+@app.put("/api/llm-settings")
+async def api_put_llm_settings(data: dict, authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    settings = llm_settings_store.save_settings(user["id"], data)
+    return {"settings": settings, "catalog": llm_models.public_catalog()}
+
+
+def _llm_credentials_ready(effective: dict) -> bool:
+    provider = llm_models.provider_defaults(effective.get("provider"))
+    return bool(
+        effective.get("base_url")
+        and effective.get("model_name")
+        and (effective.get("api_key") or not provider["requires_api_key"])
+    )
+
+
+@app.post("/api/llm-settings/models")
+async def api_list_llm_models(data: dict | None = None, authorization: str | None = Header(None)):
+    """Discover endpoint models and merge them with the curated current catalog."""
+    user = _require_user(authorization)
+    effective = llm_settings_store.get_effective_settings(user["id"], data or {})
+    if not _llm_credentials_ready(effective):
+        return {"ok": False, "message": "Base URL, model and API Key are required", "models": []}
+    headers = {}
+    if effective.get("api_key"):
+        headers["Authorization"] = f"Bearer {effective['api_key']}"
+    try:
+        import httpx
+        async with httpx.AsyncClient(
+            base_url=effective["base_url"].rstrip("/"),
+            timeout=httpx.Timeout(15),
+            headers=headers,
+        ) as client:
+            response = await client.get("/models")
+            response.raise_for_status()
+            remote = response.json().get("data", [])
+        discovered = [
+            str(item.get("id", "")).strip()
+            for item in remote
+            if isinstance(item, dict) and str(item.get("id", "")).strip()
+        ]
+        curated = [
+            item["id"]
+            for item in llm_models.model_catalog(effective.get("provider"))
+        ]
+        models = list(dict.fromkeys(discovered + curated))
+        return {"ok": True, "models": models, "selected_model": effective["model_name"]}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)[:500], "models": []}
+
+
+@app.post("/api/llm-settings/test")
+async def api_test_llm_settings(data: dict | None = None, authorization: str | None = Header(None)):
+    user = _require_user(authorization)
+    effective = llm_settings_store.get_effective_settings(user["id"], data or {})
+    if not _llm_credentials_ready(effective):
+        return {"ok": False, "message": "Base URL, model and API Key are required"}
+    client = LLMClient.from_settings(effective)
+    try:
+        result = await client.generate_json(
+            system_prompt="Return valid JSON only.",
+            user_prompt='Connection test. Return exactly {"ok": true}.',
+            max_tokens=64,
+            temperature=0,
+        )
+        return {
+            "ok": bool(result.get("ok")),
+            "message": "Model inference and JSON output succeeded",
+            "model": effective["model_name"],
+            "diagram_mode": "text",
+        }
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)[:500]}
+    finally:
+        await client.close()
 
 
 @app.get("/api/xasr/status")

@@ -36,8 +36,9 @@
   function resolveApiBase() {
     const params = new URLSearchParams(window.location.search);
     const host = params.get('apiHost') || window.location.hostname;
-    const port = params.get('apiPort') || '8766';
-    const proto = params.get('apiProto') || window.location.protocol.replace(':', '') || 'http';
+    const port = params.get('apiPort') || '8765';
+    const pageProto = window.location.protocol.replace(':', '');
+    const proto = params.get('apiProto') || (pageProto === 'http' || pageProto === 'https' ? pageProto : 'http');
     return `${proto}://${host}:${port}`;
   }
 

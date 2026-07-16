@@ -748,6 +748,14 @@ body {
   display:flex; flex-direction:column; overflow:hidden;
 }
 .summary-dialog-body { padding:18px; overflow-y:auto; flex:1; }
+.llm-settings-dialog { background:#fff; border:1px solid #e9d5ff; box-shadow:0 24px 80px rgba(76,29,149,0.2); }
+.llm-settings-dialog .management-header { background:#faf7ff; border-bottom:1px solid #eadcff; }
+.llm-settings-dialog input,
+.llm-settings-dialog select { padding:7px 9px; border:1px solid #ded5e8; border-radius:7px; background:#fff; color:var(--text-primary); font:inherit; }
+.llm-settings-dialog input:focus,
+.llm-settings-dialog select:focus { outline:none; border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.1); }
+.llm-settings-dialog input[type="checkbox"] { accent-color:#7c3aed; }
+.llm-settings-dialog .btn-primary { border-color:#7c3aed; background:#7c3aed; }
 .entity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .entity-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 5px 8px; font-size: 10px; }
 .entity-card .title { font-weight: 600; color: var(--text-primary); font-size: 11px; }
@@ -1794,6 +1802,100 @@ body {
 </div>
 
 
+<!-- ═══ G2: LLM Settings Dialog ═══════════════════════════════════ -->
+<div class="summary-dialog-overlay" id="llmSettingsDialog" aria-hidden="true" style="display:none;">
+  <div class="summary-dialog llm-settings-dialog">
+    <div class="management-header">
+      <strong>大模型接入设置</strong>
+      <button class="btn btn-secondary" id="btnCloseLLMSettings">关闭</button>
+    </div>
+    <div class="summary-dialog-body">
+      <div class="settings-section-title">连接配置</div>
+      <label style="display:block;margin-bottom:6px;">Provider
+        <select id="llmProvider" style="width:100%;box-sizing:border-box;">
+          <option value="deepseek" selected>DeepSeek（DSv4）</option>
+          <option value="qwen">Qwen (DashScope)</option>
+          <option value="openai">OpenAI</option>
+          <option value="ollama">Ollama</option>
+          <option value="openai_compatible">OpenAI Compatible / 自定义</option>
+        </select>
+      </label>
+      <label style="display:block;margin-bottom:6px;">Base URL
+        <input id="llmBaseUrl" style="width:100%;box-sizing:border-box;" placeholder="https://api.openai.com/v1">
+      </label>
+      <label style="display:block;margin-bottom:6px;">API Key <small id="llmApiKeyHint"></small>
+        <input id="llmApiKey" type="password" style="width:100%;box-sizing:border-box;" placeholder="sk-...">
+      </label>
+      <label style="display:block;margin-bottom:6px;">模型 ID
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;">
+          <input id="llmModelName" list="llmModelOptions" style="width:100%;box-sizing:border-box;" value="deepseek-v4-flash" placeholder="deepseek-v4-pro / 自定义模型 ID">
+          <button class="btn btn-secondary" id="btnRefreshLLMModels" type="button">更新模型列表</button>
+        </div>
+        <datalist id="llmModelOptions">
+          <option value="deepseek-v4-flash">DSv4 Flash（默认）</option>
+          <option value="deepseek-v4-pro">DSv4 Pro</option>
+          <option value="qwen3.7-max">Qwen3.7 Max</option>
+          <option value="qwen3.7-plus">Qwen3.7 Plus</option>
+          <option value="qwen3.6-flash">Qwen3.6 Flash</option>
+          <option value="gpt-5.2">GPT-5.2</option>
+          <option value="gpt-5.1">GPT-5.1</option>
+          <option value="gpt-5-mini">GPT-5 mini</option>
+        </datalist>
+      </label>
+      <div id="llmCapabilityNote" style="margin:-1px 0 10px;color:var(--text-muted);font-size:10px;line-height:1.5;">deepseek-v4-flash 按文字模型调用；流程图输出为 Mermaid + Markdown，不调用图像生成接口。</div>
+      <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+        <label style="flex:1;min-width:100px;">Temperature
+          <input id="llmTemperature" type="number" step="0.1" min="0" max="2" style="width:100%;box-sizing:border-box;" value="0.2">
+        </label>
+        <label style="flex:1;min-width:100px;">Max Tokens
+          <input id="llmMaxTokens" type="number" step="256" min="256" style="width:100%;box-sizing:border-box;" value="8192">
+        </label>
+        <label style="flex:1;min-width:100px;">Timeout (s)
+          <input id="llmTimeout" type="number" step="10" min="10" style="width:100%;box-sizing:border-box;" value="180">
+        </label>
+      </div>
+      <div class="settings-section-title">输出控制</div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+        <label style="flex:1;min-width:120px;">输出语言
+          <select id="llmOutputLang" style="width:100%;box-sizing:border-box;">
+            <option value="zh-CN">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <label style="flex:1;min-width:120px;">公式模式
+          <select id="llmFormulaMode" style="width:100%;box-sizing:border-box;">
+            <option value="latex">LaTeX ($...$ / $$...$$)</option>
+            <option value="plain">纯文本</option>
+          </select>
+        </label>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+        <label style="flex:1;min-width:120px;">图类型
+          <select id="llmDiagramType" style="width:100%;box-sizing:border-box;">
+            <option value="auto">自动</option>
+            <option value="mindmap">思维导图</option>
+            <option value="flowchart">流程图</option>
+            <option value="architecture">架构图</option>
+          </select>
+        </label>
+        <label style="flex:1;min-width:120px;display:flex;align-items:flex-end;gap:8px;">
+          <input type="checkbox" id="llmDiagramEnabled" checked style="margin-bottom:4px;"> 生成文字图（Mermaid / Markdown）
+        </label>
+        <label style="flex:1;min-width:120px;display:flex;align-items:flex-end;gap:8px;">
+          <input type="checkbox" id="llmFormalStyle" checked style="margin-bottom:4px;"> 正式风格
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="btnTestLLM">测试连接</button>
+        <span id="llmTestStatus" style="font-size:11px;"></span>
+        <span style="flex:1;"></span>
+        <button class="btn btn-primary" id="btnSaveLLMSettings">保存设置</button>
+        <span id="llmSaveStatus" style="font-size:11px;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ S6: Summary Dialog ═══════════════════════════════════════ -->
 <div class="summary-dialog-overlay" id="summaryDialog" aria-hidden="true" style="display:none;">
   <div class="summary-dialog">
@@ -1862,6 +1964,7 @@ body {
     <button class="btn btn-secondary btn-clear-select" id="btnClearSelectRecords" style="display:none;">清除</button>
     <span class="select-count" id="selectCountLabel" style="display:none;font-size:11px;color:var(--text-muted);">已选择 0 条</span>
     <button class="btn btn-primary" id="btnGenerateSummary" style="display:none;" disabled>生成摘要</button>
+    <button class="btn btn-secondary" id="btnLLMSettings" style="font-size:10px;">大模型设置</button>
   </div>
   <div class="records-layout">
     <div class="records-list" id="recordsList"><div class="entity-card">暂无记录</div></div>
@@ -2091,6 +2194,7 @@ body {
 <script src="./live-protocol.js"></script>
 <script src="./management-transcription.js"></script>
 <script src="./record-summary.js"></script>
+<script src="./llm-settings.js"></script>
 <script src="./app-settings.js"></script>
 <script src="./hotword-settings.js"></script>
 <script src="./i18n.js"></script>
@@ -5504,6 +5608,14 @@ function initApp() {
   if ($('btnDownloadSummary')) $('btnDownloadSummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.downloadMarkdown(); });
   if ($('btnRetrySummary')) $('btnRetrySummary').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.retry(); });
   if ($('btnBackToConfig')) $('btnBackToConfig').addEventListener('click', () => { if (window.DiTingRecordSummary) window.DiTingRecordSummary.backToConfig(); });
+  // G2: LLM settings dialog
+  if ($('btnLLMSettings')) $('btnLLMSettings').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.open(); });
+  if ($('btnRefreshLLMModels')) $('btnRefreshLLMModels').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.refreshModels(); });
+  if ($('llmProvider')) $('llmProvider').addEventListener('change', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.applyProviderPreset(true); });
+  if ($('llmModelName')) $('llmModelName').addEventListener('input', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.updateCapabilityNote(); });
+  if ($('btnCloseLLMSettings')) $('btnCloseLLMSettings').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.close(); });
+  if ($('btnTestLLM')) $('btnTestLLM').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.testConnection(); });
+  if ($('btnSaveLLMSettings')) $('btnSaveLLMSettings').addEventListener('click', () => { if (window.DiTingLLMSettings) window.DiTingLLMSettings.saveSettings(); });
   if ($('recordTitleInput')) $('recordTitleInput').addEventListener('input', event => {
     if (meetingTitleDisplay) meetingTitleDisplay.textContent = event.target.value || '未命名会议记录';
   });

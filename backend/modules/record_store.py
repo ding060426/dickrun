@@ -162,8 +162,39 @@ def _migrate_db(conn) -> None:
             FOREIGN KEY (summary_id) REFERENCES record_summaries(id) ON DELETE CASCADE,
             FOREIGN KEY (record_id) REFERENCES meeting_records(id) ON DELETE RESTRICT
         );
+
+        CREATE TABLE IF NOT EXISTS user_llm_settings (
+            user_id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL DEFAULT '',
+            base_url TEXT NOT NULL DEFAULT '',
+            api_key_encrypted TEXT NOT NULL DEFAULT '',
+            model_name TEXT NOT NULL DEFAULT '',
+            temperature REAL NOT NULL DEFAULT 0.2,
+            max_tokens INTEGER NOT NULL DEFAULT 8192,
+            timeout_sec INTEGER NOT NULL DEFAULT 180,
+            diagram_enabled INTEGER NOT NULL DEFAULT 1,
+            diagram_type TEXT NOT NULL DEFAULT 'auto',
+            output_language TEXT NOT NULL DEFAULT 'zh-CN',
+            formal_style INTEGER NOT NULL DEFAULT 1,
+            formula_mode TEXT NOT NULL DEFAULT 'latex',
+            updated_at TEXT NOT NULL
+        );
         """
     )
+
+    # G3a: extend record_summaries with diagram / formula fields
+    for col, spec in [
+        ("diagram_json", "TEXT NOT NULL DEFAULT '{}'"),
+        ("diagram_mermaid", "TEXT NOT NULL DEFAULT ''"),
+        ("diagram_markdown", "TEXT NOT NULL DEFAULT ''"),
+        ("llm_settings_snapshot_json", "TEXT NOT NULL DEFAULT '{}'"),
+        ("output_style", "TEXT NOT NULL DEFAULT 'formal'"),
+        ("formula_mode", "TEXT NOT NULL DEFAULT 'latex'"),
+        ("diagram_type", "TEXT NOT NULL DEFAULT 'auto'"),
+    ]:
+        existing = {r[1] for r in conn.execute("PRAGMA table_info('record_summaries')")}
+        if col not in existing:
+            conn.execute(f"ALTER TABLE record_summaries ADD COLUMN {col} {spec}")
 
 
 def _json_dump(value: Any, fallback: Any) -> str:
@@ -631,7 +662,10 @@ def save_record(
                 ),
             )
     if include_segments:
-        return get_record(record_id)
+        # The save API historically returns the complete payload it accepted,
+        # including per-segment audio.  Normal GET/list calls can still omit
+        # audio and fetch it on demand through the dedicated endpoint.
+        return get_record(record_id, include_audio=True)
     with connect() as conn:
         row = conn.execute(
             "SELECT * FROM meeting_records WHERE id = ?", (record_id,)

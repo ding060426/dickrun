@@ -1,6 +1,6 @@
 # 谛听 (会悟) v3.0 — Smart Meeting Speech Cognitive System
 
-基于 X-ASR (sherpa-onnx zipformer2) 的智能会议语音认知系统。支持音频文件上传、实时转写、热词修正、逻辑校验、音频波形可视化。
+基于 X-ASR (sherpa-onnx zipformer2) 与可选 Qwen3-ASR 的智能会议语音认知系统。支持音频文件上传、实时转写、热词修正、会议摘要、文字流程图和音频波形可视化。
 
 ## 系统架构
 
@@ -15,10 +15,15 @@ backend/
     sherpa_backend.py ← pyannote segmentation + 3D-Speaker 本地推理
   xasr/
     asr_engine.py  ← X-ASR 引擎 (VAD + 端点检测 + 转写)
+    qwen3_engine.py ← Qwen3-ASR 文件/最终转写适配器
+    engine_pool.py ← X-ASR 实时预览与最终转写模型切换
     live_audio.py  ← 实时 PCM 校验 + Silero VAD + ASR 会话边界
     models/        ← ONNX 模型 (需自行下载)
   modules/
     audio_processor.py  ← SNR/RT60 估算 + 热词修正 + 逻辑校验 + 不确定性估计
+    llm_client.py       ← OpenAI ChatCompletions 兼容客户端
+    llm_models.py       ← DSv4/Qwen/OpenAI 文字模型目录与能力路由
+    summary_service.py  ← 会议摘要、Mermaid/Markdown 文字图生成
   utils/
     logger.py      ← 统一日志系统 (控制台 + 文件 + 环形缓冲)
 ```
@@ -27,8 +32,9 @@ backend/
 
 ### 1. 环境要求
 
-```bash
-pip install fastapi uvicorn numpy
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
 ### 2. 下载 X-ASR 模型文件
@@ -54,6 +60,33 @@ backend/xasr/models/
   ├── tokens.txt
   └── silero_vad.onnx       (麦克风与文件切分共用的本地 Silero VAD)
 ```
+
+### 2.1 可选：启用本地 Qwen3-ASR
+
+设置页支持在 `X-ASR` 与 `Qwen3-ASR` 之间直接切换最终转写引擎。实时麦克风预览仍由低延迟
+X-ASR 完成；上传文件和录音停止后的最终转写可切到 Qwen3-ASR。这样不会用大模型加载延迟阻塞实时预览。
+
+建议为 Qwen 单独创建 Python 3.12 环境，启动器检测到 `.venv-qwen3` 后会自动用它启动后端：
+
+```powershell
+py -3.12 -m venv .venv-qwen3
+.venv-qwen3\Scripts\python.exe -m pip install -r backend\requirements.txt qwen-asr
+# 再按 PyTorch 官方安装页安装与本机显卡匹配的 CUDA 版本
+```
+
+打开 `会议转写 → 设置 → 识别与分段`，选择 `Qwen3-ASR`，填写本地模型目录（目录中应包含
+`config.json`、tokenizer/preprocessor 文件和完整的 `.safetensors` 分片），设备选 `CUDA 0`、
+精度选 `bfloat16`，保存后状态应显示：
+
+```text
+selected_provider=qwen3
+effective_provider=qwen3
+provider_fallback=false
+```
+
+若依赖、模型目录或显存不可用，系统会明确显示原因并安全回退到 X-ASR。Qwen3-ASR 的安装与
+本地音频输入格式以 [Qwen3-ASR 官方仓库](https://github.com/QwenLM/Qwen3-ASR) 为准；CUDA Torch
+版本以 [PyTorch 官方安装页](https://pytorch.org/get-started/locally/) 为准。
 
 离线说话人日志还需要两个 sherpa-onnx 兼容模型（当前本地工作区已放置好）：
 
@@ -139,6 +172,39 @@ python start.py
 不会影响本地转写服务启动。Supabase 初始化脚本会迁移旧版 JSON 参会人数据，并用 PostgreSQL 触发器在同一事务中
 同步预约和参会关系。当前 SQL 中的 RLS 策略仅用于开发调试；推向公网前必须把 `SUPABASE_KEY` 保留在后端，
 使用服务端密钥，并将开发阶段的全开放策略替换为正式最小权限策略。
+
+### 5.1 大模型摘要与 DSv4
+
+在 `记录管理 → 大模型设置` 中配置摘要模型。默认 Provider 为 DeepSeek，默认模型为
+`deepseek-v4-flash`（界面显示 DSv4 Flash），高质量档可直接切到 `deepseek-v4-pro`（DSv4 Pro）。
+DeepSeek 官方当前只公布这两个 V4 API ID；旧 `deepseek-chat` / `deepseek-reasoner` 将于
+2026-07-24 停用，详见 [DeepSeek 官方模型与价格](https://api-docs.deepseek.com/quick_start/pricing/)
+和 [模型列表 API](https://api-docs.deepseek.com/api/list-models)。
+
+设置界面支持以下方式：
+
+- 选择 DSv4 Flash / DSv4 Pro、Qwen3.7、Qwen3.6 Flash、GPT-5.x 等常用文字模型；
+- 点击“更新模型列表”从当前 Base URL 的 `/models` 读取账号实际可用模型；
+- 直接填写自定义模型 ID，例如私有网关使用的 `dsv4pro`；
+- 点击“测试连接”执行一次真实 JSON 推理，而不只是检测 `/models` 是否可访问。
+
+DSv4 等聊天模型不会被当作图像生成模型调用。会议结构图始终由模型返回结构化文字节点，再由本地代码
+渲染为 Mermaid 和 Markdown；设置中的“生成文字图”不会请求任何图片接口。阿里云当前 Qwen 文字模型
+列表可参考 [Model Studio 模型更新页](https://help.aliyun.com/en/model-studio/newly-released-models)。
+
+用户在界面保存的 Provider、Base URL、模型和 API Key 会真正用于该用户的摘要任务；API Key 使用
+Fernet 加密，密钥保存在忽略提交的 `backend/data/llm_secret.key`。也可用环境变量作为低优先级默认值：
+
+```powershell
+$env:DITING_LLM_PROVIDER = "deepseek"
+$env:DITING_LLM_BASE_URL = "https://api.deepseek.com"
+$env:DITING_LLM_API_KEY = "<your-key>"
+$env:DITING_LLM_MODEL = "deepseek-v4-flash"
+python start.py
+```
+
+对应 API：`GET/PUT /api/llm-settings`、`POST /api/llm-settings/models` 和
+`POST /api/llm-settings/test`。摘要记录只保存脱敏后的配置快照，不保存明文 API Key。
 
 ### 6. 离线多说话人会议
 
@@ -262,6 +328,7 @@ python backend/evaluate_profiles.py manifest.json --profiles low-latency meeting
 | 功能 | 状态 | 说明 |
 |------|------|------|
 | ASR 转写 | ✅ | sherpa-onnx zipformer2 流式推理 |
+| Qwen3-ASR 最终转写 | ✅ | 本地 CUDA 文件/最终转写，可在设置中切换；实时预览继续使用 X-ASR |
 | VAD + 端点检测 | ✅ | 文件：Silero 提供时间锚点，X-ASR 跨段保留上下文并按完整句合并；实时：Silero 优先、能量 VAD 降级 + 可配置 pre-roll |
 | 热词修正 | ✅ | 可持久化逐词权重 + modified beam search + 多音字模糊拼音 + ASCII 标准化 |
 | 文本后处理 | ✅ | 保守去口癖、标点恢复、重复清理与中文数字 ITN |
@@ -271,6 +338,8 @@ python backend/evaluate_profiles.py manifest.json --profiles low-latency meeting
 | 实时录音转写 | ✅ | AudioWorklet + DTP2 帧序号 + partial/final + 持久 WAV + 停止后二次定稿和离线说话人对齐 |
 | Eval_Ali 评测 | ✅ | CER 计算 / 热词提取 |
 | 说话人日志/分段 | ✅ | pyannote segmentation + 3D-Speaker，全局聚类、时间平滑、边界重识别与可重命名标签 |
+| DSv4 会议摘要 | ✅ | 用户级 OpenAI 兼容配置、真实推理测试、DSv4 Flash/Pro 与动态模型列表 |
+| 文字流程图 | ✅ | 结构化 JSON → Mermaid + Markdown，不调用图像生成接口 |
 | 重叠语音双路分离 | 🔜 | LocalMeet 已有 MossFormer2 离线 GPU 实现；不放入低延迟实时预览主链路 |
 | 说话人识别 | 🔜 | 声纹注册库匹配 待实现 |
 

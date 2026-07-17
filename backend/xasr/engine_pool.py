@@ -5,25 +5,18 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from .asr_engine import XASREngine
 from .config import ASR_CHUNK_PROFILES
-from .qwen3_engine import Qwen3AsrEngine
+from .model_paths import inspect_xasr_profiles
 
 
 PROFILE_FALLBACK_ORDER = ("meeting", "balanced", "low-latency", "quality")
 
 
 def deployed_profiles(model_dir: str | Path) -> list[str]:
-    root = Path(model_dir)
-    if not (root / "tokens.txt").is_file():
-        return []
     return [
         profile
-        for profile, chunk_ms in ASR_CHUNK_PROFILES.items()
-        if all(
-            (root / f"{component}-{chunk_ms}ms.onnx").is_file()
-            for component in ("encoder", "decoder", "joiner")
-        )
+        for profile, status in inspect_xasr_profiles(model_dir).items()
+        if status["complete"]
     ]
 
 
@@ -33,6 +26,28 @@ def resolve_deployed_profile(requested: str, available: list[str]) -> str | None
     return next((profile for profile in PROFILE_FALLBACK_ORDER if profile in available), None)
 
 
+class _DefaultQwenEngineFactory:
+    @staticmethod
+    def availability(model_path="") -> dict:
+        import importlib.util
+
+        if not str(model_path or "").strip():
+            return {"available": False, "reason": "model_not_configured"}
+        missing = [
+            package
+            for package in ("torch", "qwen_asr")
+            if importlib.util.find_spec(package) is None
+        ]
+        if missing:
+            return {"available": False, "reason": "missing_dependencies", "missing": missing}
+        return {"available": True, "reason": ""}
+
+    def __call__(self, **kwargs):
+        from .qwen3_engine import Qwen3AsrEngine
+
+        return Qwen3AsrEngine(**kwargs)
+
+
 class AsrEnginePool:
     """Own the process-level live and canonical recognizer runtimes."""
 
@@ -40,12 +55,18 @@ class AsrEnginePool:
         self,
         model_dir: str | Path,
         *,
-        engine_factory=XASREngine,
-        qwen_engine_factory=Qwen3AsrEngine,
+        engine_factory=None,
+        qwen_engine_factory=None,
         base_options=None,
     ):
         self.model_dir = Path(model_dir)
+        if engine_factory is None:
+            from .asr_engine import XASREngine
+
+            engine_factory = XASREngine
         self.engine_factory = engine_factory
+        if qwen_engine_factory is None:
+            qwen_engine_factory = _DefaultQwenEngineFactory()
         self.qwen_engine_factory = qwen_engine_factory
         self.base_options = dict(base_options or {})
         self._lock = threading.RLock()
@@ -144,7 +165,7 @@ class AsrEnginePool:
             "provider_reason": provider_reason,
             "providers": {
                 "xasr": {"available": True, "reason": ""},
-                "qwen3": dict(qwen_availability),
+                "qwen3": {**dict(qwen_availability), **self._runtime_status(final)},
             },
             "live": self._profile_status(requested_live, effective_live),
             "final": self._profile_status(requested_final, effective_xasr_final),
@@ -255,6 +276,11 @@ class AsrEnginePool:
         )
 
     @staticmethod
+    def _runtime_status(engine) -> dict:
+        runtime_status = getattr(engine, "runtime_status", None)
+        return runtime_status() if callable(runtime_status) else {"loaded": False}
+
+    @staticmethod
     def _profile_status(requested: str, effective: str) -> dict:
         return {
             "requested_profile": requested,
@@ -285,7 +311,7 @@ class AsrEnginePool:
             "provider_reason": "",
             "providers": {
                 "xasr": {"available": False, "reason": "not_loaded"},
-                "qwen3": Qwen3AsrEngine.availability(""),
+                "qwen3": self.qwen_engine_factory.availability(""),
             },
             "live": {},
             "final": {},

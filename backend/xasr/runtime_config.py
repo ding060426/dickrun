@@ -8,20 +8,23 @@ import threading
 from copy import deepcopy
 from pathlib import Path
 
+from .model_paths import resolve_qwen3_model_dir
+
 
 ASR_PROFILES = ("low-latency", "balanced", "meeting", "quality")
 ASR_PROVIDERS = ("xasr", "qwen3")
 QWEN3_DEVICES = ("auto", "cuda:0", "cpu")
 QWEN3_DTYPES = ("auto", "bfloat16", "float16", "float32")
+DEFAULT_QWEN3_MODEL_PATH = str(resolve_qwen3_model_dir())
 
 DEFAULT_RUNTIME_SETTINGS = {
     "recognition": {
         "asr_provider": "xasr",
-        "qwen3_model_path": "",
+        "qwen3_model_path": DEFAULT_QWEN3_MODEL_PATH,
         "qwen3_device": "auto",
         "qwen3_dtype": "auto",
-        "live_asr_profile": "meeting",
-        "final_asr_profile": "meeting",
+        "live_asr_profile": "low-latency",
+        "final_asr_profile": "low-latency",
         "final_transcription_enabled": True,
         "file_vad_provider": "silero",
         "file_vad_threshold": 0.5,
@@ -109,7 +112,11 @@ class RuntimeConfigStore:
                 recognition_default["asr_provider"],
             ),
             "qwen3_model_path": str(
-                recognition_source.get("qwen3_model_path", "") or ""
+                recognition_source.get(
+                    "qwen3_model_path",
+                    recognition_default["qwen3_model_path"],
+                )
+                or ""
             ).strip()[:1024],
             "qwen3_device": _choice(
                 recognition_source.get("qwen3_device"),

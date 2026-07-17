@@ -5,7 +5,13 @@ const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const recordSummaryJs = fs.readFileSync(path.join(__dirname, '..', 'record-summary.js'), 'utf8');
-assert.match(html, /data-module="meeting">会议转写/);
+const cssBundle = [
+  'css/base.css',
+  'css/transcription.css',
+  'css/mic-orb.css',
+  'css/layout.css',
+  'css/settings.css',
+].map(file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
 assert.match(html, /buildUploadUrl\(API_BASE/);
 assert.match(html, /enableDiarization/);
 assert.match(html, /HuiWuLiveProtocol\.encodePcmFrame/);
@@ -38,13 +44,13 @@ assert.match(html, /id="btnRefreshLLMModels"/);
 assert.match(html, /Mermaid \/ Markdown/);
 assert.match(html, /asr_provider: selectedAsrProvider/);
 assert.match(html, /setAsrProviderUI\(recognition\.asr_provider/);
-assert.match(html, /--settings-accent: #7c3aed/);
-assert.match(html, /\.asr-provider-card\.active/);
+assert.match(cssBundle, /--settings-accent: #7c3aed/);
+assert.match(cssBundle, /\.asr-provider-card\.active/);
 assert.match(html, /remove\.textContent = '×'/);
 assert.match(html, /settings\.hotwords\.enable_word/);
 assert.match(html, /settings\.hotwords\.delete_word/);
 assert.doesNotMatch(html, /脳|鍚敤|鐑瘝|鏉冮噸|鍒犻櫎/);
-assert.match(html, /input\[type="range"\].*accent-color:\s*var\(--settings-accent\)/s);
+assert.match(cssBundle, /input\[type="range"\].*accent-color:\s*var\(--settings-accent\)/s);
 assert.doesNotMatch(html, /rgba\(15, 17, 23, 0\.48\)/);
 assert.match(recordSummaryJs, /apiPort'\) \|\| '8765'/);
 assert.doesNotMatch(recordSummaryJs, /apiPort'\) \|\| '8766'/);

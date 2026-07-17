@@ -1,6 +1,10 @@
 # ── Large datasets ──
 Eval_Ali/
 
+# ── Project-local model files ──
+models/
+download/
+
 # ── ONNX model files (>100MB each) ──
 backend/xasr/models/*.onnx
 backend/xasr/models/**/*.onnx
@@ -18,8 +22,9 @@ __pycache__/
 *.pyo
 *.egg-info/
 
-# ── Logs ──
+# ── Logs and runtime data ──
 backend/logs/
+backend/recordings/
 backend/data/hotwords.json
 backend/data/settings.json
 backend/data/llm_secret.key

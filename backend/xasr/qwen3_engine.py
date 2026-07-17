@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import gc
 import importlib.util
+import os
 import threading
+import time
 import weakref
 from pathlib import Path
 from typing import Callable
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # Optional until Qwen3 is actually used.
+    np = None
 
 from audio_buffer import AudioBuffer, load_audio_buffer
 
@@ -48,6 +53,11 @@ class Qwen3AsrEngine:
         self._torch = torch_module
         self._runtime = shared_runtime or {"model": None, "lock": threading.RLock()}
         self._runtime.setdefault("owners", weakref.WeakSet()).add(self)
+        self._runtime.setdefault("last_used_at", None)
+        self._runtime.setdefault("device", self.device)
+        self._runtime.setdefault("dtype", self.dtype)
+        self._runtime.setdefault("last_error", "")
+        self.idle_timeout_sec = max(0, int(os.getenv("DITING_QWEN3_IDLE_UNLOAD_SEC", "0") or "0"))
         self._hotwords = list(hotwords or []) if enable_hotword_correction else []
         self._hotword_scores = dict(hotword_scores or {})
 
@@ -93,6 +103,9 @@ class Qwen3AsrEngine:
                     loader = Qwen3ASRModel.from_pretrained
                 device = self._resolve_device(torch)
                 dtype = self._resolve_dtype(torch, device)
+                self._runtime["device"] = device
+                self._runtime["dtype"] = self.dtype if self.dtype != "auto" else ("bfloat16" if device.startswith("cuda") else "float32")
+                self._runtime["last_error"] = ""
                 self._runtime["model"] = loader(
                     self.model_path,
                     dtype=dtype,
@@ -101,6 +114,7 @@ class Qwen3AsrEngine:
                     max_new_tokens=1024,
                 )
         self.is_model_available = True
+        self._runtime["last_used_at"] = time.time()
         return self
 
     def fork_session(self):
@@ -124,6 +138,7 @@ class Qwen3AsrEngine:
         with self._runtime["lock"]:
             model = self._runtime.get("model")
             self._runtime["model"] = None
+            self._runtime["last_used_at"] = None
             for owner in tuple(self._runtime.get("owners", ())):
                 owner.is_model_available = False
         if model is None:
@@ -192,7 +207,9 @@ class Qwen3AsrEngine:
             result.audio_data = audio_buffer.slice(start_sec, end_sec)
         return result
 
-    def _transcribe(self, samples: np.ndarray, sample_rate: int, start: float, end: float):
+    def _transcribe(self, samples, sample_rate: int, start: float, end: float):
+        if np is None:
+            raise RuntimeError("Qwen3-ASR requires numpy")
         if self._runtime["model"] is None:
             self.warmup()
         context = self._hotword_context()
@@ -202,7 +219,10 @@ class Qwen3AsrEngine:
         try:
             with self._runtime["lock"]:
                 output = self._runtime["model"].transcribe(**kwargs)
+                self._runtime["last_used_at"] = time.time()
+                self._runtime["last_error"] = ""
         except Exception as exc:
+            self._runtime["last_error"] = str(exc)
             if self._is_cuda_oom(exc):
                 self.close()
             raise
@@ -249,6 +269,30 @@ class Qwen3AsrEngine:
             (oom_type is not None and isinstance(exc, oom_type))
             or "out of memory" in str(exc).lower()
         )
+
+    def runtime_status(self) -> dict:
+        last_used_at = self._runtime.get("last_used_at")
+        return {
+            "loaded": self._runtime.get("model") is not None,
+            "last_used_at": last_used_at,
+            "idle_timeout_sec": self.idle_timeout_sec,
+            "device": self._runtime.get("device", self.device),
+            "dtype": self._runtime.get("dtype", self.dtype),
+            "estimated_vram_gb": 5.5,
+            "last_error": self._runtime.get("last_error", ""),
+        }
+
+    def maybe_unload_idle(self, now: float | None = None) -> bool:
+        if self.idle_timeout_sec <= 0 or self._runtime.get("model") is None:
+            return False
+        last_used_at = self._runtime.get("last_used_at")
+        if not last_used_at:
+            return False
+        current = time.time() if now is None else float(now)
+        if current - float(last_used_at) < self.idle_timeout_sec:
+            return False
+        self.close()
+        return True
 
     def _release_cuda_cache(self) -> None:
         torch = self._torch

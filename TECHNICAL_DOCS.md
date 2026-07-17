@@ -219,6 +219,8 @@ $env:DITING_LLM_MODEL = "deepseek-v4-flash"
 
 `DITING_ASR_THREADS` 是单个 X-ASR recognizer 及 Qwen 音频预处理的 CPU 线程数，默认 12；`DITING_PROCESSING_WORKERS` 是并行处理的会议任务数，默认保持 2，避免多个长音频或 Qwen 推理同时争抢内存和显存。Qwen 运行时在模型切换、CUDA OOM 和服务关闭时主动丢弃模型引用，并调用 PyTorch CUDA 缓存回收接口；切回 X-ASR 后不再长期保留 Qwen 显存。
 
+模型默认统一放在项目根目录 `models/`：`models/xasr/`、`models/vad/`、`models/qwen3/`、`models/diarization/`。旧的 `backend/xasr/models/` 只作为历史排查线索，不再作为主模型目录。完整模型准备说明见 [MODEL_SETUP.md](MODEL_SETUP.md)，故障排查见 [DEBUGGING.md](DEBUGGING.md)。
+
 模型延迟档位包括 `low-latency`（160 ms）、`balanced`（480 ms）、`meeting`（960 ms）和 `quality`（1920 ms）；只有对应 ONNX 文件存在时才可选择。实时和最终 X-ASR 档位相同时共享已预热运行时。
 
 ## 10. 部署与验证
@@ -226,7 +228,7 @@ $env:DITING_LLM_MODEL = "deepseek-v4-flash"
 ```powershell
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-python backend\xasr\download_models.py --profile meeting
+python backend\xasr\download_models.py --profile low-latency
 python start.py
 ```
 
@@ -234,7 +236,7 @@ python start.py
 
 ```powershell
 .venv\Scripts\python.exe -m pytest backend\tests -q
-node --test frontend\tests\*.test.mjs
+node --test frontend\tests\*.test.js
 ```
 
 协议烟测：
@@ -250,6 +252,7 @@ python backend\tests\smoke_live_websocket.py sample.wav --url ws://127.0.0.1:876
 3. 设置页执行模型加载或 LLM 真实连接测试。
 4. 日志面板或 `backend/logs/diting.log` 查看阶段错误。
 5. 麦克风问题先检查浏览器权限、设备、RMS，再检查 WebSocket 帧和 VAD。
+6. 运行 `python tools\doctor.py` 统一检查依赖、模型、端口和后端 API。
 
 ## 11. 安全与隐私
 

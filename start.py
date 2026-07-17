@@ -22,11 +22,12 @@ import threading
 from pathlib import Path
 
 from backend.build_info import API_REVISION
+from backend.xasr.model_paths import resolve_xasr_model_dir
 
 ROOT_DIR = Path(__file__).parent.absolute()
 FRONTEND_DIR = ROOT_DIR / "frontend"
 BACKEND_DIR = ROOT_DIR / "backend"
-XASR_MODELS_DIR = BACKEND_DIR / "xasr" / "models"
+XASR_MODELS_DIR = resolve_xasr_model_dir()
 BACKEND_HOST = os.environ.get("DITING_BACKEND_HOST", "127.0.0.1")
 FRONTEND_HOST = os.environ.get("DITING_FRONTEND_HOST", "127.0.0.1")
 BACKEND_PORT = int(os.environ.get("DITING_BACKEND_PORT", "8765"))

@@ -66,7 +66,7 @@ docs/
   会悟智能会议语音认知系统实验报告.docx
 ```
 
-更完整的接口、存储、协议和故障排查见 [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)，会议记录生命周期见 [MEETING_RECORDS.md](MEETING_RECORDS.md)。
+更完整的接口、存储、协议和故障排查见 [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)，模型准备见 [MODEL_SETUP.md](MODEL_SETUP.md)，诊断流程见 [DEBUGGING.md](DEBUGGING.md)，架构边界见 [ARCHITECTURE.md](ARCHITECTURE.md)，会议记录生命周期见 [MEETING_RECORDS.md](MEETING_RECORDS.md)。
 
 ## 快速开始
 
@@ -77,30 +77,37 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-### 2. 下载 X-ASR 模型
+### 2. 准备本地模型
 
 ```powershell
-python backend\xasr\download_models.py --profile meeting
+python backend\xasr\download_models.py --profile low-latency
 ```
 
 默认模型目录：
 
 ```text
-backend/xasr/models/
-  encoder-960ms.onnx
-  decoder-960ms.onnx
-  joiner-960ms.onnx
-  tokens.txt
-  silero_vad.onnx
+models/
+  xasr/
+    encoder-160ms.onnx
+    decoder-160ms.onnx
+    joiner-160ms.onnx
+    tokens.txt
+  vad/
+    silero_vad.onnx
+  qwen3/
+    config.json
+    model-*.safetensors
 ```
 
 可选说话人模型：
 
 ```text
-backend/diarization/models/
+models/diarization/
   pyannote-segmentation-3.0.int8.onnx
   3dspeaker-eres2net.onnx
 ```
+
+当前只部署 160ms X-ASR 时，真实可用档位是 `low-latency`；`balanced`、`meeting`、`quality` 需要补齐对应 ONNX 后才会启用。完整说明见 [MODEL_SETUP.md](MODEL_SETUP.md)。
 
 ### 3. 启动
 
@@ -209,7 +216,8 @@ backend/recordings/
 
 ```powershell
 .venv\Scripts\python.exe -m pytest backend\tests -q
-node --test frontend\tests\*.test.mjs
+node --test frontend\tests\*.test.js
+python tools\doctor.py
 ```
 
 本次品牌与文档更新提交前会重新执行全量测试；可复现结果以当前分支提交记录和终端输出为准。

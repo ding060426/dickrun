@@ -12,11 +12,15 @@ import requests
 
 try:
     from .config import ASR_CHUNK_PROFILES
+    from .model_paths import resolve_xasr_model_dir
 except ImportError:  # direct script execution
     from config import ASR_CHUNK_PROFILES
 
+    def resolve_xasr_model_dir() -> Path:
+        return Path(__file__).resolve().parents[2] / "models" / "xasr"
 
-MODEL_DIR = Path(__file__).parent / "models"
+
+MODEL_DIR = resolve_xasr_model_dir()
 REPO_ID = "GilgameshWind/X-ASR-zh-en"
 BASE_URL = f"https://huggingface.co/{REPO_ID}/resolve/main"
 

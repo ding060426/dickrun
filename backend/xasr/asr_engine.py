@@ -24,6 +24,7 @@ from .contracts import ASRResult
 from .config import resolve_asr_profile
 from .file_vad import SileroFileVad
 from .hotwords import prepare_hotword_assets
+from .model_paths import resolve_vad_model_path, resolve_xasr_model_dir
 from .sherpa_streaming_infer import (
     SherpaRecognizerRuntime,
     SherpaStreamingASR,
@@ -65,7 +66,7 @@ class XASREngine:
         results = engine.process_file("meeting.wav")  # or .mp3
     """
 
-    DEFAULT_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+    DEFAULT_MODEL_DIR = str(resolve_xasr_model_dir())
 
     def __init__(
         self,
@@ -275,9 +276,16 @@ class XASREngine:
         return XASREngine(**options)
 
     def _create_file_segmenter(self):
-        model_path = os.path.join(self.model_dir, "silero_vad.onnx")
-        if not os.path.isfile(model_path):
-            logger.warning("Silero file VAD model missing; file recognition will use whole audio")
+        candidates = [
+            resolve_vad_model_path(),
+            os.path.join(self.model_dir, "silero_vad.onnx"),
+        ]
+        model_path = next((path for path in candidates if os.path.isfile(path)), None)
+        if model_path is None:
+            logger.warning(
+                "Silero file VAD model missing; file recognition will use whole audio; checked: %s",
+                [str(path) for path in candidates],
+            )
             return None
         return SileroFileVad(model_path, **self._file_vad_options)
 

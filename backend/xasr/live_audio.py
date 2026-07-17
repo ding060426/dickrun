@@ -17,6 +17,7 @@ from typing import Protocol
 import numpy as np
 
 from .contracts import ASRResult
+from .model_paths import resolve_vad_model_path
 from .recording import LiveRecording, RecordingResult
 
 
@@ -238,15 +239,10 @@ class SherpaSileroVad:
 
 
 def find_silero_vad_model(model_dir: Path | None = None) -> Path | None:
-    """Find a deployed model, with a development fallback to LocalMeet."""
-    configured = os.getenv("DITING_SILERO_VAD_PATH", "").strip()
-    candidates = []
-    if configured:
-        candidates.append(Path(configured))
+    """Find the configured Silero VAD model with legacy per-model fallback."""
+    candidates = [resolve_vad_model_path()]
     if model_dir is not None:
         candidates.append(Path(model_dir) / "silero_vad.onnx")
-    package_model = Path(__file__).resolve().parent / "models" / "silero_vad.onnx"
-    candidates.append(package_model)
     candidates.append(
         Path(__file__).resolve().parents[3]
         / "LocalMeet_AI_Demo"

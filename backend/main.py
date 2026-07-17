@@ -50,9 +50,22 @@ BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BACKEND_DIR)
 
 # ── Logging ─────────────────────────────────────────────────────
-from utils.logger import init_logging, get_logger, get_recent_logs, log_buffer
+from utils.logger import init_logging, get_logger, get_recent_logs as read_recent_logs, log_buffer
 from upload_storage import UploadTooLargeError, save_upload_to_temp
 from xasr.hotword_config import HotwordConfigStore
+from xasr.model_paths import (
+    inspect_model_paths,
+    resolve_diarization_model_dir,
+    resolve_diarization_segmentation_model,
+    resolve_hotwords_config_path,
+    resolve_models_root,
+    resolve_qwen3_model_dir,
+    resolve_recordings_dir,
+    resolve_runtime_config_path,
+    resolve_speaker_embedding_model,
+    resolve_vad_model_path,
+    resolve_xasr_model_dir,
+)
 from xasr.runtime_config import RuntimeConfigStore
 from diarization import (
     ChunkedDiarizationBackend,
@@ -69,6 +82,9 @@ from modules import summary_store
 from modules import llm_settings_store
 from modules import llm_models
 from modules.llm_client import LLMClient
+from services.model_runtime import ModelRuntimeService
+from services.model_status_service import build_xasr_status
+from services.upload_service import UploadJobStore
 
 init_logging(console_level="INFO", file_level="DEBUG")
 logger = get_logger("main")
@@ -113,35 +129,26 @@ xasr_engine: Optional["XASREngine"] = None
 final_xasr_engine: Optional["XASREngine"] = None
 xasr_pool: Optional[object] = None
 xasr_loading: bool = False
-_xasr_reload_lock = threading.Lock()
-_xasr_reload_pending = False
-_xasr_reload_worker_active = False
+model_runtime: Optional[ModelRuntimeService] = None
 ASR_INFERENCE_THREADS = max(1, int(os.getenv("DITING_ASR_THREADS", "12")))
 PROCESSING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=max(1, int(os.getenv("DITING_PROCESSING_WORKERS", "2"))),
     thread_name_prefix="huiwu-asr",
 )
-RECORDINGS_DIR = Path(
-    os.getenv("DITING_RECORDINGS_DIR", os.path.join(BACKEND_DIR, "recordings"))
-)
-HOTWORDS_CONFIG_PATH = Path(
-    os.getenv("DITING_HOTWORDS_CONFIG", os.path.join(BACKEND_DIR, "data", "hotwords.json"))
-)
-RUNTIME_CONFIG_PATH = Path(
-    os.getenv("DITING_RUNTIME_CONFIG", os.path.join(BACKEND_DIR, "data", "settings.json"))
-)
+RECORDINGS_DIR = resolve_recordings_dir()
+HOTWORDS_CONFIG_PATH = resolve_hotwords_config_path()
+RUNTIME_CONFIG_PATH = resolve_runtime_config_path()
 hotword_config_store = None
 runtime_config_store = RuntimeConfigStore(RUNTIME_CONFIG_PATH)
-DIARIZATION_MODEL_DIR = Path(BACKEND_DIR) / "diarization" / "models"
+PROJECT_ROOT = Path(BACKEND_DIR).parent
+MODELS_ROOT = resolve_models_root()
+XASR_MODEL_DIR = resolve_xasr_model_dir()
+QWEN3_MODEL_DIR = resolve_qwen3_model_dir()
+VAD_MODEL_PATH = resolve_vad_model_path()
+DIARIZATION_MODEL_DIR = resolve_diarization_model_dir()
 base_diarization_backend = SherpaDiarizationBackend(
-    os.getenv(
-        "DITING_DIARIZATION_SEGMENTATION_MODEL",
-        str(DIARIZATION_MODEL_DIR / "pyannote-segmentation-3.0.int8.onnx"),
-    ),
-    os.getenv(
-        "DITING_SPEAKER_EMBEDDING_MODEL",
-        str(DIARIZATION_MODEL_DIR / "3dspeaker-eres2net.onnx"),
-    ),
+    str(resolve_diarization_segmentation_model()),
+    str(resolve_speaker_embedding_model()),
     threshold=float(os.getenv("DITING_DIARIZATION_THRESHOLD", "0.8")),
     num_threads=int(os.getenv("DITING_DIARIZATION_THREADS", "4")),
     min_turn_sec=float(os.getenv("DITING_DIARIZATION_MIN_TURN_SEC", "0.5")),
@@ -168,7 +175,7 @@ diarization_chunk_config = ChunkedDiarizationConfig(
     stitch_threshold=float(os.getenv("DITING_SPEAKER_STITCH_THRESHOLD", "0.75")),
 )
 diarization_speech_detector = None
-diarization_vad_model = Path(BACKEND_DIR) / "xasr" / "models" / "silero_vad.onnx"
+diarization_vad_model = VAD_MODEL_PATH
 if HAS_XASR and diarization_vad_model.is_file():
     diarization_speech_detector = SileroFileVad(
         diarization_vad_model,
@@ -195,68 +202,27 @@ def _asr_engine_label(engine) -> str:
     """Return the provider label shown to upload and recording clients."""
     return str(getattr(engine, "engine_name", "X-ASR (sherpa-onnx zipformer2 v2.0)"))
 
-def _load_xasr_engine():
-    """Build and atomically publish the configured live/final ASR runtimes."""
+
+def _sync_model_runtime_globals() -> None:
+    """Keep legacy module globals in sync while routes are migrated to services."""
     global xasr_engine, final_xasr_engine, xasr_pool, xasr_loading
-    if not HAS_XASR:
-        logger.info("X-ASR not available; transcription is disabled")
+    xasr_pool = model_runtime.pool if model_runtime else None
+    xasr_engine = model_runtime.live_engine if model_runtime else None
+    final_xasr_engine = model_runtime.final_engine if model_runtime else None
+    xasr_loading = model_runtime.loading if model_runtime else False
+
+
+def _load_xasr_engine():
+    if model_runtime is None:
         return
-    xasr_loading = True
-    logger.info("Loading configured X-ASR live/final runtimes...")
-    try:
-        runtime_settings = runtime_config_store.load()
-        hotword_settings = hotword_config_store.load()
-        pool = xasr_pool
-        if not isinstance(pool, AsrEnginePool):
-            pool = AsrEnginePool(
-                XASREngine.DEFAULT_MODEL_DIR,
-                base_options={
-                    "enable_logic_validation": True,
-                    "enable_uncertainty": True,
-                    "enable_endpoint_detection": False,
-                    "provider": "cpu",
-                    "num_threads": ASR_INFERENCE_THREADS,
-                },
-            )
-        status = pool.reload(runtime_settings["recognition"], hotword_settings)
-        xasr_pool = pool
-        xasr_engine = pool.live_engine
-        final_xasr_engine = pool.final_engine
-        logger.info(
-            "X-ASR ready: live=%sms final=%sms shared=%s file_vad=%s threads=%s",
-            status["live"]["chunk_ms"],
-            status["final"]["chunk_ms"],
-            status["shared_runtime"],
-            status["file_vad_provider"],
-            status["inference_threads"],
-        )
-    except Exception as e:
-        logger.error(f"X-ASR init failed: {e}")
-        logger.error(traceback.format_exc())
-    finally:
-        xasr_loading = False
-
-
-def _xasr_reload_worker() -> None:
-    """Serialize heavyweight reloads and coalesce saves to the latest config."""
-    global _xasr_reload_pending, _xasr_reload_worker_active
-    while True:
-        with _xasr_reload_lock:
-            if not _xasr_reload_pending:
-                _xasr_reload_worker_active = False
-                return
-            _xasr_reload_pending = False
-        _load_xasr_engine()
+    model_runtime.load()
+    _sync_model_runtime_globals()
 
 
 def _schedule_xasr_reload() -> None:
-    global _xasr_reload_pending, _xasr_reload_worker_active
-    with _xasr_reload_lock:
-        _xasr_reload_pending = True
-        if _xasr_reload_worker_active:
-            return
-        _xasr_reload_worker_active = True
-    threading.Thread(target=_xasr_reload_worker, daemon=True).start()
+    if model_runtime is None:
+        return
+    model_runtime.schedule_reload(_sync_model_runtime_globals)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -276,8 +242,9 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down 会悟 backend...")
     PROCESSING_EXECUTOR.shutdown(wait=False, cancel_futures=True)
-    if xasr_pool is not None:
-        xasr_pool.close()
+    if model_runtime is not None:
+        model_runtime.close()
+    _sync_model_runtime_globals()
 
 app = FastAPI(
     title="会悟 - Smart Meeting Speech Cognitive System",
@@ -297,6 +264,20 @@ app.add_middleware(
 hotword_config_store = HotwordConfigStore(
     HOTWORDS_CONFIG_PATH,
     [],
+)
+model_runtime = ModelRuntimeService(
+    has_xasr=HAS_XASR,
+    model_dir=XASR_MODEL_DIR,
+    runtime_config_store=runtime_config_store,
+    hotword_config_store=hotword_config_store,
+    logger=logger,
+    base_options={
+        "enable_logic_validation": True,
+        "enable_uncertainty": True,
+        "enable_endpoint_detection": False,
+        "provider": "cpu",
+        "num_threads": ASR_INFERENCE_THREADS,
+    },
 )
 
 # ===========================================================================
@@ -324,6 +305,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 upload_sessions: dict = {}
+upload_jobs = UploadJobStore()
 
 # ===========================================================================
 # API Routes
@@ -1175,53 +1157,27 @@ async def api_test_llm_settings(data: dict | None = None, authorization: str | N
         await client.close()
 
 
+def _current_model_status() -> dict:
+    engine_model_dir = getattr(xasr_engine, "model_dir", XASR_MODEL_DIR)
+    vad_model = find_silero_vad_model(engine_model_dir) if HAS_XASR else None
+    return build_xasr_status(
+        has_xasr=HAS_XASR,
+        xasr_engine=xasr_engine,
+        xasr_pool=xasr_pool,
+        xasr_loading=xasr_loading,
+        runtime_settings=runtime_config_store.load(),
+        hotword_settings=hotword_config_store.load(),
+        meeting_pipeline=meeting_pipeline,
+        live_vad_model=vad_model,
+        processing_workers=getattr(PROCESSING_EXECUTOR, "_max_workers", 0),
+        upload_jobs=upload_jobs.counts(),
+    )
+
+
 @app.get("/api/xasr/status")
 async def get_xasr_status():
-    """Get X-ASR engine status with detail."""
-    if not HAS_XASR:
-        return {"available": False, "reason": "X-ASR module not installed", "loading": False}
-    if xasr_engine is None:
-        return {
-            "available": HAS_XASR,
-            "reason": "Loading model..." if xasr_loading else "Engine init failed",
-            "model_available": False,
-            "loading": xasr_loading,
-        }
-
-    vad_model = find_silero_vad_model(xasr_engine.model_dir)
-    runtime_settings = runtime_config_store.load()
-    pool_status = xasr_pool.status() if xasr_pool else {}
-    return {
-        "available": True,
-        "model_available": xasr_engine.is_model_available,
-        "model_dir": xasr_engine.model_dir,
-        "endpoint_detection": xasr_engine.enable_endpoint_detection,
-        "live_vad": {
-            "provider": "sherpa-silero-vad" if vad_model else "asr-endpoint-fallback",
-            "available": vad_model is not None,
-            "model_path": str(vad_model) if vad_model else None,
-            "endpoint_policy": (
-                "silero-vad-with-resume-grace"
-                if vad_model else "sherpa-asr-endpoint-fallback"
-            ),
-            "endpoint_grace_ms": runtime_settings["microphone"]["endpoint_grace_ms"] if vad_model else 0,
-        },
-        "models": pool_status,
-        "file_vad": {
-            "provider": pool_status.get("file_vad_provider", "unavailable"),
-            "threshold": runtime_settings["recognition"]["file_vad_threshold"],
-        },
-        "diarization": meeting_pipeline.status(),
-        "hotwords_count": hotword_config_store.load()["active_count"],
-        "features": {
-            "logic_validation": xasr_engine.enable_logic_validation,
-            "hotword_correction": xasr_engine.enable_hotword_correction,
-            "fuzzy_pinyin": xasr_engine.enable_fuzzy_pinyin,
-            "uncertainty_estimation": xasr_engine.enable_uncertainty,
-            "speaker_diarization": meeting_pipeline.status()["available"],
-        },
-        "loading": xasr_loading,
-    }
+    """Get ASR, model, VAD, diarization, and runtime status details."""
+    return _current_model_status()
 
 
 @app.get("/api/hotwords")
@@ -1231,22 +1187,15 @@ async def get_hotwords():
 
 
 def _apply_hotword_settings(settings: dict) -> None:
-    if not xasr_pool:
-        return
-    xasr_pool.configure_hotwords(settings)
+    if model_runtime is not None:
+        model_runtime.configure_hotwords(settings)
 
 
 def _complete_settings_payload() -> dict:
     return {
         **runtime_config_store.load(),
         "hotwords": hotword_config_store.load(),
-        "models": xasr_pool.status() if xasr_pool else {
-            "available_profiles": [],
-            "live": {},
-            "final": {},
-            "shared_runtime": False,
-            "file_vad_provider": "unavailable",
-        },
+        "models": _current_model_status(),
         "applies_to": "new_sessions",
     }
 
@@ -1295,7 +1244,7 @@ async def replace_hotword_settings(data: dict):
 @app.get("/api/logs/recent")
 async def get_recent_logs(n: int = Query(50, ge=1, le=500)):
     """Get recent log entries (for frontend debug panel)."""
-    return {"logs": get_recent_logs(n), "count": len(log_buffer)}
+    return {"logs": read_recent_logs(n), "count": len(log_buffer)}
 
 
 @app.get("/api/logs/download")
@@ -1513,6 +1462,8 @@ async def upload_audio(
         logger.info(f"Upload: {file.filename} ({file_size_mb:.1f}MB) file_id={file_id[:8]}...")
 
         queue = upload_sessions.get(file_id)
+        job = upload_jobs.create(file_id, filename=file.filename or "audio", source_path=tmp_path)
+        upload_jobs.update(file_id, status="loading", progress=0.05)
 
         if xasr_pool and xasr_engine and xasr_engine.is_model_available:
             processing_engine = xasr_pool.create_final_session()
@@ -1532,29 +1483,28 @@ async def upload_audio(
                 loop = asyncio.get_event_loop()
 
                 def on_segment(result, idx, total):
+                    if job.cancel_event.is_set():
+                        raise RuntimeError("upload_cancelled")
                     seg_data = _result_to_dict_with_audio(result, idx)
-
-                    asyncio.run_coroutine_threadsafe(
-                        queue.put({
-                            "type": "segment",
-                            "data": {
-                                "segment": seg_data,
-                                "segment_index": idx - 1,
-                                "total_estimated": total,
-                                "cumulative_stats": {"segments_processed": idx},
-                            }
-                        }),
-                        loop
-                    )
+                    event = {
+                        "type": "segment",
+                        "data": {
+                            "segment": seg_data,
+                            "segment_index": idx - 1,
+                            "total_estimated": total,
+                            "cumulative_stats": {"segments_processed": idx},
+                        }
+                    }
+                    upload_jobs.publish(file_id, event, loop)
+                    asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
                 def on_progress(stage, fraction):
-                    asyncio.run_coroutine_threadsafe(
-                        queue.put({
-                            "type": "progress",
-                            "data": {"stage": stage, "fraction": fraction}
-                        }),
-                        loop
-                    )
+                    if job.cancel_event.is_set():
+                        raise RuntimeError("upload_cancelled")
+                    upload_jobs.update(file_id, status=stage, progress=fraction)
+                    event = {"type": "progress", "data": {"stage": stage, "fraction": fraction}}
+                    upload_jobs.publish(file_id, event, loop)
+                    asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
                 def do_process():
                     try:
@@ -1577,29 +1527,31 @@ async def upload_audio(
                             segments=final_segments,
                             speakers=run.speakers,
                         )
-                        asyncio.run_coroutine_threadsafe(
-                            queue.put({
-                                "type": "complete",
-                                "data": {
-                                    "file_id": file_id,
-                                    "filename": file.filename,
-                                    "status": "completed",
-                                    "engine": _asr_engine_label(processing_engine),
-                                    "segments_count": len(results),
-                                    "segments": final_segments,
-                                    "speakers": run.speakers,
-                                    "diarization": run.metadata(),
-                                }
-                            }),
-                            loop
-                        )
+                        complete_event = {
+                            "type": "complete",
+                            "data": {
+                                "file_id": file_id,
+                                "filename": file.filename,
+                                "status": "completed",
+                                "engine": _asr_engine_label(processing_engine),
+                                "segments_count": len(results),
+                                "segments": final_segments,
+                                "speakers": run.speakers,
+                                "diarization": run.metadata(),
+                            }
+                        }
+                        upload_jobs.update(file_id, status="complete", progress=1.0, result=complete_event["data"])
+                        upload_jobs.publish(file_id, complete_event, loop)
+                        asyncio.run_coroutine_threadsafe(queue.put(complete_event), loop)
                     except Exception as e:
                         logger.error(f"Processing error: {e}")
                         logger.error(traceback.format_exc())
-                        asyncio.run_coroutine_threadsafe(
-                            queue.put({"type": "error", "data": {"message": str(e)}}),
-                            loop
-                        )
+                        status = "cancelled" if str(e) == "upload_cancelled" else "error"
+                        message = "Upload cancelled" if status == "cancelled" else str(e)
+                        error_event = {"type": "error", "data": {"message": message, "status": status}}
+                        upload_jobs.update(file_id, status=status, error=message)
+                        upload_jobs.publish(file_id, error_event, loop)
+                        asyncio.run_coroutine_threadsafe(queue.put(error_event), loop)
                     finally:
                         logic_validator = getattr(processing_engine, "logic_validator", None)
                         if logic_validator:
@@ -1634,6 +1586,14 @@ async def upload_audio(
                         num_speakers=num_speakers,
                     ),
                 )
+                if job.cancel_event.is_set():
+                    upload_jobs.update(file_id, status="cancelled", error="Upload cancelled")
+                    return {
+                        "file_id": file_id,
+                        "filename": file.filename,
+                        "status": "cancelled",
+                        "error": "Upload cancelled",
+                    }
                 results = run.results
                 segments = []
                 for i, r in enumerate(results):
@@ -1653,7 +1613,7 @@ async def upload_audio(
                     logic_validator.reset()
 
                 logger.info(f"Done: {len(segments)} segments from {file.filename}")
-                return {
+                response_payload = {
                     "file_id": file_id,
                     "filename": file.filename,
                     "status": "completed",
@@ -1663,6 +1623,8 @@ async def upload_audio(
                     "speakers": run.speakers,
                     "diarization": run.metadata(),
                 }
+                upload_jobs.update(file_id, status="complete", progress=1.0, result=response_payload)
+                return response_payload
         else:
             # ── X-ASR unavailable ──────────────────────────────
             try:
@@ -1672,6 +1634,7 @@ async def upload_audio(
 
             error_message = "X-ASR model is not loaded; transcription cannot start"
             logger.warning("%s: %s", error_message, file.filename)
+            upload_jobs.update(file_id, status="error", error=error_message)
             if queue:
                 await queue.put({
                     "type": "complete",
@@ -1692,6 +1655,7 @@ async def upload_audio(
 
     except UploadTooLargeError as e:
         logger.warning("Upload rejected: %s", e)
+        upload_jobs.update(file_id or str(uuid.uuid4()), status="error", error=str(e))
         return {
             "file_id": file_id or str(uuid.uuid4()),
             "filename": file.filename if file else "unknown",
@@ -1706,12 +1670,29 @@ async def upload_audio(
                 pass
         logger.error(f"Upload error: {e}")
         logger.error(traceback.format_exc())
+        upload_jobs.update(file_id or str(uuid.uuid4()), status="error", error=str(e))
         return {
             "file_id": file_id or str(uuid.uuid4()),
             "filename": file.filename if file else "unknown",
             "status": "error",
             "error": str(e),
         }
+
+
+@app.get("/api/audio/upload/{file_id}/status")
+async def get_upload_status(file_id: str):
+    status = upload_jobs.snapshot(file_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="upload job not found")
+    return status
+
+
+@app.post("/api/audio/upload/{file_id}/cancel")
+async def cancel_upload(file_id: str):
+    job = upload_jobs.cancel(file_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="upload job not found")
+    return job.snapshot()
 
 
 @app.get("/api/meetings/{meeting_id}")
@@ -2033,7 +2014,7 @@ async def ws_live(websocket: WebSocket):
 async def ws_upload_progress(websocket: WebSocket, file_id: str):
     """Real-time upload progress via WebSocket."""
     await websocket.accept()
-    queue = asyncio.Queue()
+    queue = upload_jobs.subscribe(file_id)
     upload_sessions[file_id] = queue
     logger.info(f"Upload WS connected: {file_id[:8]}...")
 
@@ -2069,6 +2050,7 @@ async def ws_upload_progress(websocket: WebSocket, file_id: str):
             pass
     finally:
         upload_sessions.pop(file_id, None)
+        upload_jobs.unsubscribe(file_id, queue)
 
 
 @app.websocket("/ws/logs")
@@ -2081,7 +2063,7 @@ async def ws_logs(websocket: WebSocket):
     logger.info("Log streaming WS connected")
     try:
         while True:
-            logs = get_recent_logs(50)
+            logs = read_recent_logs(50)
             await websocket.send_json({"type": "logs", "data": logs})
             try:
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=2)

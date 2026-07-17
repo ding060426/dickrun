@@ -26,7 +26,7 @@ const settings = normalizeAppSettings({
 });
 
 assert.equal(settings.recognition.live_asr_profile, 'quality');
-assert.equal(settings.recognition.final_asr_profile, 'meeting');
+assert.equal(settings.recognition.final_asr_profile, 'low-latency');
 assert.equal(settings.recognition.asr_provider, 'qwen3');
 assert.equal(settings.recognition.qwen3_model_path, 'Qwen/Qwen3-ASR-0.6B');
 assert.equal(settings.recognition.qwen3_device, 'cuda:0');

@@ -12,14 +12,14 @@ from xasr.runtime_config import RuntimeConfigStore
 
 
 class RuntimeConfigStoreTests(unittest.TestCase):
-    def test_defaults_use_local_960ms_models_and_silero_file_segmentation(self):
+    def test_defaults_use_local_160ms_models_and_silero_file_segmentation(self):
         with tempfile.TemporaryDirectory() as root:
             settings = RuntimeConfigStore(Path(root) / "settings.json").load()
 
-        self.assertEqual(settings["recognition"]["live_asr_profile"], "meeting")
-        self.assertEqual(settings["recognition"]["final_asr_profile"], "meeting")
+        self.assertEqual(settings["recognition"]["live_asr_profile"], "low-latency")
+        self.assertEqual(settings["recognition"]["final_asr_profile"], "low-latency")
         self.assertEqual(settings["recognition"]["asr_provider"], "xasr")
-        self.assertEqual(settings["recognition"]["qwen3_model_path"], "")
+        self.assertTrue(settings["recognition"]["qwen3_model_path"].endswith("models/qwen3") or settings["recognition"]["qwen3_model_path"].endswith("models\\qwen3"))
         self.assertEqual(settings["recognition"]["qwen3_device"], "auto")
         self.assertEqual(settings["recognition"]["qwen3_dtype"], "auto")
         self.assertEqual(settings["recognition"]["file_vad_provider"], "silero")
@@ -49,7 +49,7 @@ class RuntimeConfigStoreTests(unittest.TestCase):
 
         self.assertEqual(settings, reloaded)
         self.assertEqual(settings["recognition"]["live_asr_profile"], "quality")
-        self.assertEqual(settings["recognition"]["final_asr_profile"], "meeting")
+        self.assertEqual(settings["recognition"]["final_asr_profile"], "low-latency")
         self.assertEqual(settings["recognition"]["asr_provider"], "qwen3")
         self.assertEqual(settings["recognition"]["qwen3_model_path"], "Qwen/Qwen3-ASR-0.6B")
         self.assertEqual(settings["recognition"]["qwen3_device"], "cuda:0")
